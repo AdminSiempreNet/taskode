@@ -196,6 +196,7 @@ a:focus-visible {
 }
 .sidebar-edge {
   --sidebar-edge-color: #0d9269;
+  --sidebar-toggle-top: 33px;
   position: absolute;
   top: 0;
   bottom: 0;
@@ -229,7 +230,7 @@ a:focus-visible {
 }
 .sidebar-edge-toggle[data-slot="button"] {
   position: absolute;
-  top: 50%;
+  top: var(--sidebar-toggle-top);
   left: 50%;
   transform: translate(-50%, -50%);
   width: 24px;
@@ -291,7 +292,7 @@ a:focus-visible {
 }
 .sidebar-edge-collapsed .sidebar-edge-toggle-icon {
   position: absolute;
-  top: 50%;
+  top: var(--sidebar-toggle-top);
   left: 0;
   transform: translateY(-50%);
   border-radius: 0 6px 6px 0;
