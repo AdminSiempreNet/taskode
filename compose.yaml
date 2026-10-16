@@ -1,0 +1,13 @@
+services:
+  brote:
+    build: .
+    ports:
+      - "5010:5010"
+    environment:
+      DATABASE_PATH: /app/data/brote.sqlite
+      SEED_DEMO: ${SEED_DEMO:-1}
+    volumes:
+      - brote-data:/app/data
+    restart: unless-stopped
+volumes:
+  brote-data:

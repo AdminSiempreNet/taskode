@@ -1,0 +1,763 @@
+"use client";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  Archive,
+  ArrowLeft,
+  DatabaseBackup,
+  ArrowUpRight,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  CircleHelp,
+  Layers3,
+  LayoutGrid,
+  List,
+  Loader2,
+  MoreHorizontal,
+  Menu,
+  Pencil,
+  Plus,
+  Search,
+  Settings2,
+  Sprout,
+  Upload,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ProjectSelector } from "./project-selector";
+import { FeatureSidebar } from "./feature-sidebar";
+import { ResizableSidebar } from "./resizable-sidebar";
+import { Board, Empty, ListView } from "./views";
+import { CalendarView } from "./calendar-view";
+import {
+  Confirm,
+  WorkspaceModal,
+  type Confirmation,
+  type Modal,
+  type MutationResult,
+} from "./forms";
+import type { Workspace, Task } from "@/lib/types";
+import { getProjectView, projectPath, taskPath } from "@/lib/routes";
+import { ProjectCatalog } from "./project-catalog";
+import { SettingsModal } from "./settings-modal";
+import { BackupModal } from "./backup-modal";
+import { TaskDetail, type TaskDefaults } from "./task-detail";
+import { StatusFilter } from "./status-filter";
+
+export function WorkspaceApp({
+  initialWorkspace,
+  projectId = "",
+  taskId = "",
+  taskDefaults,
+  initialTaskCreation,
+}: {
+  initialWorkspace: Workspace;
+  projectId?: string;
+  taskId?: string;
+  taskDefaults?: TaskDefaults;
+  initialTaskCreation?: TaskDefaults;
+}) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const view = getProjectView(searchParams.get("view"));
+  const [workspace, setWorkspace] = useState<Workspace | null>(
+    initialWorkspace,
+  );
+  const [featureId, setFeatureId] = useState("all");
+  const [search, setSearch] = useState("");
+  const [statusSelection, setStatusSelection] = useState({
+    projectId,
+    ids: [] as string[],
+  });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const sidebarTrigger = useRef<HTMLButtonElement>(null);
+  const desktopSidebarTrigger = useRef<HTMLButtonElement>(null);
+  const [archived, setArchived] = useState(false);
+  const [modal, setModal] = useState<Modal | null>(
+    initialTaskCreation
+      ? { type: "task", defaults: initialTaskCreation }
+      : null,
+  );
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
+  const [busy, setBusy] = useState(false);
+  const mutating = useRef(false);
+  const openingMenuDialog = useRef(false);
+  const [loadError, setLoadError] = useState("");
+  const [backupOpen, setBackupOpen] = useState(false);
+  const selectProject = useCallback(
+    (id: string) => {
+      setMobileSidebarOpen(false);
+      router.push(projectPath(id), { scroll: false });
+    },
+    [router],
+  );
+  const load = useCallback(async () => {
+    setLoadError("");
+    try {
+      const r = await fetch("/api/workspace", { cache: "no-store" });
+      if (!r.ok) throw new Error("No se pudo cargar tu espacio.");
+      const w: Workspace = await r.json();
+      setWorkspace(w);
+      if (!w.projects.some((project) => project.id === projectId)) {
+        const destination = w.projects[0] ? projectPath(w.projects[0].id) : "/";
+        if (projectId || w.projects.length)
+          router.replace(destination, { scroll: false });
+      }
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Error de conexión.");
+    }
+  }, [projectId, router]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+  useEffect(() => {
+    let ids: string[] = [];
+    try {
+      const saved: unknown = JSON.parse(
+        localStorage.getItem(`brote.status-filter.${projectId}`) ?? "[]",
+      );
+      if (Array.isArray(saved) && saved.every((id) => typeof id === "string"))
+        ids = saved;
+    } catch {
+      // Invalid or unavailable storage falls back to showing all statuses.
+    }
+    setStatusSelection({ projectId, ids });
+  }, [projectId]);
+  function setStatusIds(ids: string[]) {
+    setStatusSelection({ projectId, ids });
+    try {
+      localStorage.setItem(
+        `brote.status-filter.${projectId}`,
+        JSON.stringify(ids),
+      );
+    } catch {
+      // Filtering also works when browser storage is unavailable.
+    }
+  }
+  useEffect(() => {
+    try {
+      setSidebarCollapsed(
+        localStorage.getItem("brote.sidebar-collapsed") === "true",
+      );
+    } catch {
+      // The sidebar also works when browser storage is unavailable.
+    }
+  }, []);
+  useEffect(() => {
+    if (modal || settingsOpen || backupOpen) setMobileSidebarOpen(false);
+  }, [modal, settingsOpen, backupOpen]);
+  function toggleSidebar() {
+    const collapsed = !sidebarCollapsed;
+    setSidebarCollapsed(collapsed);
+    window.requestAnimationFrame(() => desktopSidebarTrigger.current?.focus());
+    try {
+      localStorage.setItem("brote.sidebar-collapsed", String(collapsed));
+    } catch {
+      // Keep the current preference for this session.
+    }
+  }
+  const mutate = useCallback(
+    async (command: unknown): Promise<MutationResult | null> => {
+      if (mutating.current) return null;
+      mutating.current = true;
+      setBusy(true);
+      try {
+        const r = await fetch("/api/workspace", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(command),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || "No se pudo guardar.");
+        setWorkspace(data.workspace);
+        const w = data.workspace as Workspace;
+        if (
+          projectId &&
+          !w.projects.some((project) => project.id === projectId)
+        ) {
+          router.replace(w.projects[0] ? projectPath(w.projects[0].id) : "/", {
+            scroll: false,
+          });
+        }
+        setFeatureId((current) =>
+          current === "all" || w.features.some((f) => f.id === current)
+            ? current
+            : "all",
+        );
+        return data;
+      } catch (e) {
+        toast.error(
+          e instanceof Error
+            ? e.message
+            : "No se pudo guardar. Comprueba tu conexión.",
+        );
+        return null;
+      } finally {
+        mutating.current = false;
+        setBusy(false);
+      }
+    },
+    [projectId, router],
+  );
+  const project = workspace?.projects.find((p) => p.id === projectId);
+  const selectedTask = workspace?.tasks.find(
+    (task) => task.id === taskId && task.projectId === projectId,
+  );
+  const showTaskDetail = !!taskId && (taskId === "new" || !!selectedTask);
+  const features =
+    workspace?.features.filter((f) => f.projectId === projectId) ?? [];
+  const statuses =
+    workspace?.statuses.filter((s) => s.projectId === projectId) ?? [];
+  const statusIds =
+    statusSelection.projectId === projectId ? statusSelection.ids : [];
+  const selectedStatusIds = statusIds.filter((id) =>
+    statuses.some((status) => status.id === id),
+  );
+  const allTasks =
+    workspace?.tasks.filter((t) => t.projectId === projectId) ?? [];
+  const active = allTasks.filter((t) => !t.archived);
+  const tasks = allTasks.filter(
+    (t) =>
+      t.archived === archived &&
+      (featureId === "all" || t.featureId === featureId) &&
+      (!selectedStatusIds.length || selectedStatusIds.includes(t.statusId)) &&
+      (!search ||
+        `${t.title} ${t.description} ${t.labels.join(" ")}`
+          .toLocaleLowerCase("es")
+          .includes(search.toLocaleLowerCase("es"))),
+  );
+  const selectedFeature = features.find((f) => f.id === featureId);
+  const openTask = (t: Task) => router.push(taskPath(projectId, t.id, view));
+  const openMenuDialog = (nextModal: Modal) => {
+    openingMenuDialog.current = true;
+    setModal(nextModal);
+  };
+  const addTask = (
+    statusId?: string,
+    startDate?: string,
+    startTime?: string,
+  ) => {
+    if (!features.length) {
+      setModal({ type: "feature" });
+      toast.info("Crea una feature para agrupar tus tareas.");
+      return;
+    }
+    setModal({
+      type: "task",
+      defaults: {
+        featureId: featureId !== "all" ? featureId : undefined,
+        statusId,
+        startDate,
+        startTime,
+      },
+    });
+  };
+  const desktopSidebarControl = (
+    <Button
+      className="sidebar-desktop-toggle sidebar-edge-toggle"
+      variant="ghost"
+      size="icon"
+      ref={desktopSidebarTrigger}
+      aria-label={
+        sidebarCollapsed ? "Expandir barra lateral" : "Contraer barra lateral"
+      }
+      title={
+        sidebarCollapsed ? "Expandir barra lateral" : "Contraer barra lateral"
+      }
+      aria-expanded={!sidebarCollapsed}
+      aria-controls="workspace-sidebar"
+      onClick={toggleSidebar}
+    >
+      <span className="sidebar-edge-toggle-icon" aria-hidden="true">
+        {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+      </span>
+    </Button>
+  );
+  const sidebarControls = (
+    <Button
+      className="sidebar-mobile-toggle"
+      variant="outline"
+      size="icon"
+      ref={sidebarTrigger}
+      aria-label="Abrir barra lateral"
+      title="Abrir barra lateral"
+      aria-expanded={mobileSidebarOpen}
+      aria-controls="workspace-sidebar"
+      aria-haspopup="dialog"
+      onClick={() => setMobileSidebarOpen(true)}
+    >
+      <Menu size={18} />
+    </Button>
+  );
+  return (
+    <ProjectCatalog.Provider
+      value={{
+        priorities:
+          workspace?.priorities.filter((p) => p.projectId === projectId) ?? [],
+        labels:
+          workspace?.labels.filter((l) => l.projectId === projectId) ?? [],
+      }}
+    >
+      <div className="app-shell" data-sidebar-collapsed={sidebarCollapsed}>
+        <ResizableSidebar
+          collapsed={sidebarCollapsed}
+          edgeControl={desktopSidebarControl}
+          mobileOpen={mobileSidebarOpen}
+          onMobileOpenChange={setMobileSidebarOpen}
+          triggerRef={sidebarTrigger}
+        >
+          <ProjectSelector
+            projects={workspace?.projects ?? []}
+            project={project}
+            loading={!workspace}
+            disabled={busy}
+            onSelect={selectProject}
+            onCreate={() => setModal({ type: "project" })}
+          />
+          <div className="sidebar-panel">
+            <FeatureSidebar
+              key={projectId}
+              projectId={project?.id}
+              features={features}
+              modules={
+                workspace?.modules.filter(
+                  (module) => module.projectId === projectId,
+                ) ?? []
+              }
+              selectedId={featureId}
+              counts={Object.fromEntries(
+                features.map((feature) => [
+                  feature.id,
+                  active.filter((task) => task.featureId === feature.id).length,
+                ]),
+              )}
+              busy={busy}
+              select={(id) => {
+                setFeatureId(id);
+                setMobileSidebarOpen(false);
+                if (taskId) router.push(projectPath(projectId, view));
+              }}
+              create={() => setModal({ type: "feature" })}
+              createModule={() => setModal({ type: "module" })}
+              edit={(feature) => setModal({ type: "feature", feature })}
+              editModule={(module) => setModal({ type: "module", module })}
+              mutate={mutate}
+            />
+            <div className="sidebar-bottom">
+              <button
+                className="nav-item"
+                aria-label="Importar Trello"
+                title="Importar Trello"
+                onClick={() => setModal({ type: "import" })}
+                disabled={busy}
+              >
+                <Upload size={17} />
+                <span>Importar Trello</span>
+                <ArrowUpRight size={14} />
+              </button>
+              <button
+                className="nav-item"
+                aria-label="Respaldo"
+                title="Respaldo"
+                onClick={() => setBackupOpen(true)}
+                disabled={busy}
+              >
+                <DatabaseBackup size={17} />
+                <span>Respaldo</span>
+              </button>
+              <div className="sidebar-footer">
+                <button
+                  type="button"
+                  className="nav-item"
+                  disabled={busy}
+                  aria-label="Configuración"
+                  title="Configuración"
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  <Settings2 size={17} />
+                  <span>Configuración</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </ResizableSidebar>
+        <div className="main-shell">
+          {(loadError ||
+            !workspace ||
+            !project ||
+            (taskId && !showTaskDetail)) && (
+            <div className="workspace-navigation">{sidebarControls}</div>
+          )}
+          <main id="workspace-main">
+            <span className="sr-only" role="status">
+              {busy ? "Guardando cambios…" : "Todos los cambios guardados"}
+            </span>
+            {loadError ? (
+              <Empty
+                icon={<CircleHelp />}
+                title="No pudimos abrir tu espacio"
+                description={loadError}
+                action={<Button onClick={load}>Volver a intentar</Button>}
+              />
+            ) : !workspace ? (
+              <div className="loading-state">
+                <Loader2 className="animate-spin" />
+                <span>Preparando tu espacio…</span>
+              </div>
+            ) : !project ? (
+              <Empty
+                icon={<Sprout />}
+                title="Todo empieza con una idea"
+                description="Crea tu primer proyecto o trae tus tareas desde Trello. Tu próximo logro empieza aquí."
+                action={
+                  <>
+                    <Button onClick={() => setModal({ type: "project" })}>
+                      <Plus />
+                      Crear proyecto
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setModal({ type: "import" })}
+                    >
+                      <Upload />
+                      Importar Trello
+                    </Button>
+                  </>
+                }
+              />
+            ) : taskId ? (
+              showTaskDetail ? (
+                <TaskDetail
+                  key={taskId}
+                  task={selectedTask}
+                  sidebarControls={sidebarControls}
+                  project={project}
+                  workspace={workspace}
+                  defaults={taskDefaults}
+                  mutate={mutate}
+                  busy={busy}
+                  confirm={setConfirmation}
+                />
+              ) : (
+                <Empty
+                  icon={<CircleHelp />}
+                  title="Tarea no encontrada"
+                  description="Esta tarea ya no existe en este proyecto."
+                  action={
+                    <Button
+                      onClick={() => router.push(projectPath(projectId, view))}
+                    >
+                      Volver al proyecto
+                    </Button>
+                  }
+                />
+              )
+            ) : (
+              <>
+                <h1 className="sr-only">{project.name}</h1>
+                <div className="view-toolbar">
+                  <div className="view-navigation">
+                    {sidebarControls}
+                    <div
+                      className="view-tabs"
+                      role="tablist"
+                      aria-label="Vistas del proyecto"
+                    >
+                      {(
+                        [
+                          { id: "board", label: "Tablero", icon: LayoutGrid },
+                          { id: "list", label: "Lista", icon: List },
+                          {
+                            id: "calendar",
+                            label: "Calendario",
+                            icon: CalendarDays,
+                          },
+                        ] as const
+                      ).map((v) => (
+                        <button
+                          key={v.id}
+                          role="tab"
+                          aria-selected={view === v.id}
+                          className={view === v.id ? "active-view" : ""}
+                          onClick={() => {
+                            const url = new URL(window.location.href);
+                            if (v.id === "board")
+                              url.searchParams.delete("view");
+                            else url.searchParams.set("view", v.id);
+                            window.history.replaceState(null, "", url);
+                          }}
+                        >
+                          <v.icon size={16} />
+                          {v.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="view-tools">
+                    <div className="search-field">
+                      <Search size={15} />
+                      <Input
+                        aria-label="Buscar tareas"
+                        placeholder="Buscar tareas…"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                      />
+                      {search && (
+                        <button
+                          aria-label="Limpiar búsqueda"
+                          onClick={() => setSearch("")}
+                        >
+                          <X size={13} />
+                        </button>
+                      )}
+                    </div>
+                    <StatusFilter
+                      statuses={statuses}
+                      selectedIds={selectedStatusIds}
+                      onChange={setStatusIds}
+                    />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          disabled={busy}
+                          aria-label="Opciones del proyecto"
+                          title="Opciones del proyecto"
+                        >
+                          <MoreHorizontal />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        className="project-actions-menu"
+                        onCloseAutoFocus={(event) => {
+                          if (openingMenuDialog.current) {
+                            event.preventDefault();
+                            openingMenuDialog.current = false;
+                          }
+                        }}
+                      >
+                        <DropdownMenuLabel className="project-menu-heading">
+                          <strong>
+                            {project.icon} {project.name}
+                          </strong>
+                          {project.description && (
+                            <span>{project.description}</span>
+                          )}
+                        </DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onSelect={() =>
+                            openMenuDialog({ type: "project", project })
+                          }
+                        >
+                          <Pencil />
+                          Editar proyecto
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            setArchived(!archived);
+                            setSearch("");
+                          }}
+                        >
+                          <Archive />
+                          {archived
+                            ? "Volver a las tareas"
+                            : "Tareas archivadas"}
+                          <span className="menu-count">
+                            {allTasks.filter((t) => t.archived).length}
+                          </span>
+                        </DropdownMenuItem>
+                        {selectedFeature && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onSelect={() =>
+                                openMenuDialog({
+                                  type: "feature",
+                                  feature: selectedFeature,
+                                })
+                              }
+                            >
+                              <Pencil />
+                              Editar feature
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+                {(archived ||
+                  selectedFeature ||
+                  search ||
+                  selectedStatusIds.length > 0) && (
+                  <div className="content-context">
+                    <div>
+                      <h2>
+                        {archived
+                          ? "Tareas archivadas"
+                          : (selectedFeature?.name ?? "Todas las features")}
+                      </h2>
+                      <span>
+                        {tasks.length} {tasks.length === 1 ? "tarea" : "tareas"}
+                        {selectedFeature?.description
+                          ? ` · ${selectedFeature.description}`
+                          : ""}
+                      </span>
+                      {(search || selectedStatusIds.length > 0) && (
+                        <button
+                          className="clear-filters"
+                          onClick={() => {
+                            setSearch("");
+                            setStatusIds([]);
+                          }}
+                        >
+                          Limpiar filtros
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="context-actions">
+                      {selectedFeature && (
+                        <button
+                          className="context-button"
+                          onClick={() =>
+                            setModal({
+                              type: "feature",
+                              feature: selectedFeature,
+                            })
+                          }
+                        >
+                          <MoreHorizontal size={14} />
+                          Editar feature
+                        </button>
+                      )}
+                      {archived && (
+                        <button
+                          className="context-button"
+                          onClick={() => setArchived(false)}
+                        >
+                          <ArrowLeft size={14} />
+                          Volver a las tareas
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+                <div className="view-content" data-view={view}>
+                  {view === "board" ? (
+                    !features.length ? (
+                      <Empty
+                        icon={<Layers3 />}
+                        title="Dale forma a tu proyecto"
+                        description="Crea una feature para agrupar tus primeras tareas."
+                        action={
+                          <Button onClick={() => setModal({ type: "feature" })}>
+                            <Plus />
+                            Crear feature
+                          </Button>
+                        }
+                      />
+                    ) : (
+                      <Board
+                        tasks={tasks}
+                        statuses={statuses.filter(
+                          (s) =>
+                            !selectedStatusIds.length ||
+                            selectedStatusIds.includes(s.id),
+                        )}
+                        features={features}
+                        open={openTask}
+                        add={(status) => addTask(status)}
+                        mutate={mutate}
+                        busy={busy}
+                        archived={archived}
+                      />
+                    )
+                  ) : view === "list" ? (
+                    <ListView
+                      tasks={tasks}
+                      features={features.filter(
+                        (f) => featureId === "all" || f.id === featureId,
+                      )}
+                      statuses={statuses}
+                      open={openTask}
+                      add={() => addTask()}
+                      archived={archived}
+                    />
+                  ) : (
+                    <CalendarView
+                      tasks={tasks}
+                      statuses={statuses}
+                      open={openTask}
+                      add={(date, time) => addTask(undefined, date, time)}
+                      archived={archived}
+                      busy={busy}
+                    />
+                  )}
+                </div>
+              </>
+            )}
+          </main>
+        </div>
+        {modal && workspace && (
+          <WorkspaceModal
+            key={
+              modal.type +
+              ("feature" in modal
+                ? (modal.feature?.id ?? "new")
+                : "module" in modal
+                  ? (modal.module?.id ?? "new")
+                  : "project" in modal
+                    ? (modal.project?.id ?? "new")
+                    : "")
+            }
+            modal={modal}
+            close={() => {
+              setModal(null);
+              if (initialTaskCreation)
+                router.replace(projectPath(projectId, view));
+            }}
+            project={project}
+            workspace={workspace}
+            mutate={mutate}
+            busy={busy}
+            confirm={setConfirmation}
+            selectProject={selectProject}
+          />
+        )}
+        {settingsOpen && workspace && (
+          <SettingsModal
+            project={project}
+            workspace={workspace}
+            mutate={mutate}
+            busy={busy}
+            close={() => setSettingsOpen(false)}
+            confirm={setConfirmation}
+          />
+        )}
+        {backupOpen && <BackupModal close={() => setBackupOpen(false)} />}
+        <Confirm
+          value={confirmation}
+          close={() => setConfirmation(null)}
+          busy={busy}
+        />
+      </div>
+    </ProjectCatalog.Provider>
+  );
+}
