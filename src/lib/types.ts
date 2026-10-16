@@ -40,6 +40,7 @@ export interface TaskStatusChange {
 }
 export interface Project {
   id: string;
+  ownerId: string;
   name: string;
   description: string;
   icon: string;
@@ -93,6 +94,8 @@ export interface Task {
   statusHistory: TaskStatusChange[];
 }
 export interface Workspace {
+  currentUser: CurrentUser;
+  onboarding: { step: number; firstProjectId: string | null };
   projects: Project[];
   modules: ProjectModule[];
   features: Feature[];
@@ -100,6 +103,18 @@ export interface Workspace {
   tasks: Task[];
   priorities: ProjectPriority[];
   labels: ProjectLabel[];
+}
+export interface Actor {
+  id: string;
+}
+export interface CurrentUser {
+  id: string;
+  name: string;
+  email: string;
+  image: string | null;
+  role: "admin" | "member";
+  createdAt: string;
+  providers: string[];
 }
 export interface ImportReport {
   imported: number;

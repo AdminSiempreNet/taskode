@@ -293,7 +293,7 @@ export function WorkspaceModal({
         )}
         {modal.type === "import" && (
           <ImportForm
-            project={project}
+            project={project && (workspace.currentUser.role === "admin" || project.ownerId === workspace.currentUser.id) ? project : undefined}
             mutate={mutate}
             busy={busy}
             close={close}

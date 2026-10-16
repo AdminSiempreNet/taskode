@@ -1,0 +1,458 @@
+.auth-shell,
+.onboarding-shell {
+  min-height: 100dvh;
+  background: var(--muted);
+  padding: 40px 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.auth-card,
+.onboarding-card {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 36px;
+  box-shadow: 0 8px 30px #00000005;
+}
+.auth-card {
+  max-width: 420px;
+  text-align: center;
+}
+.auth-card h1,
+.onboarding-card h1 {
+  font-size: 25px;
+  font-weight: 650;
+  letter-spacing: -0.6px;
+  margin: 24px 0 12px;
+}
+.auth-card p,
+.onboarding-card > p {
+  color: var(--muted-foreground);
+  line-height: 1.6;
+  margin: 0 0 24px;
+}
+.auth-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: #07835e;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+.dark .auth-brand {
+  color: #72c5a7;
+}
+.auth-providers {
+  display: grid;
+  gap: 12px;
+}
+.auth-providers > button {
+  height: 44px;
+  justify-content: center;
+}
+.provider-symbol {
+  display: inline-flex;
+  width: 20px;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 650;
+}
+.auth-card .auth-note {
+  font-size: 12px;
+  margin: 22px 0 0;
+}
+.form-error {
+  color: var(--destructive) !important;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 12px 0 !important;
+}
+.muted {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+}
+.onboarding-shell {
+  align-items: flex-start;
+}
+.onboarding-container {
+  width: 100%;
+  max-width: 720px;
+}
+.onboarding-steps {
+  list-style: none;
+  display: flex;
+  gap: 24px;
+  padding: 0;
+  margin: 28px 0;
+  justify-content: center;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.onboarding-steps li {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.onboarding-steps li > span {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  width: 27px;
+  height: 27px;
+}
+.onboarding-steps li[aria-current] {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.onboarding-steps li[aria-current] > span {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+.onboarding-card h1 {
+  margin-top: 0;
+}
+.onboarding-card .form-stack {
+  gap: 12px;
+}
+.onboarding-properties {
+  display: flex;
+  gap: 16px;
+}
+.onboarding-properties > label {
+  display: grid;
+  gap: 7px;
+  max-width: 130px;
+}
+.onboarding-properties input[type="color"] {
+  padding: 4px;
+  width: 90px;
+}
+.demo-option {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 14px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 6px 0;
+}
+.demo-option input {
+  margin-top: 4px;
+  accent-color: var(--primary);
+}
+.demo-option span {
+  display: grid;
+  gap: 4px;
+}
+.demo-option small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.onboarding-finish {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border);
+  margin-top: 24px;
+  padding-top: 20px;
+}
+.account-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 8px;
+  text-align: left;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+}
+.account-trigger:hover,
+.account-trigger[data-state="open"] {
+  background: var(--accent);
+}
+.account-trigger-text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.account-trigger-text strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.account-trigger-text small {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.account-trigger-text > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 33px;
+  height: 33px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 12px;
+  overflow: hidden;
+}
+.account-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.account-dropdown {
+  min-width: 240px;
+}
+.account-dropdown [data-slot="dropdown-menu-item"] {
+  gap: 10px;
+  padding: 9px;
+}
+.sidebar-bottom {
+  padding-bottom: 8px;
+}
+.profile-dialog {
+  max-width: 460px !important;
+}
+.profile-heading {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 8px 0;
+}
+.profile-heading .account-avatar {
+  width: 58px;
+  height: 58px;
+  font-size: 20px;
+}
+.profile-heading strong {
+  font-size: 18px;
+}
+.profile-heading p {
+  margin: 5px 0;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.profile-data {
+  display: grid;
+  grid-template-columns: 130px 1fr;
+  gap: 12px;
+  padding: 18px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin: 0;
+}
+.profile-data dt {
+  color: var(--muted-foreground);
+}
+.profile-data dd {
+  margin: 0;
+}
+.profile-links {
+  display: grid;
+  gap: 12px;
+}
+.profile-links a {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--primary);
+  font-size: 13px;
+}
+.profile-links a:hover {
+  text-decoration: underline;
+}
+.people-dialog {
+  max-width: 680px !important;
+  max-height: 88dvh;
+  display: flex !important;
+  flex-direction: column;
+  gap: 12px !important;
+}
+.people-dialog > [data-slot="dialog-title"] {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+.people-scroll {
+  min-height: 0;
+  overflow: auto;
+  padding: 0 4px 4px;
+}
+.people-scroll h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 16px 0 12px;
+}
+.people-list {
+  display: grid;
+  gap: 8px;
+}
+.people-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 10px 12px;
+}
+.people-list > div > span:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+.people-list small {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.role-badge {
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+.ownership-control {
+  padding: 14px;
+  background: var(--muted);
+  border-radius: 8px;
+}
+.ownership-control > label {
+  display: block;
+  margin-bottom: 8px;
+}
+.ownership-control .muted {
+  margin-bottom: 0;
+}
+.invite-input-row {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+.invite-input-row > *:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.invite-input-row select {
+  border: 1px solid var(--input);
+  background: var(--background);
+  color: var(--foreground);
+  border-radius: 6px;
+  height: 36px;
+  padding: 0 8px;
+  max-width: 100%;
+}
+.invite-projects {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 7px;
+}
+.invite-projects legend {
+  padding: 0 0 9px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.invite-projects label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.invite-projects input {
+  accent-color: var(--primary);
+}
+.invitation-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+.invitation-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}
+.invitation-row > div:first-child {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.invitation-row strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.invitation-row small {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.invite-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.invite-link {
+  flex-basis: 100%;
+  font-size: 11px !important;
+  color: var(--muted-foreground);
+  height: 30px !important;
+}
+@media (max-width: 600px) {
+  .auth-shell,
+  .onboarding-shell {
+    padding: 24px 14px;
+  }
+  .auth-card,
+  .onboarding-card {
+    padding: 24px 20px;
+  }
+  .onboarding-steps {
+    gap: 16px;
+    font-size: 12px;
+  }
+  .onboarding-steps li {
+    gap: 6px;
+  }
+  .auth-card h1,
+  .onboarding-card h1 {
+    font-size: 22px;
+  }
+  .invite-input-row {
+    flex-wrap: wrap;
+  }
+  .invite-input-row > *:first-child {
+    flex-basis: 180px;
+  }
+  .people-dialog {
+    max-height: 90dvh;
+    padding: 20px !important;
+  }
+  .profile-data {
+    grid-template-columns: 110px 1fr;
+  }
+  .invitation-row {
+    gap: 12px;
+  }
+  .account-trigger {
+    padding: 10px;
+  }
+}

@@ -1,9 +1,10 @@
+import { adminRoute } from "@/server/access";
 import { backups } from "@/server";
 import { assertBackupOrigin, backupError } from "@/server/backup-http";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ id: string }> };
-export async function GET(_request: Request, context: Context) {
+async function handleGET(_request: Request, context: Context) {
   try {
     const { id } = await context.params;
     const bytes = await backups().download(id);
@@ -19,7 +20,7 @@ export async function GET(_request: Request, context: Context) {
     return backupError(error);
   }
 }
-export async function DELETE(request: Request, context: Context) {
+async function handleDELETE(request: Request, context: Context) {
   try {
     assertBackupOrigin(request);
     await backups().delete((await context.params).id);
@@ -28,3 +29,7 @@ export async function DELETE(request: Request, context: Context) {
     return backupError(error);
   }
 }
+
+export const GET = adminRoute(handleGET);
+
+export const DELETE = adminRoute(handleDELETE);

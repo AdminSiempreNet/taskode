@@ -1,3 +1,4 @@
+import { adminRoute } from "@/server/access";
 import { backups } from "@/server";
 import {
   assertBackupOrigin,
@@ -7,7 +8,7 @@ import {
 import { DomainError } from "@/server/repository";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   try {
     assertBackupOrigin(request);
     const form = await restoreForm(request);
@@ -41,3 +42,5 @@ export async function POST(request: Request) {
     return backupError(error);
   }
 }
+
+export const POST = adminRoute(handlePOST);

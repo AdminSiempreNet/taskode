@@ -22,6 +22,7 @@ import {
   Settings2,
   Sprout,
   Upload,
+  Users,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -53,6 +54,9 @@ import { ProjectCatalog } from "./project-catalog";
 import { SettingsModal } from "./settings-modal";
 import { BackupModal } from "./backup-modal";
 import { TaskDetail, type TaskDefaults } from "./task-detail";
+import { AccountMenu, ProfileModal } from "./account-menu";
+import { UsersModal } from "./invitation-manager";
+import { ProjectPeopleModal } from "./project-people";
 import { StatusFilter } from "./status-filter";
 
 export function WorkspaceApp({
@@ -97,6 +101,9 @@ export function WorkspaceApp({
   const openingMenuDialog = useRef(false);
   const [loadError, setLoadError] = useState("");
   const [backupOpen, setBackupOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [usersOpen, setUsersOpen] = useState(false);
+  const [peopleOpen, setPeopleOpen] = useState(false);
   const selectProject = useCallback(
     (id: string) => {
       setMobileSidebarOpen(false);
@@ -108,6 +115,10 @@ export function WorkspaceApp({
     setLoadError("");
     try {
       const r = await fetch("/api/workspace", { cache: "no-store" });
+      if (r.status === 401) {
+        window.location.assign("/login");
+        return;
+      }
       if (!r.ok) throw new Error("No se pudo cargar tu espacio.");
       const w: Workspace = await r.json();
       setWorkspace(w);
@@ -157,8 +168,16 @@ export function WorkspaceApp({
     }
   }, []);
   useEffect(() => {
-    if (modal || settingsOpen || backupOpen) setMobileSidebarOpen(false);
-  }, [modal, settingsOpen, backupOpen]);
+    if (
+      modal ||
+      settingsOpen ||
+      backupOpen ||
+      profileOpen ||
+      usersOpen ||
+      peopleOpen
+    )
+      setMobileSidebarOpen(false);
+  }, [modal, settingsOpen, backupOpen, profileOpen, usersOpen, peopleOpen]);
   function toggleSidebar() {
     const collapsed = !sidebarCollapsed;
     setSidebarCollapsed(collapsed);
@@ -180,6 +199,10 @@ export function WorkspaceApp({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(command),
         });
+        if (r.status === 401) {
+          window.location.assign("/login");
+          return null;
+        }
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || "No se pudo guardar.");
         setWorkspace(data.workspace);
@@ -213,6 +236,10 @@ export function WorkspaceApp({
     [projectId, router],
   );
   const project = workspace?.projects.find((p) => p.id === projectId);
+  const canManageProject =
+    !!workspace &&
+    (workspace.currentUser.role === "admin" ||
+      project?.ownerId === workspace.currentUser.id);
   const selectedTask = workspace?.tasks.find(
     (task) => task.id === taskId && task.projectId === projectId,
   );
@@ -282,7 +309,11 @@ export function WorkspaceApp({
       onClick={toggleSidebar}
     >
       <span className="sidebar-edge-toggle-icon" aria-hidden="true">
-        {sidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+        {sidebarCollapsed ? (
+          <ChevronRight size={18} />
+        ) : (
+          <ChevronLeft size={18} />
+        )}
       </span>
     </Button>
   );
@@ -357,40 +388,17 @@ export function WorkspaceApp({
               mutate={mutate}
             />
             <div className="sidebar-bottom">
-              <button
-                className="nav-item"
-                aria-label="Importar Trello"
-                title="Importar Trello"
-                onClick={() => setModal({ type: "import" })}
-                disabled={busy}
-              >
-                <Upload size={17} />
-                <span>Importar Trello</span>
-                <ArrowUpRight size={14} />
-              </button>
-              <button
-                className="nav-item"
-                aria-label="Respaldo"
-                title="Respaldo"
-                onClick={() => setBackupOpen(true)}
-                disabled={busy}
-              >
-                <DatabaseBackup size={17} />
-                <span>Respaldo</span>
-              </button>
-              <div className="sidebar-footer">
-                <button
-                  type="button"
-                  className="nav-item"
-                  disabled={busy}
-                  aria-label="Configuración"
-                  title="Configuración"
-                  onClick={() => setSettingsOpen(true)}
-                >
-                  <Settings2 size={17} />
-                  <span>Configuración</span>
-                </button>
-              </div>
+              {workspace && (
+                <AccountMenu
+                  user={workspace.currentUser}
+                  busy={busy}
+                  onProfile={() => setProfileOpen(true)}
+                  onImport={() => setModal({ type: "import" })}
+                  onSettings={() => setSettingsOpen(true)}
+                  onBackup={() => setBackupOpen(true)}
+                  onUsers={() => setUsersOpen(true)}
+                />
+              )}
             </div>
           </div>
         </ResizableSidebar>
@@ -561,6 +569,7 @@ export function WorkspaceApp({
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
+                          disabled={!canManageProject}
                           onSelect={() =>
                             openMenuDialog({ type: "project", project })
                           }
@@ -568,6 +577,17 @@ export function WorkspaceApp({
                           <Pencil />
                           Editar proyecto
                         </DropdownMenuItem>
+                        {canManageProject && (
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              openingMenuDialog.current = true;
+                              setPeopleOpen(true);
+                            }}
+                          >
+                            <Users />
+                            Participantes y propietario
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem
                           onSelect={() => {
                             setArchived(!archived);
@@ -743,7 +763,7 @@ export function WorkspaceApp({
         )}
         {settingsOpen && workspace && (
           <SettingsModal
-            project={project}
+            project={canManageProject ? project : undefined}
             workspace={workspace}
             mutate={mutate}
             busy={busy}
@@ -751,7 +771,30 @@ export function WorkspaceApp({
             confirm={setConfirmation}
           />
         )}
-        {backupOpen && <BackupModal close={() => setBackupOpen(false)} />}
+        {profileOpen && workspace && (
+          <ProfileModal
+            user={workspace.currentUser}
+            close={() => setProfileOpen(false)}
+          />
+        )}
+        {usersOpen && workspace?.currentUser.role === "admin" && (
+          <UsersModal
+            projects={workspace.projects}
+            projectId={projectId}
+            close={() => setUsersOpen(false)}
+          />
+        )}
+        {peopleOpen && project && workspace && canManageProject && (
+          <ProjectPeopleModal
+            project={project}
+            currentUser={workspace.currentUser}
+            mutate={mutate}
+            close={() => setPeopleOpen(false)}
+          />
+        )}
+        {backupOpen && workspace?.currentUser.role === "admin" && (
+          <BackupModal close={() => setBackupOpen(false)} />
+        )}
         <Confirm
           value={confirmation}
           close={() => setConfirmation(null)}

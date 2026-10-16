@@ -11,18 +11,24 @@
     "start": "next start --hostname 0.0.0.0 --port 5010",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
-    "test:http": "node --test tests/http-smoke.mjs"
+    "test:http": "node --import tsx --test tests/http-smoke.mjs",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "^1.7.10",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@libsql/client": "^0.18.0",
     "@tiptap/markdown": "^3.32.0",
     "@tiptap/pm": "^3.32.0",
     "@tiptap/react": "^3.32.0",
     "@tiptap/starter-kit": "^3.32.0",
+    "better-auth": "^1.7.10",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "drizzle-orm": "^0.45.4",
     "emoji-picker-react": "^5.0.0",
     "lucide-react": "^0.577.0",
     "next": "16.4.2",
@@ -32,6 +38,7 @@
     "react-dom": "19.3.1",
     "react-markdown": "^10.1.0",
     "remark-breaks": "^4.0.0",
+    "resend": "^6.33.0",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.5.0",
     "zod": "^4.3.6"
@@ -41,6 +48,7 @@
     "@types/node": "^24.12.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "drizzle-kit": "^0.31.11",
     "tailwindcss": "^4.2.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

@@ -1,10 +1,11 @@
+import { adminRoute } from "@/server/access";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { repository } from "@/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export async function GET() {
+async function handleGET(_request: Request) {
   const dir = await mkdtemp(join(tmpdir(), "brote-backup-"));
   try {
     const path = join(dir, "backup.sqlite");
@@ -27,3 +28,5 @@ export async function GET() {
     await rm(dir, { recursive: true, force: true });
   }
 }
+
+export const GET = adminRoute(handleGET);

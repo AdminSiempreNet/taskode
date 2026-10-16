@@ -1,20 +1,18 @@
+import { requireActor, httpError, assertOrigin } from "@/server/access";
 import { NextRequest, NextResponse } from "next/server";
 import { commandSchema } from "@/lib/validation";
 import { repository } from "@/server";
 import { DomainError, isDomainError } from "@/server/repository";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    return NextResponse.json(await repository().getWorkspace(), {
+    const actor = await requireActor(request);
+    return NextResponse.json(await repository().getWorkspace(actor), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    console.error(error);
-    return NextResponse.json(
-      { error: "No se pudo abrir la base de datos." },
-      { status: 500 },
-    );
+    return httpError(error);
   }
 }
 export async function POST(request: NextRequest) {
@@ -34,6 +32,8 @@ export async function POST(request: NextRequest) {
     }
   }
   try {
+    assertOrigin(request);
+    const actor = await requireActor(request);
     if (Number(request.headers.get("content-length")) > 12 * 1024 * 1024)
       throw new DomainError("El archivo supera el límite de 12 MB.", 413);
     const reader = request.body?.getReader();
@@ -57,9 +57,9 @@ export async function POST(request: NextRequest) {
         { error: parsed.error.issues[0]?.message ?? "Datos inválidos." },
         { status: 400 },
       );
-    const result = await repository().execute(parsed.data);
+    const result = await repository().execute(parsed.data, actor);
     return NextResponse.json({
-      workspace: await repository().getWorkspace(),
+      workspace: await repository().getWorkspace(actor),
       ...result,
     });
   } catch (error) {

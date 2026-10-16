@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./calendar.css";
 @import "./details.css";
+@import "./account.css";
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {

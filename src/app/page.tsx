@@ -1,3 +1,4 @@
+import { requirePageActor } from "@/server/access";
 import { WorkspaceApp } from "@/components/workspace-app";
 import { redirect } from "next/navigation";
 import { projectPath } from "@/lib/routes";
@@ -11,7 +12,9 @@ export default async function Home({
 }: {
   searchParams: Promise<{ project?: string | string[] }>;
 }) {
-  const workspace = await repository().getWorkspace();
+  const actor = await requirePageActor();
+  const workspace = await repository().getWorkspace(actor);
+  if (workspace.currentUser.role === "admin" && workspace.onboarding.step < 2) redirect("/onboarding");
   const { project: legacyProjectId } = await searchParams;
   const project =
     workspace.projects.find((p) => p.id === legacyProjectId) ??

@@ -1,14 +1,13 @@
 import type { Command } from "../lib/validation";
-import type { ImportReport, Workspace } from "../lib/types";
+import type { Actor, ImportReport, Workspace } from "../lib/types";
 
 // The UI and HTTP layer depend on this contract; another database can replace SQLite here.
 export interface WorkspaceRepository {
-  getWorkspace(): Workspace | Promise<Workspace>;
+  getWorkspace(actor: Actor): Promise<Workspace>;
   execute(
     command: Command,
-  ):
-    | { report?: ImportReport; createdId?: string }
-    | Promise<{ report?: ImportReport; createdId?: string }>;
+    actor: Actor,
+  ): Promise<{ report?: ImportReport; createdId?: string }>;
   exportBackup(destination: string): Promise<void>;
   restoreBackup(
     source: string,

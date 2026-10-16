@@ -1,8 +1,9 @@
+import { adminRoute } from "@/server/access";
 import { backups } from "@/server";
 import { assertBackupOrigin, backupError } from "@/server/backup-http";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export async function GET() {
+async function handleGET(_request: Request) {
   try {
     return Response.json(
       { backups: await backups().list() },
@@ -12,7 +13,7 @@ export async function GET() {
     return backupError(error);
   }
 }
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   try {
     assertBackupOrigin(request);
     return Response.json({ backup: await backups().create() }, { status: 201 });
@@ -20,3 +21,7 @@ export async function POST(request: Request) {
     return backupError(error);
   }
 }
+
+export const GET = adminRoute(handleGET);
+
+export const POST = adminRoute(handlePOST);

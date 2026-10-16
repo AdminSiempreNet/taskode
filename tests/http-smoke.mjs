@@ -1,4 +1,5 @@
-import { test } from "node:test";
+import { startHttpFixture } from "./http-fixture.ts";
+import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -6,7 +7,19 @@ import { tmpdir } from "node:os";
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 
-const base = process.env.TEST_BASE_URL || "http://localhost:5010";
+let base, fixture;
+before(async () => {
+  fixture = await startHttpFixture();
+  base = fixture.base;
+});
+after(async () => {
+  await fixture?.stop();
+});
+const fetch = (url, init = {}) => {
+  const headers = new Headers(init.headers);
+  headers.set("Cookie", fixture.cookie);
+  return globalThis.fetch(url, { ...init, headers });
+};
 async function send(command, expected = 200) {
   const r = await fetch(base + "/api/workspace", {
     method: "POST",
@@ -425,6 +438,43 @@ test("HTTP: crear, editar, mover, archivar, restaurar, importar, respaldar y eli
         !removed.workspace.tasks.some((t) => t.projectId === projectId),
       );
     }
-    await rm(dir, { recursive: true, force: true });
+    await rm(dir, {
+      recursive: true,
+      force: true,
+      maxRetries: 20,
+      retryDelay: 50,
+    });
   }
+});
+
+test("HTTP: páginas y API requieren sesión; healthcheck y login son públicos", async () => {
+  for (const path of [
+    "/api/workspace",
+    "/api/backup",
+    "/api/backups",
+    "/api/invitations",
+    "/api/users",
+  ]) {
+    const r = await globalThis.fetch(base + path);
+    assert.equal(r.status, 401, path);
+  }
+  const home = await globalThis.fetch(base, { redirect: "manual" });
+  assert.equal(home.status, 307);
+  assert.equal(new URL(home.headers.get("location"), base).pathname, "/login");
+  const login = await globalThis.fetch(base + "/login");
+  assert.equal(login.status, 200);
+  const html = await login.text();
+  assert.match(html, /Continuar con Google/);
+  assert.match(html, /Continuar con GitHub/);
+  assert.equal((await globalThis.fetch(base + "/api/health")).status, 200);
+});
+
+test("HTTP: cerrar sesión revoca la sesión almacenada", async () => {
+  const response = await fetch(base + "/api/auth/sign-out", {
+    method: "POST",
+    headers: { Origin: base, "Content-Type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(response.status, 200);
+  assert.equal((await fetch(base + "/api/workspace")).status, 401);
 });

@@ -3,9 +3,11 @@ services:
     build: .
     ports:
       - "5010:5010"
+    env_file:
+      - path: .env.local
+        required: false
     environment:
       DATABASE_PATH: /app/data/brote.sqlite
-      SEED_DEMO: ${SEED_DEMO:-1}
     volumes:
       - brote-data:/app/data
     restart: unless-stopped

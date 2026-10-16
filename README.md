@@ -1,10 +1,10 @@
 # Brote · Proyectos y tareas
 
-Aplicación en español con Next.js, React, TypeScript, componentes shadcn/ui, fondos neutros y temas claro, oscuro y del sistema. Guarda los datos en SQLite en el servidor y no requiere autenticación.
+Aplicación en español con Next.js, React, TypeScript, componentes shadcn/ui, fondos neutros y temas claro, oscuro y del sistema. Guarda los datos en SQLite mediante Drizzle ORM. El acceso usa Better Auth con Google y GitHub; el registro requiere invitación salvo para el primer administrador.
 
 ## Desarrollo local
 
-No necesitas Docker ni una compilación de producción para desarrollar. Requiere Node.js **24 o posterior** (se usa `node:sqlite`, sin módulos nativos externos).
+No necesitas Docker ni una compilación de producción para desarrollar. Requiere Node.js **24 o posterior**. Drizzle usa SQLite local mediante libSQL; los respaldos utilizan la API nativa `node:sqlite`.
 
 ```powershell
 npm ci
@@ -15,7 +15,28 @@ Abre **http://localhost:5010** y deja el proceso en ejecución. Los cambios en l
 
 Si ya hay un contenedor usando el puerto 5010, detén ese servicio con `docker compose stop brote` antes de ejecutar `npm run dev`. Detén el servidor local con `Ctrl+C`. Para producción sin Docker: `npm run build` y `npm start`.
 
-El archivo por defecto es `data/brote.sqlite`. Puedes copiar `.env.example` a `.env.local` para cambiar `DATABASE_PATH`. En el primer inicio se crea un proyecto de ejemplo con cinco tareas, identificadas con la etiqueta «Ejemplo». Configura `SEED_DEMO=0` **antes de crear la base** si prefieres un espacio vacío; en Docker se puede definir en `.env`. Eliminar todos los proyectos no vuelve a crear los ejemplos.
+El archivo por defecto es `data/brote.sqlite`. Las migraciones versionadas de Drizzle se aplican automáticamente al abrir la base. También puedes ejecutarlas con `npm run db:migrate` y generar futuras migraciones con `npm run db:generate`.
+
+## Acceso y configuración inicial
+
+Completa en `.env.local` las variables documentadas en `.env.example`: URL pública, secreto de Better Auth, credenciales OAuth de Google y GitHub y credenciales de Resend. Los secretos se utilizan únicamente en el servidor. Sin credenciales de un proveedor, su botón no se muestra; la compilación no requiere secretos reales.
+
+Configura los callbacks autorizados de las aplicaciones OAuth:
+
+- Google: `http://localhost:5010/api/auth/callback/google`.
+- GitHub: `http://localhost:5010/api/auth/callback/github`. Usa una OAuth App con acceso al correo (`user:email`).
+
+En producción sustituye localhost por la URL HTTPS configurada en `BETTER_AUTH_URL`. Usa un secreto aleatorio de al menos 32 caracteres; el comando para generarlo está en `.env.example`.
+
+La primera cuenta que complete el acceso será administradora. Después, las nuevas cuentas requieren una invitación válida para su correo verificado. Google y GitHub comparten el mismo usuario cuando coincide el correo verificado; no hay contraseñas ni registro público.
+
+El administrador completa un asistente reanudable: primero crea el proyecto, opcionalmente con ejemplos de desarrollo de una aplicación web, y luego invita a su equipo o termina sin invitaciones. Los ejemplos nunca se cargan automáticamente ni crean usuarios ficticios. El asistente no reaparece al eliminar todos los proyectos.
+
+Desde **Usuarios e invitaciones**, el administrador puede invitar, copiar enlaces, reenviar y revocar. Las invitaciones duran siete días y permiten seleccionar proyectos iniciales. Reenviar genera un enlace nuevo e invalida el anterior. Resend necesita una API key y un remitente de un dominio verificado. Si falta configuración o falla el correo, la invitación sigue disponible para copiar y reenviar.
+
+Cada proyecto pertenece a su creador. Solo el administrador puede cambiar el propietario; el anterior conserva participación. El propietario y el administrador administran el proyecto, sus catálogos y sus participantes registrados. Los participantes trabajan en módulos, features, tareas, checklists y comentarios. El administrador tiene acceso global y es el único que gestiona los respaldos. El resto solo ve sus proyectos y aquellos en los que participa.
+
+El menú de usuario del pie del sidebar reúne **Mi perfil**, **Importar Trello**, **Configuración** y **Cerrar sesión**. Añade las opciones administrativas según los permisos. El perfil muestra los datos del proveedor, el rol y la fecha de registro, con enlaces para gestionar Google o GitHub; no edita la identidad localmente.
 
 ## Ejecutar con Docker (opcional)
 
@@ -25,7 +46,7 @@ Con Docker Desktop y su motor Linux iniciados:
 docker compose up -d --build
 ```
 
-Abre **http://localhost:5010**. El volumen `brote-data` conserva la base de datos al recrear el contenedor. `docker compose down` detiene la app y conserva ese volumen; no uses `down -v` si quieres conservar los datos. El archivo SQLite de desarrollo y el volumen Docker son independientes; puedes trasladar datos mediante un respaldo.
+Docker Compose carga las variables de `.env.local` y mantiene `DATABASE_PATH=/app/data/brote.sqlite` dentro del contenedor. Abre **http://localhost:5010**. El volumen `brote-data` conserva la base de datos al recrear el contenedor. `docker compose down` detiene la app y conserva ese volumen; no uses `down -v` si quieres conservar los datos. El archivo SQLite de desarrollo y el volumen Docker son independientes; puedes trasladar datos mediante un respaldo.
 
 La imagen utiliza Node 24, una compilación Next.js standalone, un usuario sin privilegios y un healthcheck. El puerto interno y el publicado son **5010**.
 
@@ -72,19 +93,19 @@ El botón **Respaldo** abre un modal con dos pestañas:
 - **Copias de respaldo**: genera una copia SQLite en el servidor, muestra su fecha, tamaño y origen, y permite descargarla o eliminarla con confirmación. Las copias se conservan en la carpeta `backups` junto a `DATABASE_PATH` (por defecto `data/backups`); en Docker quedan dentro del volumen `brote-data`.
 - **Restaurar**: permite seleccionar una copia del servidor o adjuntar una exportación SQLite de Brote de hasta 100 MB. Antes de restaurar hay que escribir exactamente **RESTAURAR**. La opción de crear un respaldo de los datos actuales viene activada por defecto; si esa copia falla, se cancela la restauración.
 
-Cada respaldo incluye todos los proyectos, módulos, features, estados, prioridades, etiquetas y tareas (también las archivadas), con sus checklists, comentarios e historial de estados. Usa la API de respaldo de SQLite para incluir escrituras que todavía estén en el WAL.
+Cada respaldo incluye usuarios, cuentas OAuth, propiedad y participantes, estado del asistente y todos los proyectos, módulos, features, estados, prioridades, etiquetas y tareas (también las archivadas), con sus checklists, comentarios e historial de estados. Usa la API de respaldo de SQLite para incluir escrituras que todavía estén en el WAL.
 
-La restauración comprueba la integridad, la estructura y las referencias del respaldo antes de modificar la base. Las copias de versiones anteriores se migran en un archivo temporal. Los datos se reemplazan en una transacción sobre la conexión existente, sin sustituir el archivo SQLite en uso y sin reiniciar el servidor; si falla la transacción, se conservan los datos actuales. Al terminar, **Volver al espacio** recarga la aplicación con los datos recuperados. Las copias guardadas en el servidor se conservan después de restaurar.
+La restauración comprueba la integridad, la estructura y las referencias del respaldo antes de modificar la base. Solo admite respaldos de esta versión con autenticación; los anteriores se rechazan. Tras restaurar, se invalidan todas las sesiones y las invitaciones pendientes; vuelve a acceder con una cuenta contenida en el respaldo. Los datos se reemplazan en una transacción sobre la conexión existente, sin sustituir el archivo SQLite en uso y sin reiniciar el servidor; si falla la transacción, se conservan los datos actuales. Al terminar, **Volver al espacio** recarga la aplicación con los datos recuperados. Las copias guardadas en el servidor se conservan después de restaurar.
 
 No ejecutes dos instancias con archivos de base distintos si esperas que compartan datos. La configuración está orientada a una sola instancia con un volumen local.
 
-La app no tiene autenticación por requisito del encargo. Está pensada para un espacio personal o una red de confianza; todos los visitantes con acceso pueden ver y modificar los datos.
+La aplicación es single tenant: una instalación comparte usuarios y administración, con acceso separado por proyecto. Los permisos se comprueban en el servidor en cada consulta y comando.
 
 ## Arquitectura y comprobaciones
 
 - `src/lib/types.ts`: modelos compartidos; `src/lib/validation.ts`: validación de comandos y exportaciones de Trello.
 - `src/server/repository.ts`: contrato `WorkspaceRepository`, independiente de SQLite.
-- `src/server/sqlite.ts`: implementación SQLite, migración versionada con `PRAGMA user_version`, claves foráneas, transacciones e importación. Para usar otra base, implementa el contrato y sustituye la fábrica de `src/server/index.ts`.
+- `src/server/sqlite.ts`: implementación con Drizzle sobre SQLite, claves foráneas, transacciones e importación. `src/server/schema.ts` declara el esquema y `drizzle/` conserva las migraciones versionadas. Para usar otra base, implementa el contrato y sustituye la fábrica de `src/server/index.ts`.
 - `GET /api/workspace`: datos; `POST /api/workspace`: comandos validados; `GET /api/backup`: descarga directa compatible con versiones anteriores.
 - `GET/POST /api/backups`: listar y generar copias del servidor; `GET/DELETE /api/backups/<id>`: descargar y eliminar una copia; `POST /api/backups/restore`: restaurar desde una copia del servidor o un archivo adjunto, con confirmación y respaldo previo opcional.
 - `src/components`: interfaz y componentes shadcn/ui. Los cambios se confirman en el servidor antes de actualizar la interfaz.

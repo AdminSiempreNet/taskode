@@ -1,9 +1,8 @@
 import { resolve } from "node:path";
 import { SqliteRepository } from "./sqlite";
-import type { WorkspaceRepository } from "./repository";
 import { BackupManager } from "./backups";
 const globalDatabase = globalThis as typeof globalThis & {
-  broteRepository?: WorkspaceRepository;
+  broteRepository?: SqliteRepository;
   broteBackups?: BackupManager;
 };
 export function databasePath() {
@@ -12,10 +11,9 @@ export function databasePath() {
       "./data/brote.sqlite",
   );
 }
-export function repository(): WorkspaceRepository {
+export function repository(): SqliteRepository {
   return (globalDatabase.broteRepository ??= new SqliteRepository(
     databasePath(),
-    process.env.SEED_DEMO !== "0",
   ));
 }
 export function backups() {

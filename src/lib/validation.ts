@@ -85,6 +85,17 @@ export const trelloSchema = z.object({
 });
 export type TrelloBoard = z.infer<typeof trelloSchema>;
 export const commandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("project.transferOwnership"), id, userId: id }),
+  z.object({
+    type: z.literal("project.member.add"),
+    projectId: id,
+    userId: id,
+  }),
+  z.object({
+    type: z.literal("project.member.remove"),
+    projectId: id,
+    userId: id,
+  }),
   z.object({ type: z.literal("project.create"), ...projectFields }),
   z.object({ type: z.literal("project.update"), id, ...projectFields }),
   z.object({ type: z.literal("project.delete"), id }),
