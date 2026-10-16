@@ -1,0 +1,22 @@
+services:
+  brote:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    expose:
+      - "5010"
+    environment:
+      DATABASE_PATH: /app/data/brote.sqlite
+      BETTER_AUTH_URL: https://tareas.eduinpro.net
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Required}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+    volumes:
+      - brote-data:/app/data
+    restart: unless-stopped
+volumes:
+  brote-data:

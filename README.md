@@ -50,6 +50,31 @@ Docker Compose carga las variables de `.env.local` y mantiene `DATABASE_PATH=/ap
 
 La imagen utiliza Node 24, una compilación Next.js standalone, un usuario sin privilegios y un healthcheck. El puerto interno y el publicado son **5010**.
 
+## Despliegue en Dokploy
+
+El proyecto **SiempreNet**, entorno **production**, contiene el servicio Compose **tareas** en [Dokploy](https://server.eduinpro.net/dashboard/project/BuobBokCir8Qcvw2rSInN/environment/fb29iaagt1aM2R0fwD4Oh/services/compose/pqfvH9IlEdtXcVZMT-KhC). La URL pública es **https://tareas.eduinpro.net**; Dokploy dirige el tráfico HTTPS al puerto interno 5010. `compose.dokploy.yaml` define las variables de ejecución y el volumen persistente `brote-data`, sin publicar puertos del servidor.
+
+Para actualizar desde este equipo, con Node 24, Docker, Git, tar y la CLI de Dokploy instalada:
+
+```powershell
+node scripts/deploy-dokploy.mjs deploy
+node scripts/deploy-dokploy.mjs status
+node scripts/deploy-dokploy.mjs logs
+```
+
+El script lee `DOKPLOY_API_KEY` y las credenciales de la aplicación desde `.env.local`. Autentica el cliente de la CLI mediante variables de entorno del proceso y utiliza los endpoints REST de Dokploy. No guarda la clave en la configuración global ni la envía al contenedor. Solo transfiere las variables de aplicación indicadas en el Compose, con `BETTER_AUTH_URL=https://tareas.eduinpro.net` y `DATABASE_PATH=/app/data/brote.sqlite`.
+
+Como este despliegue usa código local, el script empaqueta una lista explícita de archivos de aplicación, verifica su SHA-256 y los envía mediante File Mounts a `../files/build/<sha256>/`. Genera un Compose con `dockerfile_inline` que conserva las etapas del Dockerfile existente. Los archivos `.env`, bases locales, dependencias y pruebas quedan fuera del paquete. Los artefactos locales se guardan en `.dokploy/`, excluido de Git y de Docker. `prepare` permite generar y validar el paquete sin cambiar el servidor.
+
+El DNS debe tener un registro **A**, nombre **tareas**, valor **147.93.3.216**. El dominio está configurado con HTTPS y Let's Encrypt. Configura en los proveedores OAuth los callbacks de producción:
+
+- Google: `https://tareas.eduinpro.net/api/auth/callback/google`.
+- GitHub: `https://tareas.eduinpro.net/api/auth/callback/github`.
+
+La base de producción empieza vacía y se conserva entre despliegues mediante el volumen. La primera cuenta que acceda será administradora. Los datos de desarrollo pueden trasladarse desde la función de respaldos de la aplicación.
+
+Consulta la [configuración de Compose en Dokploy](https://docs.dokploy.com/docs/core/docker-compose) y su [gestión de dominios](https://docs.dokploy.com/docs/core/docker-compose/domains).
+
 ## Uso
 
 - Cambia de proyecto desde el selector desplegable en la parte superior del sidebar. Muestra el icono y nombre del proyecto actual y permite crear uno nuevo con «Nuevo proyecto». Puedes navegar por las opciones con el teclado o escribir el nombre para saltar a un proyecto. Cada proyecto tiene su propia URL `/projects/<projectId>`; puedes abrirla directamente, recargarla y usar Atrás/Adelante. `/` abre el primer proyecto disponible o la pantalla de creación si el espacio está vacío. Los enlaces antiguos `/?project=<id>` redirigen a la nueva ruta; un identificador inexistente muestra una página 404.

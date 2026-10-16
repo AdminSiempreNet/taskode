@@ -1,6 +1,7 @@
 node_modules
 .next
 .git
+.dokploy
 data
 test-results
 *.tsbuildinfo
