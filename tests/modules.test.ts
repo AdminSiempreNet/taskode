@@ -1,13 +1,10 @@
+import { assertIntegrity } from "./postgres-fixture";
 import { actor, createRepository } from "./helpers";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
-import { SqliteRepository } from "../src/server/sqlite";
+import { PostgresRepository } from "../src/server/postgres";
 import { commandSchema } from "../src/lib/validation";
-async function project(repo: SqliteRepository, name = "Proyecto") {
+async function project(repo: PostgresRepository, name = "Proyecto") {
   return (
     await repo.execute(
       {
@@ -21,7 +18,11 @@ async function project(repo: SqliteRepository, name = "Proyecto") {
     )
   ).createdId!;
 }
-async function module(repo: SqliteRepository, projectId: string, name: string) {
+async function module(
+  repo: PostgresRepository,
+  projectId: string,
+  name: string,
+) {
   return (
     await repo.execute(
       {
@@ -35,7 +36,7 @@ async function module(repo: SqliteRepository, projectId: string, name: string) {
   ).createdId!;
 }
 test("el módulo es opcional y cambiarlo asigna un número del destino conservando tareas, posición y fijadas", async () => {
-  const repo = await createRepository(":memory:", false);
+  const repo = await createRepository();
   try {
     const projectId = await project(repo);
     const a = await module(repo, projectId, "Administración");
@@ -172,13 +173,13 @@ test("el módulo es opcional y cambiarlo asigna un número del destino conservan
       null,
     );
     assert.deepEqual(saved.tasks, tasks);
-    assert.deepEqual(repo.db.prepare("PRAGMA foreign_key_check").all(), []);
+    await assertIntegrity(repo);
   } finally {
     await repo.close();
   }
 });
 test("no se asignan módulos de otro proyecto o inexistentes y los errores no modifican datos", async () => {
-  const repo = await createRepository(":memory:", false);
+  const repo = await createRepository();
   try {
     const a = await project(repo);
     const b = await project(repo, "Otro");
@@ -240,7 +241,7 @@ test("no se asignan módulos de otro proyecto o inexistentes y los errores no mo
   }
 });
 test("editar y ordenar módulos conserva el orden de features y rechaza órdenes incompletos o ajenos", async () => {
-  const repo = await createRepository(":memory:", false);
+  const repo = await createRepository();
   try {
     const projectId = await project(repo);
     const a = await module(repo, projectId, "Uno");
@@ -286,7 +287,7 @@ test("editar y ordenar módulos conserva el orden de features y rechaza órdenes
   }
 });
 test("eliminar un módulo pasa sus features a General y conserva tareas archivadas y relaciones", async () => {
-  const repo = await createRepository(":memory:", false);
+  const repo = await createRepository();
   try {
     const projectId = await project(repo);
     const id = await module(repo, projectId, "Eliminar");
@@ -336,7 +337,7 @@ test("eliminar un módulo pasa sus features a General y conserva tareas archivad
     await module(repo, projectId, "Cascada");
     await repo.execute({ type: "project.delete", id: projectId }, actor);
     assert.deepEqual((await repo.getWorkspace(actor)).modules, []);
-    assert.deepEqual(repo.db.prepare("PRAGMA foreign_key_check").all(), []);
+    await assertIntegrity(repo);
   } finally {
     await repo.close();
   }

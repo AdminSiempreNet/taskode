@@ -5,7 +5,7 @@ import { APIError, getOAuthState } from "better-auth/api";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import { eq } from "drizzle-orm";
 import { repository } from "./index";
-import type { SqliteRepository } from "./sqlite";
+import type { PostgresRepository } from "./postgres";
 import { InvitationService } from "./invitations";
 import { isDomainError } from "./repository";
 import * as schema from "./schema";
@@ -24,7 +24,7 @@ export function providersConfigured() {
 export function authConfigured() {
   return Boolean(
     process.env.BETTER_AUTH_SECRET &&
-    Object.values(providersConfigured()).some(Boolean),
+      Object.values(providersConfigured()).some(Boolean),
   );
 }
 export function invitationService(repo = repository()) {
@@ -36,7 +36,7 @@ export function invitationService(repo = repository()) {
 }
 
 export function createProjectAuth(
-  repo: SqliteRepository,
+  repo: PostgresRepository,
   config: Record<string, string | undefined> = process.env,
 ) {
   const context = new AsyncLocalStorage<Admission>();
@@ -47,8 +47,8 @@ export function createProjectAuth(
   );
   // All adapter operations inside Better Auth transactions share the application's
   // transaction. Admission, account creation and invitation consumption commit together.
-  const adapter = (options: BetterAuthOptions): DBAdapter => {
-    const base = drizzleAdapter(repo.store.db, { provider: "sqlite", schema })(
+  const rawAdapter = (options: BetterAuthOptions): DBAdapter => {
+    const base = drizzleAdapter(repo.store.db, { provider: "pg", schema })(
       options,
     );
     return {
@@ -82,7 +82,7 @@ export function createProjectAuth(
               });
             if (state.adminId) await invites.verify(proof.invitation!, email);
             const created = await drizzleAdapter(repo.store.db, {
-              provider: "sqlite",
+              provider: "pg",
               schema,
             })(options).create<T, R>({
               ...params,
@@ -113,6 +113,32 @@ export function createProjectAuth(
         }
       },
     };
+  };
+  const adapter = (options: BetterAuthOptions): DBAdapter => {
+    const base = rawAdapter(options);
+    const writes = new Set([
+      "create",
+      "update",
+      "updateMany",
+      "delete",
+      "deleteMany",
+    ]);
+    return new Proxy(base, {
+      get(target, property) {
+        const value = Reflect.get(target, property);
+        if (
+          typeof property !== "string" ||
+          !writes.has(property) ||
+          typeof value !== "function"
+        )
+          return value;
+        return (...args: unknown[]) =>
+          repo.store.transaction(async () => {
+            const current = rawAdapter(options);
+            return Reflect.apply(Reflect.get(current, property), current, args);
+          });
+      },
+    });
   };
   const instance = betterAuth({
     appName: "Brote",
@@ -248,7 +274,7 @@ export function createProjectAuth(
 }
 type AuthBundle = ReturnType<typeof createProjectAuth>;
 const globalAuth = globalThis as typeof globalThis & {
-  broteAuth?: { repo: SqliteRepository; bundle: AuthBundle };
+  broteAuth?: { repo: PostgresRepository; bundle: AuthBundle };
 };
 export function getAuth() {
   const repo = repository();

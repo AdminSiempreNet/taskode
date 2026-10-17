@@ -10,7 +10,7 @@ async function handleGET(_request: Request, context: Context) {
     const bytes = await backups().download(id);
     return new Response(bytes, {
       headers: {
-        "Content-Type": "application/vnd.sqlite3",
+        "Content-Type": "application/json",
         "Content-Disposition": `attachment; filename="${id}"`,
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",

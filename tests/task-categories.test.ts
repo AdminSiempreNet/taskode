@@ -1,11 +1,8 @@
+import { assertIntegrity } from "./postgres-fixture";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 import { actor, addUser, createRepository } from "./helpers";
-import { SqliteRepository } from "../src/server/sqlite";
+import { PostgresRepository } from "../src/server/postgres";
 import { commandSchema } from "../src/lib/validation";
 import { DEFAULT_TASK_TYPES, DEFAULT_IMPACTS } from "../src/lib/types";
 import {
@@ -14,7 +11,7 @@ import {
   validFilterIds,
 } from "../src/lib/task-filters";
 
-async function project(repo: SqliteRepository, name = "Categorías") {
+async function project(repo: PostgresRepository, name = "Categorías") {
   const projectId = (
     await repo.execute(
       {
@@ -285,108 +282,12 @@ for (const [kind, catalog, field] of [
         actor,
       );
       assert.equal((await repo.getWorkspace(actor))[catalog].length, 0);
-      assert.deepEqual(repo.db.prepare("PRAGMA foreign_key_check").all(), []);
+      await assertIntegrity(repo);
     } finally {
       await repo.close();
     }
   });
 }
-
-test("el despliegue migra proyectos existentes sin cambiar tareas ni relaciones, y el backfill no se repite", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "brote-categories-"));
-  const path = join(directory, "legacy.sqlite");
-  let repo = await createRepository(path);
-  try {
-    const { projectId, fields } = await project(repo);
-    await project(repo, "Proyecto vacío");
-    const taskId = (
-      await repo.execute({ type: "task.create", ...fields }, actor)
-    ).createdId!;
-    await repo.execute(
-      { type: "comment.create", taskId, content: "Conservar comentario" },
-      actor,
-    );
-    const checklistId = (
-      await repo.execute(
-        { type: "checklist.create", taskId, title: "Conservar checklist" },
-        actor,
-      )
-    ).createdId!;
-    await repo.execute(
-      { type: "checklist.item.create", checklistId, title: "Conservar ítem" },
-      actor,
-    );
-    const nextStatus = (await repo.getWorkspace(actor)).statuses.find(
-      (status) =>
-        status.projectId === projectId && status.id !== fields.statusId,
-    )!;
-    await repo.execute(
-      {
-        type: "task.move",
-        id: taskId,
-        statusId: nextStatus.id,
-        beforeId: null,
-      },
-      actor,
-    );
-    await repo.execute(
-      { type: "task.archive", id: taskId, archived: true },
-      actor,
-    );
-    const before = await repo.getWorkspace(actor);
-    await repo.close();
-    const legacy = new DatabaseSync(path);
-    try {
-      legacy.exec(
-        "ALTER TABLE tasks DROP COLUMN typeId; ALTER TABLE tasks DROP COLUMN impactId; ALTER TABLE tasks DROP COLUMN ticketNumber; DROP TABLE task_types; DROP TABLE impacts; DELETE FROM __drizzle_migrations WHERE created_at>(SELECT MIN(created_at) FROM __drizzle_migrations);",
-      );
-    } finally {
-      legacy.close();
-    }
-    repo = new SqliteRepository(path);
-    const migrated = await repo.getWorkspace(actor);
-    assert.deepEqual(migrated.tasks, before.tasks);
-    assert.deepEqual(migrated.projects, before.projects);
-    assert.deepEqual(migrated.features, before.features);
-    for (const project of migrated.projects) {
-      assert.deepEqual(
-        migrated.taskTypes
-          .filter((option) => option.projectId === project.id)
-          .map(({ name, color }) => ({ name, color })),
-        [...DEFAULT_TASK_TYPES],
-      );
-      assert.deepEqual(
-        migrated.impacts
-          .filter((option) => option.projectId === project.id)
-          .map(({ name, color }) => ({ name, color })),
-        [...DEFAULT_IMPACTS],
-      );
-    }
-    assert.deepEqual(repo.db.prepare("PRAGMA foreign_key_check").all(), []);
-    const option = migrated.taskTypes[0];
-    await repo.execute(
-      { type: "taskType.delete", projectId: option.projectId, id: option.id },
-      actor,
-    );
-    const customized = await repo.getWorkspace(actor);
-    await repo.close();
-    repo = new SqliteRepository(path);
-    assert.deepEqual(await repo.getWorkspace(actor), customized);
-    assert.equal(
-      repo.db.prepare("SELECT COUNT(*) AS n FROM __drizzle_migrations").get()
-        ?.n,
-      3,
-    );
-  } finally {
-    await repo.close();
-    await rm(directory, {
-      recursive: true,
-      force: true,
-      maxRetries: 10,
-      retryDelay: 50,
-    });
-  }
-});
 
 test("el ticket es opcional, conserva ceros y referencias, y las actualizaciones anteriores no lo borran", async () => {
   const repo = await createRepository();
@@ -437,136 +338,6 @@ test("el ticket es opcional, conserva ceros y referencias, y las actualizaciones
       );
   } finally {
     await repo.close();
-  }
-});
-
-test("la migración añade emojis y ticket vacío conservando IDs, tareas, colores, nombres personalizados y opciones en conflicto", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "brote-emojis-test-"));
-  const path = join(directory, "workspace.sqlite");
-  let repo = await createRepository(path);
-  try {
-    const { fields, projectId, workspace } = await project(repo);
-    const typeId = workspace.taskTypes[0].id,
-      impactId = workspace.impacts[0].id;
-    const taskId = (
-      await repo.execute(
-        { type: "task.create", ...fields, typeId, impactId },
-        actor,
-      )
-    ).createdId!;
-    await repo.execute(
-      { type: "task.archive", id: taskId, archived: true },
-      actor,
-    );
-    for (const [table, options] of [
-      ["task_types", workspace.taskTypes],
-      ["impacts", workspace.impacts],
-    ] as const)
-      for (const option of options)
-        repo.db
-          .prepare(`UPDATE ${table} SET name=? WHERE id=?`)
-          .run(option.name.slice(option.name.indexOf(" ") + 1), option.id);
-    repo.db
-      .prepare(
-        "UPDATE task_types SET name='Solicitud especial',color='#123456' WHERE id=?",
-      )
-      .run(workspace.taskTypes[1].id);
-    repo.db
-      .prepare(
-        "UPDATE impacts SET name='Cliente VIP',color='#654321' WHERE id=?",
-      )
-      .run(workspace.impacts[1].id);
-    const duplicateId = (
-      await repo.execute(
-        {
-          type: "taskType.create",
-          projectId,
-          name: "🐛 Error",
-          color: "#112233",
-        },
-        actor,
-      )
-    ).createdId!;
-    const before = await repo.getWorkspace(actor);
-    await repo.close();
-    const legacy = new DatabaseSync(path);
-    try {
-      legacy.exec(
-        "ALTER TABLE tasks DROP COLUMN ticketNumber; DELETE FROM __drizzle_migrations WHERE created_at=(SELECT MAX(created_at) FROM __drizzle_migrations);",
-      );
-    } finally {
-      legacy.close();
-    }
-    repo = new SqliteRepository(path);
-    const migrated = await repo.getWorkspace(actor);
-    assert.deepEqual(migrated.tasks, before.tasks);
-    assert.deepEqual(
-      migrated.taskTypes.map((option) => option.id),
-      before.taskTypes.map((option) => option.id),
-    );
-    assert.equal(
-      migrated.taskTypes.find((option) => option.id === typeId)?.name,
-      "💡 Sugerencia",
-    );
-    assert.equal(
-      migrated.impacts.find((option) => option.id === impactId)?.name,
-      "👤 Usuario",
-    );
-    assert.equal(
-      migrated.taskTypes.find(
-        (option) => option.id === workspace.taskTypes[1].id,
-      )?.name,
-      "Solicitud especial",
-    );
-    assert.equal(
-      migrated.taskTypes.find(
-        (option) => option.id === workspace.taskTypes[1].id,
-      )?.color,
-      "#123456",
-    );
-    assert.equal(
-      migrated.impacts.find((option) => option.id === workspace.impacts[1].id)
-        ?.name,
-      "Cliente VIP",
-    );
-    assert.equal(
-      migrated.impacts.find((option) => option.id === workspace.impacts[1].id)
-        ?.color,
-      "#654321",
-    );
-    assert.equal(
-      migrated.taskTypes.find(
-        (option) => option.id === workspace.taskTypes[3].id,
-      )?.name,
-      "Error",
-    );
-    assert.equal(
-      migrated.taskTypes.find((option) => option.id === duplicateId)?.name,
-      "🐛 Error",
-    );
-    assert.deepEqual(repo.db.prepare("PRAGMA foreign_key_check").all(), []);
-    await repo.execute(
-      {
-        type: "taskType.update",
-        projectId,
-        id: typeId,
-        name: "Sugerencia",
-        color: "#334455",
-      },
-      actor,
-    );
-    const customized = await repo.getWorkspace(actor);
-    await repo.close();
-    repo = new SqliteRepository(path);
-    assert.deepEqual(await repo.getWorkspace(actor), customized);
-  } finally {
-    await repo.close();
-    await rm(directory, {
-      recursive: true,
-      force: true,
-      maxRetries: 12,
-      retryDelay: 50,
-    });
   }
 });
 

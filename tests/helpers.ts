@@ -1,4 +1,6 @@
-import { SqliteRepository } from "../src/server/sqlite";
+import { PostgresRepository } from "../src/server/postgres";
+import { createEmptyRepository } from "./postgres-fixture";
+export { createEmptyRepository, assertIntegrity } from "./postgres-fixture";
 import { user, installation, account } from "../src/server/schema";
 import { eq } from "drizzle-orm";
 import { createProjectAuth } from "../src/server/auth";
@@ -8,36 +10,32 @@ import { serializeSignedCookie } from "better-call";
 import { randomUUID } from "node:crypto";
 export const actor = { id: "test-admin" };
 export async function addUser(
-  repo: SqliteRepository,
+  repo: PostgresRepository,
   id: string,
   role: "admin" | "member" = "member",
 ) {
   await repo.store.ready;
-  await repo.store.db
-    .insert(user)
-    .values({
-      id,
-      name: id,
-      email: `${id}@example.com`,
-      emailVerified: true,
-      role,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-  await repo.store.db
-    .insert(account)
-    .values({
-      id: `account-${id}`,
-      userId: id,
-      providerId: "google",
-      accountId: id,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+  await repo.store.db.insert(user).values({
+    id,
+    name: id,
+    email: `${id}@example.com`,
+    emailVerified: true,
+    role,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
+  await repo.store.db.insert(account).values({
+    id: `account-${id}`,
+    userId: id,
+    providerId: "google",
+    accountId: id,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  });
   return { id };
 }
-export async function createRepository(path = ":memory:", _seed = false) {
-  const repo = new SqliteRepository(path);
+export async function createRepository() {
+  const repo = await createEmptyRepository();
   await repo.store.ready;
   const existing = await repo.store.db
     .select()

@@ -1,36 +1,60 @@
 import { relations, sql } from "drizzle-orm";
 import {
-  sqliteTable,
+  pgTable,
   text,
   integer,
-  real,
+  doublePrecision,
+  boolean,
+  timestamp,
+  bigint,
+  jsonb,
   primaryKey,
   uniqueIndex,
   index,
   foreignKey,
   check,
-} from "drizzle-orm/sqlite-core";
+} from "drizzle-orm/pg-core";
 
-export const user = sqliteTable("user", {
+export const user = pgTable("user", {
   id: text().primaryKey(),
   name: text().notNull(),
   email: text().notNull().unique(),
-  emailVerified: integer({ mode: "boolean" }).notNull().default(false),
+  emailVerified: boolean().notNull().default(false),
   image: text(),
-  createdAt: integer({ mode: "timestamp_ms" }).notNull(),
-  updatedAt: integer({ mode: "timestamp_ms" }).notNull(),
+  createdAt: timestamp({
+    withTimezone: true,
+    precision: 3,
+    mode: "date",
+  }).notNull(),
+  updatedAt: timestamp({
+    withTimezone: true,
+    precision: 3,
+    mode: "date",
+  }).notNull(),
   role: text({ enum: ["admin", "member"] })
     .notNull()
     .default("member"),
 });
-export const session = sqliteTable(
+export const session = pgTable(
   "session",
   {
     id: text().primaryKey(),
     token: text().notNull().unique(),
-    expiresAt: integer({ mode: "timestamp_ms" }).notNull(),
-    createdAt: integer({ mode: "timestamp_ms" }).notNull(),
-    updatedAt: integer({ mode: "timestamp_ms" }).notNull(),
+    expiresAt: timestamp({
+      withTimezone: true,
+      precision: 3,
+      mode: "date",
+    }).notNull(),
+    createdAt: timestamp({
+      withTimezone: true,
+      precision: 3,
+      mode: "date",
+    }).notNull(),
+    updatedAt: timestamp({
+      withTimezone: true,
+      precision: 3,
+      mode: "date",
+    }).notNull(),
     ipAddress: text(),
     userAgent: text(),
     userId: text()
@@ -39,7 +63,7 @@ export const session = sqliteTable(
   },
   (t) => [index("session_user").on(t.userId)],
 );
-export const account = sqliteTable(
+export const account = pgTable(
   "account",
   {
     id: text().primaryKey(),
@@ -53,29 +77,57 @@ export const account = sqliteTable(
     idToken: text(),
     scope: text(),
     password: text(),
-    accessTokenExpiresAt: integer({ mode: "timestamp_ms" }),
-    refreshTokenExpiresAt: integer({ mode: "timestamp_ms" }),
-    createdAt: integer({ mode: "timestamp_ms" }).notNull(),
-    updatedAt: integer({ mode: "timestamp_ms" }).notNull(),
+    accessTokenExpiresAt: timestamp({
+      withTimezone: true,
+      precision: 3,
+      mode: "date",
+    }),
+    refreshTokenExpiresAt: timestamp({
+      withTimezone: true,
+      precision: 3,
+      mode: "date",
+    }),
+    createdAt: timestamp({
+      withTimezone: true,
+      precision: 3,
+      mode: "date",
+    }).notNull(),
+    updatedAt: timestamp({
+      withTimezone: true,
+      precision: 3,
+      mode: "date",
+    }).notNull(),
   },
   (t) => [
     uniqueIndex("account_provider_identity").on(t.providerId, t.accountId),
     index("account_user").on(t.userId),
   ],
 );
-export const verification = sqliteTable(
+export const verification = pgTable(
   "verification",
   {
     id: text().primaryKey(),
     identifier: text().notNull(),
     value: text().notNull(),
-    expiresAt: integer({ mode: "timestamp_ms" }).notNull(),
-    createdAt: integer({ mode: "timestamp_ms" }).notNull(),
-    updatedAt: integer({ mode: "timestamp_ms" }).notNull(),
+    expiresAt: timestamp({
+      withTimezone: true,
+      precision: 3,
+      mode: "date",
+    }).notNull(),
+    createdAt: timestamp({
+      withTimezone: true,
+      precision: 3,
+      mode: "date",
+    }).notNull(),
+    updatedAt: timestamp({
+      withTimezone: true,
+      precision: 3,
+      mode: "date",
+    }).notNull(),
   },
   (t) => [index("verification_identifier").on(t.identifier)],
 );
-export const installation = sqliteTable(
+export const installation = pgTable(
   "installation",
   {
     id: integer().primaryKey(),
@@ -85,7 +137,7 @@ export const installation = sqliteTable(
   },
   (t) => [check("single_installation", sql`${t.id} = 1`)],
 );
-export const projects = sqliteTable(
+export const projects = pgTable(
   "projects",
   {
     id: text().primaryKey(),
@@ -100,7 +152,7 @@ export const projects = sqliteTable(
   },
   (t) => [index("project_owner").on(t.ownerId)],
 );
-export const projectMembers = sqliteTable(
+export const projectMembers = pgTable(
   "project_members",
   {
     projectId: text()
@@ -115,7 +167,7 @@ export const projectMembers = sqliteTable(
     index("membership_user").on(t.userId),
   ],
 );
-export const invitations = sqliteTable(
+export const invitations = pgTable(
   "invitations",
   {
     id: text().primaryKey(),
@@ -123,16 +175,16 @@ export const invitations = sqliteTable(
     createdBy: text()
       .notNull()
       .references(() => user.id),
-    createdAt: integer().notNull(),
-    expiresAt: integer().notNull(),
-    revokedAt: integer(),
-    acceptedAt: integer(),
+    createdAt: bigint({ mode: "number" }).notNull(),
+    expiresAt: bigint({ mode: "number" }).notNull(),
+    revokedAt: bigint({ mode: "number" }),
+    acceptedAt: bigint({ mode: "number" }),
     acceptedBy: text().references(() => user.id),
     deliveryStatus: text().notNull().default("pending"),
   },
   (t) => [index("invitation_email").on(t.email)],
 );
-export const invitationProjects = sqliteTable(
+export const invitationProjects = pgTable(
   "invitation_projects",
   {
     invitationId: text()
@@ -144,7 +196,7 @@ export const invitationProjects = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.invitationId, t.projectId] })],
 );
-export const modules = sqliteTable(
+export const modules = pgTable(
   "modules",
   {
     id: text().primaryKey(),
@@ -153,11 +205,11 @@ export const modules = sqliteTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     name: text().notNull(),
     description: text().notNull(),
-    position: real().notNull(),
+    position: doublePrecision().notNull(),
   },
   (t) => [index("module_project").on(t.projectId, t.position)],
 );
-export const features = sqliteTable(
+export const features = pgTable(
   "features",
   {
     id: text().primaryKey(),
@@ -168,8 +220,8 @@ export const features = sqliteTable(
     number: integer().notNull().default(1),
     name: text().notNull(),
     description: text().notNull(),
-    position: real().notNull(),
-    pinned: integer().notNull().default(0),
+    position: doublePrecision().notNull(),
+    pinned: boolean().notNull().default(false),
   },
   (t) => [
     uniqueIndex("feature_identity").on(t.id, t.projectId),
@@ -181,7 +233,7 @@ export const features = sqliteTable(
     check("positive_feature_number", sql`${t.number} >= 1`),
   ],
 );
-export const statuses = sqliteTable(
+export const statuses = pgTable(
   "statuses",
   {
     id: text().primaryKey(),
@@ -190,15 +242,15 @@ export const statuses = sqliteTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     name: text().notNull(),
     color: text().notNull(),
-    position: real().notNull(),
-    isDone: integer().notNull().default(0),
+    position: doublePrecision().notNull(),
+    isDone: boolean().notNull().default(false),
   },
   (t) => [
     uniqueIndex("status_identity").on(t.id, t.projectId),
-    uniqueIndex("status_name").on(t.projectId, sql`${t.name} collate nocase`),
+    uniqueIndex("status_name").on(t.projectId, sql`lower(${t.name})`),
   ],
 );
-export const priorities = sqliteTable(
+export const priorities = pgTable(
   "priorities",
   {
     id: text().notNull(),
@@ -207,14 +259,14 @@ export const priorities = sqliteTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     name: text().notNull(),
     color: text().notNull(),
-    position: real().notNull(),
+    position: doublePrecision().notNull(),
   },
   (t) => [
     primaryKey({ columns: [t.id, t.projectId] }),
-    uniqueIndex("priority_name").on(t.projectId, sql`${t.name} collate nocase`),
+    uniqueIndex("priority_name").on(t.projectId, sql`lower(${t.name})`),
   ],
 );
-export const taskTypes = sqliteTable(
+export const taskTypes = pgTable(
   "task_types",
   {
     id: text().primaryKey(),
@@ -223,16 +275,11 @@ export const taskTypes = sqliteTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     name: text().notNull(),
     color: text().notNull(),
-    position: real().notNull(),
+    position: doublePrecision().notNull(),
   },
-  (t) => [
-    uniqueIndex("task_type_name").on(
-      t.projectId,
-      sql`${t.name} collate nocase`,
-    ),
-  ],
+  (t) => [uniqueIndex("task_type_name").on(t.projectId, sql`lower(${t.name})`)],
 );
-export const impacts = sqliteTable(
+export const impacts = pgTable(
   "impacts",
   {
     id: text().primaryKey(),
@@ -241,13 +288,11 @@ export const impacts = sqliteTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     name: text().notNull(),
     color: text().notNull(),
-    position: real().notNull(),
+    position: doublePrecision().notNull(),
   },
-  (t) => [
-    uniqueIndex("impact_name").on(t.projectId, sql`${t.name} collate nocase`),
-  ],
+  (t) => [uniqueIndex("impact_name").on(t.projectId, sql`lower(${t.name})`)],
 );
-export const labels = sqliteTable(
+export const labels = pgTable(
   "labels",
   {
     id: text().primaryKey(),
@@ -256,13 +301,11 @@ export const labels = sqliteTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     name: text().notNull(),
     color: text().notNull(),
-    position: real().notNull(),
+    position: doublePrecision().notNull(),
   },
-  (t) => [
-    uniqueIndex("label_name").on(t.projectId, sql`${t.name} collate nocase`),
-  ],
+  (t) => [uniqueIndex("label_name").on(t.projectId, sql`lower(${t.name})`)],
 );
-export const tasks = sqliteTable(
+export const tasks = pgTable(
   "tasks",
   {
     id: text().primaryKey(),
@@ -281,9 +324,9 @@ export const tasks = sqliteTable(
     dueTime: text(),
     startDate: text(),
     startTime: text(),
-    archived: integer().notNull().default(0),
-    position: real().notNull(),
-    labels: text().notNull().default("[]"),
+    archived: boolean().notNull().default(false),
+    position: doublePrecision().notNull(),
+    labels: jsonb().$type<string[]>().notNull().default([]),
     externalId: text(),
     createdAt: text().notNull(),
     updatedAt: text().notNull(),
@@ -307,15 +350,15 @@ export const tasks = sqliteTable(
     index("task_status").on(t.statusId),
     check(
       "due_time",
-      sql`${t.dueTime} is null or (${t.dueDate} is not null and ${t.dueTime} glob '[0-2][0-9]:[0-5][0-9]' and ${t.dueTime} < '24:00')`,
+      sql`${t.dueTime} is null or (${t.dueDate} is not null and ${t.dueTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')`,
     ),
     check(
       "start_time",
-      sql`${t.startTime} is null or (${t.startDate} is not null and ${t.startTime} glob '[0-2][0-9]:[0-5][0-9]' and ${t.startTime} < '24:00')`,
+      sql`${t.startTime} is null or (${t.startDate} is not null and ${t.startTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')`,
     ),
   ],
 );
-export const checklists = sqliteTable(
+export const checklists = pgTable(
   "checklists",
   {
     id: text().primaryKey(),
@@ -323,11 +366,11 @@ export const checklists = sqliteTable(
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
     title: text().notNull(),
-    position: real().notNull(),
+    position: doublePrecision().notNull(),
   },
   (t) => [uniqueIndex("checklist_task").on(t.taskId)],
 );
-export const checklistItems = sqliteTable(
+export const checklistItems = pgTable(
   "checklist_items",
   {
     id: text().primaryKey(),
@@ -335,15 +378,12 @@ export const checklistItems = sqliteTable(
       .notNull()
       .references(() => checklists.id, { onDelete: "cascade" }),
     title: text().notNull(),
-    completed: integer().notNull().default(0),
-    position: real().notNull(),
+    completed: boolean().notNull().default(false),
+    position: doublePrecision().notNull(),
   },
-  (t) => [
-    index("item_checklist").on(t.checklistId),
-    check("item_completed", sql`${t.completed} in (0,1)`),
-  ],
+  (t) => [index("item_checklist").on(t.checklistId)],
 );
-export const comments = sqliteTable(
+export const comments = pgTable(
   "comments",
   {
     id: text().primaryKey(),
@@ -356,10 +396,10 @@ export const comments = sqliteTable(
   },
   (t) => [index("comment_task").on(t.taskId, t.createdAt)],
 );
-export const taskStatusHistory = sqliteTable(
+export const taskStatusHistory = pgTable(
   "task_status_history",
   {
-    id: integer().primaryKey({ autoIncrement: true }),
+    id: integer().generatedByDefaultAsIdentity().primaryKey(),
     taskId: text()
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),

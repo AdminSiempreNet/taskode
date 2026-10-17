@@ -1,14 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SqliteRepository } from "../src/server/sqlite";
+import { PostgresRepository } from "../src/server/postgres";
 import { createProjectAuth } from "../src/server/auth";
 import { InvitationService } from "../src/server/invitations";
 import { user, account, invitations } from "../src/server/schema";
 import { eq } from "drizzle-orm";
-import { authConfig, mockOAuth, oauthLogin } from "./helpers";
+import {
+  authConfig,
+  mockOAuth,
+  oauthLogin,
+  createEmptyRepository,
+} from "./helpers";
 
 test("OAuth real de Better Auth: primer administrador, invitación obligatoria y cuenta compartida entre proveedores", async () => {
-  const repo = new SqliteRepository(":memory:"),
+  const repo = await createEmptyRepository(),
     bundle = createProjectAuth(repo, authConfig);
   try {
     await repo.store.ready;
@@ -93,26 +98,32 @@ test("OAuth real de Better Auth: primer administrador, invitación obligatoria y
 });
 
 test("OAuth: altas iniciales simultáneas generan un solo administrador", async () => {
-  const repo = new SqliteRepository(":memory:"),
+  const repo = await createEmptyRepository(),
     bundle = createProjectAuth(repo, authConfig);
+  const peer = new PostgresRepository(repo.store.connectionString, {
+    schema: repo.store.schemaName,
+  });
+  const other = createProjectAuth(peer, authConfig);
   try {
     await repo.store.ready;
     await mockOAuth(bundle);
+    await mockOAuth(other);
     await Promise.all([
       oauthLogin(bundle, "google", "first@example.com"),
-      oauthLogin(bundle, "github", "second@example.com"),
+      oauthLogin(other, "github", "second@example.com"),
     ]);
     const users = await repo.store.db.select().from(user);
     assert.equal(users.length, 1);
     assert.equal(users[0].role, "admin");
     assert.equal((await repo.store.state()).adminId, users[0].id);
   } finally {
+    await peer.close();
     await repo.close();
   }
 });
 
 test("OAuth: correo incorrecto y fallos al crear la cuenta no consumen la invitación ni dejan usuarios incompletos", async () => {
-  const repo = new SqliteRepository(":memory:"),
+  const repo = await createEmptyRepository(),
     bundle = createProjectAuth(repo, authConfig);
   try {
     await repo.store.ready;
@@ -138,9 +149,9 @@ test("OAuth: correo incorrecto y fallos al crear la cuenta no consumen la invita
     );
     assert.ok(mismatch.headers.get("location")?.includes("error="));
     assert.equal((await repo.store.db.select().from(user)).length, 1);
-    repo.db.exec(
-      "CREATE TRIGGER fail_account BEFORE INSERT ON account BEGIN SELECT RAISE(ABORT,'simulated account failure'); END;",
-    );
+    await repo.store.pool
+      .query(`CREATE FUNCTION fail_account() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'simulated account failure'; END $$;
+CREATE TRIGGER fail_account BEFORE INSERT ON account FOR EACH ROW EXECUTE FUNCTION fail_account();`);
     await oauthLogin(bundle, "github", "invited@example.com", token);
     assert.equal((await repo.store.db.select().from(user)).length, 1);
     assert.equal(
@@ -152,7 +163,9 @@ test("OAuth: correo incorrecto y fallos al crear la cuenta no consumen la invita
       )[0].acceptedAt,
       null,
     );
-    repo.db.exec("DROP TRIGGER fail_account;");
+    await repo.store.pool.query(
+      "DROP TRIGGER fail_account ON account; DROP FUNCTION fail_account();",
+    );
     assert.equal(
       (
         await oauthLogin(bundle, "github", "invited@example.com", token)

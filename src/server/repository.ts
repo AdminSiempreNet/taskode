@@ -1,7 +1,7 @@
 import type { Command } from "../lib/validation";
 import type { Actor, ImportReport, Workspace } from "../lib/types";
 
-// The UI and HTTP layer depend on this contract; another database can replace SQLite here.
+// UI and HTTP contracts remain independent of the database implementation.
 export interface WorkspaceRepository {
   getWorkspace(actor: Actor): Promise<Workspace>;
   execute(
@@ -13,6 +13,7 @@ export interface WorkspaceRepository {
     source: string,
     beforeRestore?: () => Promise<void>,
   ): Promise<void>;
+  exclusiveBackup<T>(action: () => Promise<T>): Promise<T>;
 }
 export class DomainError extends Error {
   constructor(

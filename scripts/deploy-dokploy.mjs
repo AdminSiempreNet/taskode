@@ -15,7 +15,7 @@ const server = "https://server.eduinpro.net";
 const domain = "tareas.eduinpro.net";
 const metadataPath = ".dokploy/deployment.json";
 const secretValues = Object.entries(local)
-  .filter(([key, value]) => /KEY|SECRET|TOKEN/.test(key) && value)
+  .filter(([key, value]) => /KEY|SECRET|TOKEN|PASSWORD|DATABASE_URL/.test(key) && value)
   .map(([, value]) => value);
 const scrub = (message) => secretValues.reduce(
   (text, value) => text.replaceAll(value, "[REDACTED]"), String(message),
@@ -28,11 +28,11 @@ function prepare() {
   // An explicit allowlist excludes .env files, databases, tests and local artifacts.
   const rootFiles = new Set([
     "package.json", "package-lock.json", "next.config.ts", "next-env.d.ts",
-    "tsconfig.json", "postcss.config.mjs",
+    "tsconfig.json", "postcss.config.mjs", "Dockerfile",
   ]);
   const files = run("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"])
     .toString().split("\0").filter((file) =>
-      (rootFiles.has(file) || /^(src|drizzle)\//.test(file)) && existsSync(file),
+      (rootFiles.has(file) || /^(src|drizzle\/postgresql)\//.test(file) || file === "scripts/migrate.ts") && existsSync(file),
     ).sort();
   for (const file of files) {
     if (lstatSync(file).isSymbolicLink() || /(^|\/)\.env/.test(file)) {
@@ -57,8 +57,8 @@ function prepare() {
     .replace("COPY . .", "COPY --from=source /source/ ./");
   const inline = dockerfile.replaceAll("$", "$$").trimEnd().split("\n").map((line) => `        ${line}`).join("\n");
   const compose = readFileSync("compose.dokploy.yaml", "utf8")
-    .replace("      context: .", "      context: ../files")
-    .replace("      dockerfile: Dockerfile", `      dockerfile_inline: |\n${inline}`);
+    .replaceAll("      context: .", "      context: ../files")
+    .replaceAll("      dockerfile: Dockerfile", `      dockerfile_inline: |\n${inline}`);
   if (secretValues.some((secret) => compose.includes(secret))) throw new Error("Se detectó un secreto en el Compose.");
   mkdirSync(".dokploy", { recursive: true });
   writeFileSync(".dokploy/compose.yaml", compose);
@@ -114,7 +114,7 @@ async function main() {
         });
       }
     }
-    const applicationKeys = ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "RESEND_API_KEY", "RESEND_FROM_EMAIL"];
+    const applicationKeys = ["POSTGRES_DB", "POSTGRES_PASSWORD", "BROTE_DB_PASSWORD", "BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET", "RESEND_API_KEY", "RESEND_FROM_EMAIL"];
     const env = applicationKeys.filter((key) => local[key]).map((key) => {
       if (/[\r\n]/.test(local[key])) throw new Error(`Valor multilínea no admitido: ${key}`);
       return `${key}='${local[key].replaceAll("'", "\\'")}'`;

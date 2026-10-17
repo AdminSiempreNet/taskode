@@ -1,18 +1,18 @@
+import { assertIntegrity } from "./postgres-fixture";
 import { actor, createRepository } from "./helpers";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
-import { SqliteRepository } from "../src/server/sqlite";
+import { PostgresRepository } from "../src/server/postgres";
 import {
   commandSchema,
   trelloSchema,
   type Command,
 } from "../src/lib/validation";
 async function setup() {
-  const repo = await createRepository(":memory:", false);
+  const repo = await createRepository();
   const projectId = (
     await repo.execute(
       {
@@ -40,7 +40,7 @@ async function setup() {
   return { repo, projectId, task };
 }
 test("crear y editar proyectos conserva emojis compuestos del selector", async () => {
-  const repo = await createRepository(":memory:", false);
+  const repo = await createRepository();
   const fields = { name: "Emojis", description: "", color: "#059669" };
   const england = String.fromCodePoint(
     0x1f3f4,
@@ -205,7 +205,7 @@ test("renombrar y eliminar etiquetas actualiza también tareas archivadas y cons
         (t) => t.labels.length === 0,
       ),
     );
-    assert.deepEqual(repo.db.prepare("PRAGMA foreign_key_check").all(), []);
+    await assertIntegrity(repo);
   } finally {
     await repo.close();
   }
@@ -279,7 +279,10 @@ test("checklists y comentarios permiten editar, completar y borrar y se eliminan
     await repo.execute({ type: "task.delete", id: taskId }, actor);
     for (const table of ["checklists", "checklist_items", "comments"])
       assert.equal(
-        repo.db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get()?.n,
+        Number(
+          (await repo.store.pool.query(`SELECT COUNT(*) AS n FROM ${table}`))
+            .rows[0].n,
+        ),
         0,
       );
     await assert.rejects(
@@ -585,7 +588,7 @@ test("borrar una feature o un proyecto elimina sus tareas sin dañar otros proye
     );
     assert.equal(w.tasks.length, 0);
     assert.equal(w.statuses.length, 4);
-    assert.deepEqual(repo.db.prepare("PRAGMA foreign_key_check").all(), []);
+    await assertIntegrity(repo);
   } finally {
     await repo.close();
   }
@@ -686,9 +689,10 @@ test("validación rechaza fechas imposibles y títulos vacíos", async () => {
     await repo.close();
   }
 });
-test("el respaldo incluye las escrituras WAL y puede abrirse como una base íntegra", async () => {
+test("el respaldo JSON conserva los datos confirmados y restaura en otra base", async () => {
   const dir = await mkdtemp(join(tmpdir(), "brote-test-"));
-  const repo = await createRepository(join(dir, "source.sqlite"), false);
+  const repo = await createRepository();
+  const copy = await createRepository();
   try {
     const p = (
       await repo.execute(
@@ -702,35 +706,26 @@ test("el respaldo incluye las escrituras WAL y puede abrirse como una base ínte
         actor,
       )
     ).createdId!;
-    await repo.exportBackup(join(dir, "backup.sqlite"));
+    const path = join(dir, "backup.brote-backup.json");
+    await repo.exportBackup(path);
     assert.equal(
-      (await readFile(join(dir, "backup.sqlite"))).subarray(0, 16).toString(),
-      "SQLite format 3\0",
+      JSON.parse(await readFile(path, "utf8")).format,
+      "brote-backup",
     );
-    const copy = await createRepository(join(dir, "backup.sqlite"), false);
-    try {
-      assert.equal((await copy.getWorkspace(actor)).projects[0].id, p);
-      assert.equal(
-        copy.db.prepare("PRAGMA integrity_check").get()?.integrity_check,
-        "ok",
-      );
-    } finally {
-      await copy.close();
-    }
+    await copy.restoreBackup(path);
+    assert.equal((await copy.getWorkspace(actor)).projects[0].id, p);
+    await assertIntegrity(copy);
   } finally {
+    await copy.close();
     await repo.close();
-    await rm(dir, {
-      recursive: true,
-      force: true,
-      maxRetries: 20,
-      retryDelay: 50,
-    });
+    await rm(dir, { recursive: true, force: true });
   }
 });
-test("los datos persisten al reiniciar y un espacio vacío no se vuelve a sembrar", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "brote-persist-"));
-  const path = join(dir, "data.sqlite");
-  let repo = await createRepository(path);
+test("los datos persisten al reconectar y un espacio vacío no se vuelve a sembrar", async () => {
+  const repo = await createRepository();
+  const peer = new PostgresRepository(repo.store.connectionString, {
+    schema: repo.store.schemaName,
+  });
   try {
     assert.equal((await repo.getWorkspace(actor)).projects.length, 0);
     await repo.execute(
@@ -745,25 +740,15 @@ test("los datos persisten al reiniciar y un espacio vacío no se vuelve a sembra
     );
     const first = await repo.getWorkspace(actor);
     assert.equal(first.projects.length, 1);
-    assert.equal(first.tasks.length, 0);
-    await repo.close();
-    repo = await createRepository(path);
-    assert.deepEqual(await repo.getWorkspace(actor), first);
-    await repo.execute(
+    assert.deepEqual(await peer.getWorkspace(actor), first);
+    await peer.execute(
       { type: "project.delete", id: first.projects[0].id },
       actor,
     );
-    await repo.close();
-    repo = await createRepository(path);
     assert.equal((await repo.getWorkspace(actor)).projects.length, 0);
   } finally {
+    await peer.close();
     await repo.close();
-    await rm(dir, {
-      recursive: true,
-      force: true,
-      maxRetries: 20,
-      retryDelay: 50,
-    });
   }
 });
 test("fijar features respeta el máximo de cinco por proyecto y permite liberar una plaza", async () => {

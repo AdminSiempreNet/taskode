@@ -7,3 +7,5 @@ test-results
 *.tsbuildinfo
 .env*
 tests
+
+dist

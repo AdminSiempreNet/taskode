@@ -1,12 +1,9 @@
+import { assertIntegrity } from "./postgres-fixture";
 import { actor, createRepository } from "./helpers";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
-import { SqliteRepository } from "../src/server/sqlite";
-async function project(repo: SqliteRepository) {
+import { PostgresRepository } from "../src/server/postgres";
+async function project(repo: PostgresRepository) {
   return (
     await repo.execute(
       {
@@ -20,7 +17,7 @@ async function project(repo: SqliteRepository) {
     )
   ).createdId!;
 }
-async function module(repo: SqliteRepository, projectId: string) {
+async function module(repo: PostgresRepository, projectId: string) {
   return (
     await repo.execute(
       {
@@ -34,7 +31,7 @@ async function module(repo: SqliteRepository, projectId: string) {
   ).createdId!;
 }
 async function feature(
-  repo: SqliteRepository,
+  repo: PostgresRepository,
   projectId: string,
   moduleId: string | null,
 ) {
@@ -51,13 +48,13 @@ async function feature(
     )
   ).createdId!;
 }
-async function number(repo: SqliteRepository, id: string) {
+async function number(repo: PostgresRepository, id: string) {
   return (await repo.getWorkspace(actor)).features.find(
     (feature) => feature.id === id,
   )!.number;
 }
 async function move(
-  repo: SqliteRepository,
+  repo: PostgresRepository,
   id: string,
   moduleId: string | null,
 ) {
@@ -67,7 +64,7 @@ async function move(
   );
 }
 test("los números son independientes por módulo y proyecto, y los movimientos y altas rellenan el primer hueco", async () => {
-  const repo = await createRepository(":memory:", false);
+  const repo = await createRepository();
   try {
     const p = await project(repo);
     const a = await module(repo, p);
@@ -133,18 +130,19 @@ test("los números son independientes por módulo y proyecto, y los movimientos 
     for (const f of saved) assert.equal(await number(repo, f.id), f.number);
     await move(repo, first, b);
     assert.equal(await number(repo, first), 2);
-    assert.throws(
-      () =>
-        repo.db.prepare("UPDATE features SET number=1 WHERE id=?").run(first),
-      /UNIQUE/,
+    await assert.rejects(
+      repo.store.pool.query("UPDATE features SET number=1 WHERE id=$1", [
+        first,
+      ]),
+      /unique constraint/,
     );
-    assert.deepEqual(repo.db.prepare("PRAGMA foreign_key_check").all(), []);
+    await assertIntegrity(repo);
   } finally {
     await repo.close();
   }
 });
 test("eliminar un módulo asigna los huecos de General sin colisiones y permite eliminar el proyecto completo", async () => {
-  const repo = await createRepository(":memory:", false);
+  const repo = await createRepository();
   try {
     const p = await project(repo);
     const a = await module(repo, p);
@@ -169,7 +167,7 @@ test("eliminar un módulo asigna los huecos de General sin colisiones y permite 
     await feature(repo, p, another);
     await repo.execute({ type: "project.delete", id: p }, actor);
     assert.deepEqual((await repo.getWorkspace(actor)).features, []);
-    assert.deepEqual(repo.db.prepare("PRAGMA foreign_key_check").all(), []);
+    await assertIntegrity(repo);
   } finally {
     await repo.close();
   }

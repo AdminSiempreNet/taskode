@@ -3,7 +3,7 @@ import { and, eq, isNull, gt } from "drizzle-orm";
 import { Resend } from "resend";
 import { z } from "zod";
 import type { Actor } from "../lib/types";
-import type { SqliteRepository } from "./sqlite";
+import type { PostgresRepository } from "./postgres";
 import * as s from "./schema";
 import { DomainError } from "./repository";
 
@@ -48,7 +48,7 @@ export async function sendInvitationEmail(data: {
 }
 export class InvitationService {
   constructor(
-    private repo: SqliteRepository,
+    private repo: PostgresRepository,
     private secret: string,
     private baseURL: string,
     private mailer: Mailer = sendInvitationEmail,
@@ -99,6 +99,15 @@ export class InvitationService {
     return row;
   }
   async consume(token: string, userId: string, email: string) {
+    return this.repo.store.transaction(() =>
+      this.consumeInTransaction(token, userId, email),
+    );
+  }
+  private async consumeInTransaction(
+    token: string,
+    userId: string,
+    email: string,
+  ) {
     const row = await this.verify(token, email);
     const changed = await this.repo.store.db
       .update(s.invitations)
@@ -191,10 +200,12 @@ export class InvitationService {
       error = e instanceof Error ? e.message : "No se pudo enviar el correo.";
     }
     const deliveryStatus = error ? "failed" : "sent";
-    await this.repo.store.db
-      .update(s.invitations)
-      .set({ deliveryStatus })
-      .where(eq(s.invitations.id, row.id));
+    await this.repo.store.transaction(async () => {
+      await this.repo.store.db
+        .update(s.invitations)
+        .set({ deliveryStatus })
+        .where(eq(s.invitations.id, row.id));
+    });
     return {
       invitation: { ...row, deliveryStatus, url: this.url(row) },
       deliveryError: error,
@@ -202,10 +213,12 @@ export class InvitationService {
   }
   async revoke(id: string, actor: Actor) {
     await this.repo.requireAdmin(actor);
-    await this.repo.store.db
-      .update(s.invitations)
-      .set({ revokedAt: Date.now() })
-      .where(eq(s.invitations.id, id));
+    await this.repo.store.transaction(async () => {
+      await this.repo.store.db
+        .update(s.invitations)
+        .set({ revokedAt: Date.now() })
+        .where(eq(s.invitations.id, id));
+    });
   }
   async resend(id: string, actor: Actor) {
     await this.repo.requireAdmin(actor);

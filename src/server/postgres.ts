@@ -1,9 +1,5 @@
-import { DatabaseSync, backup } from "node:sqlite";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import {
   and,
   eq,
@@ -13,15 +9,24 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
-import type { AnySQLiteTable } from "drizzle-orm/sqlite-core";
-import { DatabaseStore } from "./database";
+import type { AnyPgTable } from "drizzle-orm/pg-core";
+import { DatabaseStore, type DatabaseOptions } from "./database";
+import {
+  exportApplicationBackup,
+  restoreApplicationBackup,
+} from "./backup-data";
 import * as schema from "./schema";
 import type { Command, TrelloBoard } from "../lib/validation";
 import type { Actor, CurrentUser, ImportReport, Workspace } from "../lib/types";
 import { DEFAULT_TASK_TYPES, DEFAULT_IMPACTS } from "../lib/types";
 import { DomainError, type WorkspaceRepository } from "./repository";
 
-type Row = Record<string, string | number | null>;
+type Row = Record<string, string | number | boolean | string[] | null>;
+async function sequential<T>(queries: (() => Promise<T>)[]): Promise<T[]> {
+  const results: T[] = [];
+  for (const query of queries) results.push(await query());
+  return results;
+}
 type CommandResult = { report?: ImportReport; createdId?: string };
 const defaults = [
   { name: "Pendiente", color: "#64748b", done: false },
@@ -36,56 +41,22 @@ async function each<T>(
   for (let index = 0; index < items.length; index++)
     await fn(items[index], index);
 }
-const restoreTables = [
-  "user",
-  "account",
-  "installation",
-  "projects",
-  "project_members",
-  "modules",
-  "features",
-  "statuses",
-  "priorities",
-  "task_types",
-  "impacts",
-  "labels",
-  "tasks",
-  "checklists",
-  "checklist_items",
-  "comments",
-  "task_status_history",
-  "invitations",
-  "invitation_projects",
-  "session",
-  "verification",
-  "__drizzle_migrations",
-];
-
-export class SqliteRepository implements WorkspaceRepository {
+export class PostgresRepository implements WorkspaceRepository {
   // Incrementar al cambiar el contrato o las migraciones de una instancia cacheada.
-  static readonly cacheVersion = 3;
-  readonly cacheVersion = SqliteRepository.cacheVersion;
+  static readonly cacheVersion = 4;
+  readonly cacheVersion = PostgresRepository.cacheVersion;
   readonly store: DatabaseStore;
-  readonly db: DatabaseSync;
-  private restoring = false;
-  private temporaryDirectory?: string;
   private actorContext = new AsyncLocalStorage<Actor>();
-  constructor(path: string, _legacySeed = false) {
-    if (path === ":memory:") {
-      this.temporaryDirectory = mkdtempSync(join(tmpdir(), "brote-test-"));
-      path = join(this.temporaryDirectory, "workspace.sqlite");
-    }
-    this.store = new DatabaseStore(path);
-    this.db = new DatabaseSync(path, { timeout: 5000 });
-    this.db.exec("PRAGMA foreign_keys=ON;");
+  constructor(connectionString: string, options: DatabaseOptions = {}) {
+    this.store = new DatabaseStore(connectionString, options);
   }
-  private table(name: string): AnySQLiteTable {
+  private table(name: string): AnyPgTable {
     const table = schema.domainTables[name as keyof typeof schema.domainTables];
     if (!table) throw new Error("Tabla de dominio desconocida.");
     return table;
   }
   private condition(
-    table: AnySQLiteTable,
+    table: AnyPgTable,
     fields: Row,
     insensitive: string[] = [],
   ): SQL | undefined {
@@ -96,7 +67,7 @@ export class SqliteRepository implements WorkspaceRepository {
         return value === null
           ? isNull(columns[key])
           : insensitive.includes(key)
-            ? sql`${columns[key]} = ${value} collate nocase`
+            ? sql`lower(${columns[key]}) = lower(${value})`
             : eq(columns[key], value);
       }),
     );
@@ -345,7 +316,10 @@ export class SqliteRepository implements WorkspaceRepository {
     }
     return false;
   }
-  async getWorkspace(actor: Actor): Promise<Workspace> {
+  getWorkspace(actor: Actor): Promise<Workspace> {
+    return this.store.snapshot(() => this.readWorkspace(actor));
+  }
+  private async readWorkspace(actor: Actor): Promise<Workspace> {
     const currentUser = await this.currentUser(actor);
     const memberships = await this.store.db
       .select()
@@ -380,21 +354,21 @@ export class SqliteRepository implements WorkspaceRepository {
       impacts,
       labels,
       tasks,
-    ] = await Promise.all([
-      rows("modules"),
-      rows("features"),
-      rows("statuses"),
-      rows("priorities"),
-      rows("task_types"),
-      rows("impacts"),
-      rows("labels"),
-      rows("tasks"),
+    ] = await sequential([
+      () => rows("modules"),
+      () => rows("features"),
+      () => rows("statuses"),
+      () => rows("priorities"),
+      () => rows("task_types"),
+      () => rows("impacts"),
+      () => rows("labels"),
+      () => rows("tasks"),
     ]);
     const taskIds = tasks.map((t) => String(t.id));
-    const [lists, comments, history] = await Promise.all([
-      rows("checklists", "taskId", taskIds),
-      rows("comments", "taskId", taskIds),
-      rows("task_status_history", "taskId", taskIds),
+    const [lists, comments, history] = await sequential([
+      () => rows("checklists", "taskId", taskIds),
+      () => rows("comments", "taskId", taskIds),
+      () => rows("task_status_history", "taskId", taskIds),
     ]);
     const items = await rows(
       "checklist_items",
@@ -433,7 +407,7 @@ export class SqliteRepository implements WorkspaceRepository {
         return {
           ...row,
           archived: Boolean(t.archived),
-          labels: JSON.parse(String(t.labels)),
+          labels: t.labels,
           checklists: sort(lists.filter((l) => l.taskId === t.id)).map((l) => ({
             ...l,
             items: sort(items.filter((i) => i.checklistId === l.id)).map(
@@ -454,128 +428,17 @@ export class SqliteRepository implements WorkspaceRepository {
       }),
     } as unknown as Workspace;
   }
-  async exportBackup(destination: string) {
-    await this.store.ready;
-    await backup(this.db, destination);
+  exportBackup(destination: string) {
+    return exportApplicationBackup(this.store, destination);
   }
-  async restoreBackup(source: string, beforeRestore?: () => Promise<void>) {
-    await this.store.ready;
-    if (this.restoring)
-      throw new DomainError("Ya hay una restauración en curso.", 409);
-    this.restoring = true;
-    let input: DatabaseSync | undefined,
-      attached = false,
-      validated = false;
-    try {
-      input = new DatabaseSync(source, { readOnly: true });
-      input.exec("PRAGMA trusted_schema=OFF;");
-      if (input.prepare("PRAGMA user_version").get()?.user_version !== 8)
-        throw new DomainError(
-          "El respaldo no es compatible. Se requiere un respaldo de Brote con autenticación.",
-        );
-      const objects = input
-        .prepare(
-          "SELECT name,type,sql FROM sqlite_schema WHERE name NOT LIKE 'sqlite_%'",
-        )
-        .all();
-      if (
-        objects.some(
-          (o) =>
-            !["table", "index"].includes(String(o.type)) ||
-            (o.type === "table" && !restoreTables.includes(String(o.name))) ||
-            /CREATE\s+VIRTUAL\s+TABLE/i.test(String(o.sql)),
-        )
-      )
-        throw new DomainError(
-          "El respaldo contiene una estructura no compatible.",
-        );
-      for (const table of restoreTables) {
-        const expected = this.db.prepare(`PRAGMA table_info("${table}")`).all(),
-          actual = input.prepare(`PRAGMA table_info("${table}")`).all();
-        if (
-          !actual.length ||
-          JSON.stringify(expected) !== JSON.stringify(actual)
-        )
-          throw new DomainError(
-            "El respaldo está incompleto o tiene una estructura incompatible.",
-          );
-      }
-      if (
-        input.prepare("PRAGMA integrity_check").get()?.integrity_check !==
-          "ok" ||
-        input.prepare("PRAGMA foreign_key_check").all().length
-      )
-        throw new DomainError(
-          "El respaldo está dañado o tiene referencias inválidas.",
-        );
-      const admin = input
-        .prepare(
-          "SELECT u.id FROM installation i JOIN user u ON u.id=i.adminId WHERE i.id=1 AND u.role='admin'",
-        )
-        .get();
-      if (!admin)
-        throw new DomainError(
-          "El respaldo no contiene un administrador válido.",
-        );
-      for (const task of input.prepare("SELECT labels FROM tasks").all()) {
-        const labels = JSON.parse(String(task.labels));
-        if (!Array.isArray(labels) || labels.some((l) => typeof l !== "string"))
-          throw new DomainError("El respaldo contiene etiquetas inválidas.");
-      }
-      input.close();
-      input = undefined;
-      validated = true;
-      await beforeRestore?.();
-      this.db.prepare("ATTACH DATABASE ? AS restore_source").run(source);
-      attached = true;
-      this.db.exec("PRAGMA foreign_keys=OFF; BEGIN IMMEDIATE;");
-      try {
-        for (const table of restoreTables) {
-          const columns = this.db
-            .prepare(`PRAGMA table_info("${table}")`)
-            .all()
-            .map((c) => `"${String(c.name)}"`)
-            .join(",");
-          this.db.exec(
-            `DELETE FROM main."${table}"; INSERT INTO main."${table}" (${columns}) SELECT ${columns} FROM restore_source."${table}";`,
-          );
-        }
-        this.db.exec(
-          "DELETE FROM main.sqlite_sequence; INSERT INTO main.sqlite_sequence SELECT * FROM restore_source.sqlite_sequence; DELETE FROM session; DELETE FROM verification; UPDATE invitations SET revokedAt=COALESCE(revokedAt,unixepoch()*1000) WHERE acceptedAt IS NULL;",
-        );
-        if (this.db.prepare("PRAGMA main.foreign_key_check").all().length)
-          throw new DomainError("El respaldo tiene referencias inválidas.");
-        this.db.exec("COMMIT;");
-      } catch (error) {
-        this.db.exec("ROLLBACK;");
-        throw error;
-      } finally {
-        this.db.exec("PRAGMA foreign_keys=ON;");
-      }
-    } catch (error) {
-      if (error instanceof DomainError || validated) throw error;
-      throw new DomainError(
-        "No se pudo restaurar un respaldo SQLite válido y compatible.",
-      );
-    } finally {
-      input?.close();
-      if (attached) this.db.exec("DETACH DATABASE restore_source;");
-      this.restoring = false;
-    }
+  restoreBackup(source: string, beforeRestore?: () => Promise<void>) {
+    return restoreApplicationBackup(this.store, source, beforeRestore);
+  }
+  exclusiveBackup<T>(action: () => Promise<T>) {
+    return this.store.exclusiveOperation(action);
   }
   async close() {
-    await this.store.ready.catch(() => {});
-    this.store.close();
-    this.db.close();
-    if (this.temporaryDirectory) {
-      const { rm } = await import("node:fs/promises");
-      await rm(this.temporaryDirectory, {
-        recursive: true,
-        force: true,
-        maxRetries: 12,
-        retryDelay: 50,
-      });
-    }
+    await this.store.close();
   }
 
   private async defaultPriorities(projectId: string) {
@@ -608,8 +471,8 @@ export class SqliteRepository implements WorkspaceRepository {
     };
     return [
       ...new Set(
-        await Promise.all(
-          names.map(async (name, index) => {
+        await sequential(
+          names.map((name, index) => async () => {
             const existing = await this.optionNamed("labels", projectId, name);
             if (existing) return String(existing.name);
             const inputColor = colors[index] ?? "";
@@ -651,16 +514,16 @@ export class SqliteRepository implements WorkspaceRepository {
       [],
       false,
     )) {
-      const labels: string[] = JSON.parse(String(task.labels));
+      const labels = task.labels as string[];
       if (!labels.includes(oldName)) continue;
       await this.update("tasks", String(task.id), {
-        labels: JSON.stringify([
+        labels: [
           ...new Set(
             labels.flatMap((label) =>
               label === oldName ? (newName ? [newName] : []) : [label],
             ),
           ),
-        ]),
+        ],
         updatedAt: new Date().toISOString(),
       });
     }
@@ -703,7 +566,7 @@ export class SqliteRepository implements WorkspaceRepository {
           projectId: id,
           name: s.name,
           color: s.color,
-          isDone: Number(s.done),
+          isDone: s.done,
           position,
         }),
     );
@@ -773,11 +636,6 @@ export class SqliteRepository implements WorkspaceRepository {
     });
   }
   async execute(command: Command, actor: Actor): Promise<CommandResult> {
-    if (this.restoring)
-      throw new DomainError(
-        "Hay una restauración en curso. Espera a que termine.",
-        409,
-      );
     return this.actorContext.run(actor, async () =>
       this.transaction(async () => {
         await this.authorize(command, actor);
@@ -904,7 +762,7 @@ export class SqliteRepository implements WorkspaceRepository {
                 (
                   await this.countWhere("features", {
                     projectId: feature.projectId,
-                    pinned: 1,
+                    pinned: true,
                   })
                 )?.n,
               ) >= 5
@@ -913,7 +771,7 @@ export class SqliteRepository implements WorkspaceRepository {
                 "Puedes fijar un máximo de 5 features por proyecto. Desfija una antes de añadir otra.",
               );
             }
-            await this.update("features", c.id, { pinned: Number(c.pinned) });
+            await this.update("features", c.id, { pinned: c.pinned });
             break;
           }
           case "feature.reorder": {
@@ -964,7 +822,7 @@ export class SqliteRepository implements WorkspaceRepository {
                 projectId: p,
                 name: c.name,
                 color: c.color,
-                isDone: Number(c.isDone),
+                isDone: c.isDone,
                 position: await this.nextPosition("statuses", p),
               });
               return { createdId: id };
@@ -972,7 +830,7 @@ export class SqliteRepository implements WorkspaceRepository {
             await this.update("statuses", c.id, {
               name: c.name,
               color: c.color,
-              isDone: Number(c.isDone),
+              isDone: c.isDone,
             });
             break;
           }
@@ -1110,7 +968,7 @@ export class SqliteRepository implements WorkspaceRepository {
                   ? (existing?.dueTime ?? null)
                   : c.dueTime
                 : null,
-              labels: JSON.stringify(labels),
+              labels,
               updatedAt: new Date().toISOString(),
             };
             if (c.type === "task.create") {
@@ -1119,7 +977,7 @@ export class SqliteRepository implements WorkspaceRepository {
                 id,
                 projectId: p,
                 ...fields,
-                archived: 0,
+                archived: false,
                 position: await this.nextPosition("tasks", p),
                 externalId: null,
                 createdAt: fields.updatedAt,
@@ -1173,7 +1031,7 @@ export class SqliteRepository implements WorkspaceRepository {
           }
           case "task.archive":
             await this.update("tasks", c.id, {
-              archived: Number(c.archived),
+              archived: c.archived,
               updatedAt: new Date().toISOString(),
             });
             break;
@@ -1345,7 +1203,7 @@ export class SqliteRepository implements WorkspaceRepository {
               id,
               checklistId: c.checklistId,
               title: c.title,
-              completed: 0,
+              completed: false,
               position: Number(
                 (
                   await this.positionWhere("checklist_items", {
@@ -1359,7 +1217,7 @@ export class SqliteRepository implements WorkspaceRepository {
           case "checklist.item.update":
             await this.update("checklist_items", c.id, {
               title: c.title,
-              completed: Number(c.completed),
+              completed: c.completed,
             });
             break;
           case "checklist.item.delete":
@@ -1435,7 +1293,7 @@ export class SqliteRepository implements WorkspaceRepository {
           name,
           color: "#64748b",
           position: await this.nextPosition("statuses", projectId),
-          isDone: 0,
+          isDone: false,
         });
       statusMap.set(listId, statusId);
       return statusId;
@@ -1480,16 +1338,14 @@ export class SqliteRepository implements WorkspaceRepository {
         dueDate: card.due
           ? new Date(card.due).toISOString().slice(0, 10)
           : null,
-        archived: Number(
+        archived: Boolean(
           card.closed || listMap.get(card.idList)?.closed || false,
         ),
         position: await this.nextPosition("tasks", projectId),
-        labels: JSON.stringify(
-          await this.ensureLabels(
-            projectId,
-            card.labels.map((l) => l.name || l.color || "Etiqueta"),
-            card.labels.map((l) => l.color ?? ""),
-          ),
+        labels: await this.ensureLabels(
+          projectId,
+          card.labels.map((l) => l.name || l.color || "Etiqueta"),
+          card.labels.map((l) => l.color ?? ""),
         ),
         externalId: `trello:${card.id}`,
         createdAt: new Date().toISOString(),

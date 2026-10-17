@@ -1,13 +1,13 @@
+import { assertIntegrity } from "./postgres-fixture";
 import { actor, createRepository } from "./helpers";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
-import { SqliteRepository } from "../src/server/sqlite";
-async function setup(path = ":memory:") {
-  const repo = await createRepository(path, false);
+import { PostgresRepository } from "../src/server/postgres";
+async function setup() {
+  const repo = await createRepository();
   const projectId = (
     await repo.execute(
       {
@@ -197,8 +197,7 @@ test("los cambios rechazados no añaden historial ni modifican la tarea", async 
 });
 test("el historial conserva nombres y colores históricos, persiste en respaldo y se elimina con la tarea", async () => {
   const dir = await mkdtemp(join(tmpdir(), "brote-history-"));
-  const path = join(dir, "workspace.sqlite");
-  let { repo, id, statuses } = await setup(path);
+  let { repo, id, statuses } = await setup();
   try {
     await repo.execute(
       {
@@ -227,12 +226,18 @@ test("el historial conserva nombres y colores históricos, persiste en respaldo 
     );
     assert.equal(history[0].fromStatusColor, statuses[0].color);
     const snapshot = await repo.getWorkspace(actor);
-    const backupPath = join(dir, "backup.sqlite");
+    const backupPath = join(dir, "backup.brote-backup.json");
     await repo.exportBackup(backupPath);
-    await repo.close();
-    repo = await createRepository(path, false);
-    assert.deepEqual(await repo.getWorkspace(actor), snapshot);
-    const restored = await createRepository(backupPath, false);
+    const peer = new PostgresRepository(repo.store.connectionString, {
+      schema: repo.store.schemaName,
+    });
+    try {
+      assert.deepEqual(await peer.getWorkspace(actor), snapshot);
+    } finally {
+      await peer.close();
+    }
+    const restored = await createRepository();
+    await restored.restoreBackup(backupPath);
     try {
       assert.deepEqual(await restored.getWorkspace(actor), snapshot);
     } finally {
@@ -240,10 +245,16 @@ test("el historial conserva nombres y colores históricos, persiste en respaldo 
     }
     await repo.execute({ type: "task.delete", id }, actor);
     assert.equal(
-      repo.db.prepare("SELECT COUNT(*) AS n FROM task_status_history").get()?.n,
+      Number(
+        (
+          await repo.store.pool.query(
+            "SELECT COUNT(*) AS n FROM task_status_history",
+          )
+        ).rows[0].n,
+      ),
       0,
     );
-    assert.deepEqual(repo.db.prepare("PRAGMA foreign_key_check").all(), []);
+    await assertIntegrity(repo);
   } finally {
     await repo.close();
     await rm(dir, {

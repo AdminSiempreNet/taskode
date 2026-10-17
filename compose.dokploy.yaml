@@ -1,12 +1,42 @@
 services:
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg18-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-brote}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Required}
+      BROTE_DB_PASSWORD: ${BROTE_DB_PASSWORD:?Required}
+    volumes:
+      - brote-postgres:/var/lib/postgresql
+    configs:
+      - source: postgres-init
+        target: /docker-entrypoint-initdb.d/10-brote.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrator
+    environment:
+      DATABASE_URL: postgresql://brote:${BROTE_DB_PASSWORD:?Required}@postgres:5432/${POSTGRES_DB:-brote}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
   brote:
     build:
       context: .
       dockerfile: Dockerfile
+      target: runner
     expose:
       - "5010"
     environment:
-      DATABASE_PATH: /app/data/brote.sqlite
+      DATABASE_URL: postgresql://brote:${BROTE_DB_PASSWORD:?Required}@postgres:5432/${POSTGRES_DB:-brote}
+      BACKUP_DIR: /app/backups
       BETTER_AUTH_URL: https://tareas.eduinpro.net
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Required}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
@@ -15,8 +45,32 @@ services:
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     volumes:
-      - brote-data:/app/data
+      - brote-backups:/app/backups
     restart: unless-stopped
 volumes:
-  brote-data:
+  brote-postgres:
+  brote-backups:
+configs:
+  postgres-init:
+    content: |
+      #!/bin/sh
+      set -eu
+      psql -v ON_ERROR_STOP=1 --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB" \
+        --set=app_password="$$BROTE_DB_PASSWORD" --set=app_db="$$POSTGRES_DB" <<'SQL'
+      SELECT format('CREATE ROLE brote LOGIN PASSWORD %L', :'app_password') \gexec
+      SELECT format('GRANT CONNECT, CREATE ON DATABASE %I TO brote', :'app_db') \gexec
+      GRANT USAGE, CREATE ON SCHEMA public TO brote;
+      CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
+      SQL
+      if [ "$${BROTE_CREATE_TEST_DB:-0}" = "1" ]; then
+        psql -v ON_ERROR_STOP=1 --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB" \
+          -c 'CREATE DATABASE brote_test OWNER brote;'
+        psql -v ON_ERROR_STOP=1 --username "$$POSTGRES_USER" --dbname brote_test \
+          -c 'CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;'
+      fi

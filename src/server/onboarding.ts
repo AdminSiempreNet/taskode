@@ -1,12 +1,12 @@
 import { eq } from "drizzle-orm";
 import { commandSchema } from "../lib/validation";
 import type { Actor } from "../lib/types";
-import type { SqliteRepository } from "./sqlite";
+import type { PostgresRepository } from "./postgres";
 import { installation } from "./schema";
 import { DomainError } from "./repository";
 
 export async function createFirstProject(
-  repo: SqliteRepository,
+  repo: PostgresRepository,
   actor: Actor,
   input: unknown,
   demo: boolean,
@@ -30,7 +30,7 @@ export async function createFirstProject(
     return { projectId };
   });
 }
-export async function finishOnboarding(repo: SqliteRepository, actor: Actor) {
+export async function finishOnboarding(repo: PostgresRepository, actor: Actor) {
   await repo.requireAdmin(actor);
   await repo.store.transaction(async () => {
     const state = await repo.store.state();
@@ -43,7 +43,7 @@ export async function finishOnboarding(repo: SqliteRepository, actor: Actor) {
   });
 }
 async function seedWebApplication(
-  repo: SqliteRepository,
+  repo: PostgresRepository,
   actor: Actor,
   projectId: string,
 ) {

@@ -1,10 +1,6 @@
 import { startHttpFixture } from "./http-fixture.ts";
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
 
 let base, fixture;
@@ -167,12 +163,7 @@ test("HTTP: página de tarea, inicio/fin, catálogos, checklist y comentarios pe
     await send({ type: "checklist.delete", id: listId });
     const backup = await fetch(base + "/api/backup");
     assert.equal(backup.status, 200);
-    assert.equal(
-      Buffer.from(await backup.arrayBuffer())
-        .subarray(0, 16)
-        .toString(),
-      "SQLite format 3\0",
-    );
+    assert.equal((await backup.json()).format, "brote-backup");
     await send({ type: "task.delete", id: taskId });
     assert.equal((await fetch(base + route)).status, 404);
   } finally {
@@ -348,7 +339,6 @@ test("HTTP: orden y fijadas se guardan, y la sexta fijada se rechaza con un erro
   }
 });
 test("HTTP: crear, editar, mover, archivar, restaurar, importar, respaldar y eliminar", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "brote-http-"));
   let projectId;
   try {
     const created = await send({
@@ -429,30 +419,20 @@ test("HTTP: crear, editar, mover, archivar, restaurar, importar, respaldar y eli
     assert.equal(repeated.report.skipped, 1);
     const response = await fetch(base + "/api/backup");
     assert.equal(response.status, 200);
-    assert.match(response.headers.get("content-disposition"), /\.sqlite/);
-    const buffer = Buffer.from(await response.arrayBuffer());
-    assert.equal(buffer.subarray(0, 16).toString(), "SQLite format 3\0");
-    const path = join(dir, "backup.sqlite");
-    await writeFile(path, buffer);
-    const copy = new DatabaseSync(path);
-    try {
-      assert.equal(
-        copy.prepare("PRAGMA integrity_check").get().integrity_check,
-        "ok",
-      );
-      assert.equal(
-        copy
-          .prepare("SELECT COUNT(*) AS n FROM tasks WHERE projectId=?")
-          .get(projectId).n,
-        2,
-      );
-      assert.equal(
-        copy.prepare("SELECT dueTime FROM tasks WHERE id=?").get(id).dueTime,
-        "09:30",
-      );
-    } finally {
-      copy.close();
-    }
+    assert.match(
+      response.headers.get("content-disposition"),
+      /\.brote-backup\.json/,
+    );
+    const copy = await response.json();
+    assert.equal(copy.format, "brote-backup");
+    assert.equal(
+      copy.tables.tasks.filter((task) => task.projectId === projectId).length,
+      2,
+    );
+    assert.equal(
+      copy.tables.tasks.find((task) => task.id === id).dueTime,
+      "09:30",
+    );
     await send({ type: "task.delete", id });
   } finally {
     if (projectId) {
@@ -462,12 +442,6 @@ test("HTTP: crear, editar, mover, archivar, restaurar, importar, respaldar y eli
         !removed.workspace.tasks.some((t) => t.projectId === projectId),
       );
     }
-    await rm(dir, {
-      recursive: true,
-      force: true,
-      maxRetries: 20,
-      retryDelay: 50,
-    });
   }
 });
 

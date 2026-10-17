@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SqliteRepository } from "../src/server/sqlite";
+import { PostgresRepository } from "../src/server/postgres";
 import { BackupManager } from "../src/server/backups";
 import { GET as list, POST as create } from "../src/app/api/backups/route";
 import {
@@ -17,8 +17,8 @@ const base = "http://localhost:5010";
 async function setup() {
   Object.assign(process.env, authConfig);
   const dir = await mkdtemp(join(tmpdir(), "brote-backup-http-"));
-  const path = join(dir, "workspace.sqlite");
-  const repo = await createRepository(path, false);
+  const path = dir;
+  const repo = await createRepository();
   const manager = new BackupManager(repo, path);
   Object.assign(globalThis, { broteRepository: repo, broteBackups: manager });
   return {
@@ -64,10 +64,8 @@ test("API de respaldos: lista, genera, descarga y elimina con nombres seguros", 
       /attachment; filename="brote-/,
     );
     assert.equal(
-      Buffer.from(await file.arrayBuffer())
-        .subarray(0, 16)
-        .toString(),
-      "SQLite format 3\0",
+      JSON.parse(Buffer.from(await file.arrayBuffer()).toString()).format,
+      "brote-backup",
     );
     assert.equal(
       (await (await list(await authenticatedRequest(base))).json()).backups
@@ -170,7 +168,7 @@ test("API de restauración: exige confirmación y opción previa; valida multipa
     form.delete("backupBeforeRestore");
     assert.equal((await restore(await formRequest(form))).status, 400);
     form.set("backupBeforeRestore", "false");
-    form.set("file", new File(["invalid"], "invalid.sqlite"));
+    form.set("file", new File(["invalid"], "invalid.brote-backup.json"));
     assert.equal((await restore(await formRequest(form))).status, 400);
     form.delete("backupId");
     assert.equal((await restore(await formRequest(form))).status, 400);
@@ -211,7 +209,7 @@ test("API restaura copia del servidor y archivo adjunto con o sin respaldo previ
     assert.deepEqual(await s.repo.getWorkspace(actor), snapshot);
     await s.repo.execute({ type: "project.delete", id: project }, actor);
     form.delete("backupId");
-    form.set("file", new File([bytes], "backup.sqlite"));
+    form.set("file", new File([bytes], "backup.brote-backup.json"));
     form.set("backupBeforeRestore", "false");
     const uploaded = await restore(await formRequest(form));
     assert.equal(uploaded.status, 200);

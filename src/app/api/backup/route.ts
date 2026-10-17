@@ -8,13 +8,14 @@ export const dynamic = "force-dynamic";
 async function handleGET(_request: Request) {
   const dir = await mkdtemp(join(tmpdir(), "brote-backup-"));
   try {
-    const path = join(dir, "backup.sqlite");
-    await repository().exportBackup(path);
+    const path = join(dir, "backup.brote-backup.json");
+    const repo = repository();
+    await repo.exclusiveBackup(() => repo.exportBackup(path));
     const bytes = await readFile(/* turbopackIgnore: true */ path);
     return new Response(bytes, {
       headers: {
-        "Content-Type": "application/vnd.sqlite3",
-        "Content-Disposition": `attachment; filename="brote-${new Date().toISOString().slice(0, 10)}.sqlite"`,
+        "Content-Type": "application/json",
+        "Content-Disposition": `attachment; filename="brote-${new Date().toISOString().slice(0, 10)}.brote-backup.json"`,
         "Cache-Control": "no-store",
       },
     });

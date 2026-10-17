@@ -10,20 +10,18 @@ import { actor, authConfig, createRepository } from "./helpers";
 import { session } from "../src/server/schema";
 export async function startHttpFixture(external = false) {
   const directory = await mkdtemp(join(tmpdir(), "brote-http-")),
-    path = join(directory, "workspace.sqlite");
-  const repo = await createRepository(path),
+    backupDirectory = join(directory, "backups");
+  const repo = await createRepository(),
     token = randomUUID(),
     now = new Date();
-  await repo.store.db
-    .insert(session)
-    .values({
-      id: randomUUID(),
-      userId: actor.id,
-      token,
-      createdAt: now,
-      updatedAt: now,
-      expiresAt: new Date(Date.now() + 86400000),
-    });
+  await repo.store.db.insert(session).values({
+    id: randomUUID(),
+    userId: actor.id,
+    token,
+    createdAt: now,
+    updatedAt: now,
+    expiresAt: new Date(Date.now() + 86400000),
+  });
   const cookie = (
     await serializeSignedCookie(
       "better-auth.session_token",
@@ -53,7 +51,9 @@ export async function startHttpFixture(external = false) {
         ...process.env,
         ...authConfig,
         BETTER_AUTH_URL: base,
-        DATABASE_PATH: path,
+        DATABASE_URL: repo.store.connectionString,
+        DATABASE_SCHEMA: repo.store.schemaName,
+        BACKUP_DIR: backupDirectory,
         RESEND_API_KEY: "",
         RESEND_FROM_EMAIL: "",
         NODE_ENV: "production",

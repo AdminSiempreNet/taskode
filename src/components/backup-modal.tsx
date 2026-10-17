@@ -457,12 +457,12 @@ export function BackupModal({ close }: { close: () => void }) {
                 ) : (
                   <div className="field">
                     <label htmlFor="restore-file">
-                      Archivo de respaldo SQLite
+                      Archivo de respaldo JSON de Brote
                     </label>
                     <Input
                       id="restore-file"
                       type="file"
-                      accept=".sqlite,.sqlite3,.db,application/vnd.sqlite3,application/x-sqlite3"
+                      accept=".brote-backup.json,application/json"
                       disabled={busy}
                       aria-describedby="restore-file-help"
                       onChange={(event) => {
@@ -475,15 +475,15 @@ export function BackupModal({ close }: { close: () => void }) {
                         ) {
                           setFile(null);
                           setError(
-                            "Adjunta un respaldo SQLite de hasta 100 MB.",
+                            "Adjunta un respaldo JSON de Brote de hasta 100 MB.",
                           );
                           event.target.value = "";
                         } else setFile(selectedFile);
                       }}
                     />
                     <p id="restore-file-help" className="backup-hint">
-                      Adjunta una copia exportada desde Brote (.sqlite, .sqlite3
-                      o .db), de hasta 100 MB.
+                      Adjunta una copia exportada desde Brote
+                      (.brote-backup.json), de hasta 100 MB.
                     </p>
                     {file && (
                       <p className="backup-selected-file">

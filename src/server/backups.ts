@@ -10,7 +10,7 @@ import {
   rm,
   writeFile,
 } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
   MAX_BACKUP_BYTES,
@@ -20,18 +20,19 @@ import {
 import { DomainError, type WorkspaceRepository } from "./repository";
 
 const backupName =
-  /^brote-(manual|before-restore)-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[a-f0-9-]{36}\.sqlite$/;
+  /^brote-(manual|before-restore)-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[a-f0-9-]{36}\.brote-backup\.json$/;
 type RestoreSource =
-  { backupId: string; file?: never } | { file: Uint8Array; backupId?: never };
+  | { backupId: string; file?: never }
+  | { file: Uint8Array; backupId?: never };
 
 export class BackupManager {
   readonly directory: string;
   private busy = false;
   constructor(
     private repository: WorkspaceRepository,
-    databasePath: string,
+    backupDirectory: string,
   ) {
-    this.directory = join(dirname(databasePath), "backups");
+    this.directory = backupDirectory;
   }
   private async exclusive<T>(action: () => Promise<T>): Promise<T> {
     if (this.busy)
@@ -41,7 +42,7 @@ export class BackupManager {
       );
     this.busy = true;
     try {
-      return await action();
+      return await this.repository.exclusiveBackup(action);
     } finally {
       this.busy = false;
     }
@@ -90,8 +91,11 @@ export class BackupManager {
   }
   private async save(kind: BackupFile["kind"]): Promise<BackupFile> {
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
-    const id = `brote-${kind}-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID()}.sqlite`;
-    const pending = join(this.directory, `.pending-${randomUUID()}.sqlite`);
+    const id = `brote-${kind}-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID()}.brote-backup.json`;
+    const pending = join(
+      this.directory,
+      `.pending-${randomUUID()}.brote-backup.json`,
+    );
     try {
       await this.repository.exportBackup(pending);
       await rename(pending, join(this.directory, id));
@@ -133,13 +137,13 @@ export class BackupManager {
         (!source.file.length || source.file.length > MAX_BACKUP_BYTES)
       )
         throw new DomainError(
-          "Adjunta un respaldo SQLite de hasta 100 MB.",
+          "Adjunta un respaldo JSON de Brote de hasta 100 MB.",
           413,
         );
       const dir = await mkdtemp(join(tmpdir(), "brote-restore-"));
       let safetyBackup: BackupFile | undefined;
       try {
-        const path = join(dir, "restore.sqlite");
+        const path = join(dir, "restore.brote-backup.json");
         if (source.backupId !== undefined) {
           await this.metadata(source.backupId);
           await copyFile(join(this.directory, source.backupId), path);

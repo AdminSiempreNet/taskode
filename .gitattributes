@@ -1,0 +1,2 @@
+*.sh text eol=lf
+/drizzle/postgresql/*.sql text eol=lf
