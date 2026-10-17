@@ -18,12 +18,12 @@ import {
   type BackupFile,
 } from "../lib/backups";
 import { DomainError, type WorkspaceRepository } from "./repository";
+import { backupName, type BackupStorage } from "./backup-storage";
 
-const backupName =
-  /^brote-(manual|before-restore)-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[a-f0-9-]{36}\.brote-backup\.json$/;
 type RestoreSource =
-  | { backupId: string; file?: never }
-  | { file: Uint8Array; backupId?: never };
+  | { backupId: string; file?: never; uploadId?: never }
+  | { file: Uint8Array; backupId?: never; uploadId?: never }
+  | { uploadId: string; backupId?: never; file?: never };
 
 export class BackupManager {
   readonly directory: string;
@@ -31,6 +31,7 @@ export class BackupManager {
   constructor(
     private repository: WorkspaceRepository,
     backupDirectory: string,
+    private storage?: BackupStorage,
   ) {
     this.directory = backupDirectory;
   }
@@ -50,6 +51,7 @@ export class BackupManager {
   private async metadata(id: string): Promise<BackupFile> {
     if (!backupName.test(id))
       throw new DomainError("El respaldo no existe.", 404);
+    if (this.storage) return this.storage.metadata(id);
     try {
       // Backups are runtime data, not assets for Turbopack to trace or watch.
       const path = join(this.directory, id);
@@ -70,6 +72,7 @@ export class BackupManager {
     }
   }
   async list(): Promise<BackupFile[]> {
+    if (this.storage) return this.storage.list();
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
     const directory = this.directory;
     const files = await Promise.all(
@@ -90,6 +93,23 @@ export class BackupManager {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
   private async save(kind: BackupFile["kind"]): Promise<BackupFile> {
+    if (this.storage) {
+      const directory = await mkdtemp(join(tmpdir(), "brote-export-"));
+      try {
+        const path = join(directory, "backup.json");
+        await this.repository.exportBackup(path);
+        const bytes = await readFile(/* turbopackIgnore: true */ path);
+        const createdAt = new Date().toISOString();
+        const file: BackupFile = {
+          id: `brote-${kind}-${createdAt.replace(/[:.]/g, "-")}-${randomUUID()}.brote-backup.json`,
+          kind, createdAt, size: bytes.length,
+        };
+        await this.storage.write(file, bytes);
+        return file;
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
+    }
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
     const id = `brote-${kind}-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID()}.brote-backup.json`;
     const pending = join(
@@ -107,9 +127,21 @@ export class BackupManager {
   create() {
     return this.exclusive(() => this.save("manual"));
   }
+  async downloadUrl(id: string) {
+    return this.exclusive(async () => {
+      await this.metadata(id);
+      return this.storage?.downloadUrl?.(id) ?? null;
+    });
+  }
+  createUpload() {
+    if (!this.storage?.createUpload)
+      throw new DomainError("La carga directa requiere almacenamiento S3.", 400);
+    return this.storage.createUpload();
+  }
   download(id: string) {
     return this.exclusive(async () => {
       await this.metadata(id);
+      if (this.storage) return this.storage.read(id);
       const path = join(this.directory, id);
       return readFile(/* turbopackIgnore: true */ path);
     });
@@ -117,6 +149,7 @@ export class BackupManager {
   delete(id: string) {
     return this.exclusive(async () => {
       await this.metadata(id);
+      if (this.storage) return this.storage.delete(id);
       await rm(join(this.directory, id));
     });
   }
@@ -144,9 +177,14 @@ export class BackupManager {
       let safetyBackup: BackupFile | undefined;
       try {
         const path = join(dir, "restore.brote-backup.json");
-        if (source.backupId !== undefined) {
+        if (source.uploadId !== undefined) {
+          if (!this.storage?.readUpload) throw new DomainError("La carga directa requiere almacenamiento S3.");
+          await writeFile(path, await this.storage.readUpload(source.uploadId), { flag: "wx", mode: 0o600 });
+        } else if (source.backupId !== undefined) {
           await this.metadata(source.backupId);
-          await copyFile(join(this.directory, source.backupId), path);
+          if (this.storage)
+            await writeFile(path, await this.storage.read(source.backupId), { flag: "wx", mode: 0o600 });
+          else await copyFile(join(this.directory, source.backupId), path);
         } else {
           await writeFile(path, source.file!, { flag: "wx", mode: 0o600 });
         }
@@ -157,6 +195,8 @@ export class BackupManager {
         return { safetyBackup };
       } finally {
         await rm(dir, { recursive: true, force: true });
+        if (source.uploadId && this.storage?.deleteUpload)
+          await this.storage.deleteUpload(source.uploadId).catch(() => console.error("No se pudo eliminar una carga temporal de respaldo."));
       }
     });
   }

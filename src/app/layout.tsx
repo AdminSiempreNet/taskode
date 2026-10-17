@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   description:
     "Un espacio para tus proyectos, de la primera idea al siguiente logro.",
 };
+export const maxDuration = 60;
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {

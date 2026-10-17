@@ -1,7 +1,9 @@
 import { resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { PostgresRepository } from "./postgres";
 import { databaseUrl, databaseSchema } from "./database";
 import { BackupManager } from "./backups";
+import { createBackupStorage } from "./s3-backup-storage";
 const globalDatabase = globalThis as typeof globalThis & {
   broteRepository?: PostgresRepository;
   broteBackups?: BackupManager;
@@ -22,10 +24,13 @@ export function repository(): PostgresRepository {
 }
 export function backups() {
   const repo = repository();
+  if (globalDatabase.broteBackups) return globalDatabase.broteBackups;
+  const storage = createBackupStorage();
   return (globalDatabase.broteBackups ??= new BackupManager(
     repo,
     resolve(
-      /* turbopackIgnore: true */ process.env.BACKUP_DIR || "./data/backups",
+      /* turbopackIgnore: true */ storage ? tmpdir() : process.env.BACKUP_DIR || "./data/backups",
     ),
+    storage,
   ));
 }

@@ -6,7 +6,7 @@ La [decisión de arquitectura y sus fases](docs/migracion-sqlite-postgresql.md) 
 
 ## Desarrollo local
 
-Requiere Node.js **24 o posterior** y Docker Desktop con Docker Compose. Next.js corre en Windows con Fast Refresh; PostgreSQL 18 con pgvector 0.8.7 corre en un contenedor exclusivo de este proyecto. Desarrollo, producción y Dokploy usan `pgvector/pgvector:0.8.7-pg18-bookworm`, fijada a la última versión estable de pgvector verificada al realizar este cambio. Esta imagen incorpora PostgreSQL 18.6.
+Requiere Node.js **24.x** y Docker Desktop con Docker Compose. Next.js corre en Windows con Fast Refresh; PostgreSQL 18 con pgvector 0.8.7 corre en un contenedor exclusivo de este proyecto. Desarrollo, producción y Dokploy usan `pgvector/pgvector:0.8.7-pg18-bookworm`, fijada a la última versión estable de pgvector verificada al realizar este cambio. Esta imagen incorpora PostgreSQL 18.6.
 
 ```powershell
 npm ci
@@ -69,7 +69,18 @@ Cada proyecto pertenece a su creador. Solo el administrador puede cambiar el pro
 
 El menú de usuario del pie del sidebar reúne **Mi perfil**, **Importar Trello**, **Configuración** y **Cerrar sesión**. Añade las opciones administrativas según los permisos. El perfil muestra los datos del proveedor, el rol y la fecha de registro, con enlaces para gestionar Google o GitHub; no edita la identidad localmente.
 
-## Despliegue con Docker Compose
+## Producción: Vercel + Dokploy + S3
+
+- La aplicación Next.js (interfaz, autenticación y API) se ejecuta en **Vercel**, workspace **siemprenet**, dominio **https://tareas.siempre.net.co**.
+- PostgreSQL con pgvector se ejecuta en **Dokploy**, con volumen persistente y conexión TLS verificada desde Vercel.
+- Los respaldos usan la interfaz `BackupStorage` y su adaptador S3, configurable para **Cloudflare R2** o **Backblaze B2**. Desarrollo conserva archivos locales por defecto.
+- Los push a **`dev` no despliegan**. `main` es la rama de producción prevista; `vercel.json` habilita despliegues automáticos únicamente para `main`.
+
+La [guía de despliegue](docs/despliegue-vercel-dokploy.md) reúne variables, certificados, bucket/CORS, migraciones, DNS y las tareas de cada responsable. `.env.production.example` corresponde a Vercel y `.env.dokploy.example` a PostgreSQL. Ninguno contiene credenciales reales.
+
+`npm run prepare:dokploy` prepara únicamente el Compose de PostgreSQL. El antiguo comando `node scripts/deploy-dokploy.mjs deploy` se ha retirado. La preparación no llama a Vercel ni a Dokploy y no publica nada.
+
+## Docker Compose completo (alternativa local)
 
 Prepara `.env.local` o un archivo de entorno específico de producción con secretos propios, URL pública HTTPS y proveedores OAuth. Luego:
 
@@ -85,18 +96,6 @@ PostgreSQL no publica puertos. La aplicación conecta al servicio `postgres:5432
 `/api/health` responde 200 sólo si la conexión y el esquema están disponibles; de lo contrario responde 503. Las escrituras se serializan inicialmente mediante un bloqueo transaccional de PostgreSQL, también entre procesos. Las lecturas de espacios y respaldos usan snapshots consistentes. El despliegue incluye una instancia web y un volumen compartido de respaldos.
 
 La primera cuenta que acceda a la base nueva será administradora y realizará el asistente inicial.
-
-## Preparación para Dokploy
-
-`compose.dokploy.yaml` usa los mismos servicios y volúmenes, y expone internamente 5010 para el proxy HTTPS. El dominio configurado sigue siendo `tareas.eduinpro.net`.
-
-```powershell
-node scripts/deploy-dokploy.mjs prepare
-```
-
-Este comando sólo prepara los artefactos locales. Su lista de archivos permitidos excluye `.env`, bases, pruebas y datos, e incluye el ejecutable fuente de migraciones y las migraciones PostgreSQL. Los secretos siguen siendo variables de ejecución.
-
-El despliegue real requiere una instrucción expresa. El comando de despliegue del script utiliza `DOKPLOY_API_KEY` y transfiere las variables de PostgreSQL, OAuth y Resend necesarias; la clave de Dokploy no se incorpora al contenedor. Conserva los callbacks HTTPS del dominio configurado.
 
 ## Uso
 

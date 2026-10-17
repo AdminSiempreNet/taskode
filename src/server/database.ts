@@ -5,6 +5,8 @@ import { eq, sql } from "drizzle-orm";
 import * as schema from "./schema";
 import { expectedMigration } from "./migration-info";
 import { DomainError } from "./repository";
+import { databasePoolConfig } from "./database-config";
+import { attachDatabasePool } from "@vercel/functions";
 
 export type Database = NodePgDatabase<typeof schema>;
 export type DatabaseOptions = { schema?: string; max?: number };
@@ -39,12 +41,11 @@ export class DatabaseStore {
       throw new Error("DATABASE_URL debe ser una conexión PostgreSQL.");
     this.schemaName = databaseSchema(options.schema);
     this.pool = new Pool({
-      connectionString,
-      max: options.max ?? 10,
-      connectionTimeoutMillis: 5000,
-      idleTimeoutMillis: 30000,
+      ...databasePoolConfig(connectionString),
+      ...(options.max !== undefined ? { max: options.max } : {}),
       options: `-c search_path=${this.schemaName}`,
     });
+    if (process.env.VERCEL === "1") attachDatabasePool(this.pool);
     this.pool.on("error", () =>
       console.error("Se perdió una conexión inactiva a PostgreSQL."),
     );

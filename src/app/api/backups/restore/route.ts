@@ -13,6 +13,7 @@ async function handlePOST(request: Request) {
     assertBackupOrigin(request);
     const form = await restoreForm(request);
     const backupId = form.get("backupId");
+    const uploadId = form.get("uploadId");
     const file = form.get("file");
     const confirmation = form.get("confirmation");
     const previous = form.get("backupBeforeRestore");
@@ -24,14 +25,17 @@ async function handlePOST(request: Request) {
         "Confirma la restauración e indica si deseas un respaldo previo.",
       );
     if (
-      (typeof backupId === "string" && backupId.length > 0) ===
-      (file instanceof File && file.size > 0)
+      [typeof backupId === "string" && backupId.length > 0,
+       typeof uploadId === "string" && uploadId.length > 0,
+       file instanceof File && file.size > 0].filter(Boolean).length !== 1
     )
       throw new DomainError(
         "Selecciona una copia del servidor o adjunta un archivo de respaldo.",
       );
     const source =
-      typeof backupId === "string" && backupId.length > 0
+      typeof uploadId === "string" && uploadId.length > 0
+        ? { uploadId }
+        : typeof backupId === "string" && backupId.length > 0
         ? { backupId }
         : { file: new Uint8Array(await (file as File).arrayBuffer()) };
     return Response.json(

@@ -66,6 +66,7 @@ async function checkResponse(response: Response) {
 
 export function BackupModal({ close }: { close: () => void }) {
   const [backups, setBackups] = useState<BackupFile[]>([]);
+  const [directUpload, setDirectUpload] = useState(false);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState("");
   const [error, setError] = useState("");
@@ -91,7 +92,9 @@ export function BackupModal({ close }: { close: () => void }) {
       const response = await checkResponse(
         await fetch("/api/backups", { cache: "no-store" }),
       );
-      setBackups((await response.json()).backups);
+      const data = await response.json();
+      setBackups(data.backups);
+      setDirectUpload(!!data.directUpload);
     } catch (error) {
       setListError(
         error instanceof Error
@@ -141,6 +144,18 @@ export function BackupModal({ close }: { close: () => void }) {
   }
   function download(backup: BackupFile) {
     void run(`download:${backup.id}`, async () => {
+      const endpoint = `/api/backups/${encodeURIComponent(backup.id)}`;
+      const signed = await checkResponse(await fetch(`${endpoint}?url=1`, { cache: "no-store" }));
+      const { url: signedUrl } = await signed.json();
+      if (signedUrl) {
+        const link = document.createElement("a");
+        link.href = signedUrl;
+        link.rel = "noreferrer";
+        document.body.append(link);
+        link.click();
+        link.remove();
+        return;
+      }
       const response = await checkResponse(
         await fetch(`/api/backups/${encodeURIComponent(backup.id)}`),
       );
@@ -178,7 +193,13 @@ export function BackupModal({ close }: { close: () => void }) {
       form.set("confirmation", confirmation);
       form.set("backupBeforeRestore", String(backupBeforeRestore));
       if (source === "server") form.set("backupId", backupId);
-      else if (file) form.set("file", file);
+      else if (file && directUpload) {
+        const response = await checkResponse(await fetch("/api/backups/uploads", { method: "POST" }));
+        const upload: { id: string; url: string } = await response.json();
+        const result = await fetch(upload.url, { method: "PUT", headers: { "Content-Type": "application/json" }, body: file });
+        if (!result.ok) throw new Error("No se pudo subir el respaldo. Vuelve a intentarlo.");
+        form.set("uploadId", upload.id);
+      } else if (file) form.set("file", file);
       const response = await checkResponse(
         await fetch("/api/backups/restore", { method: "POST", body: form }),
       );

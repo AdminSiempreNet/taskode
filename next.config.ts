@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 const config: NextConfig = {
-  output: "standalone",
+  ...(process.env.VERCEL === "1" ? {} : { output: "standalone" as const }),
   poweredByHeader: false,
   serverExternalPackages: ["pg"],
   outputFileTracingIncludes: { "/*": ["./drizzle/postgresql/**/*"] },

@@ -1,5 +1,5 @@
 import { authenticatedRequest, authConfig } from "./helpers";
-import { actor, createRepository } from "./helpers";
+import { actor, createRepository, addUser } from "./helpers";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -13,6 +13,8 @@ import {
   DELETE as remove,
 } from "../src/app/api/backups/[id]/route";
 import { POST as restore } from "../src/app/api/backups/restore/route";
+import { POST as upload } from "../src/app/api/backups/uploads/route";
+import type { BackupStorage } from "../src/server/backup-storage";
 const base = "http://localhost:5010";
 async function setup() {
   Object.assign(process.env, authConfig);
@@ -43,6 +45,46 @@ async function formRequest(form: FormData) {
     body: form,
   });
 }
+test("API S3: solo el administrador obtiene enlaces; las cargas ambiguas no restauran datos", async () => {
+  const s = await setup();
+  let uploaded = false;
+  const storage: BackupStorage = {
+    list: async () => [],
+    metadata: async (id) => ({ id, kind: "manual", size: 2, createdAt: new Date().toISOString() }),
+    read: async () => Buffer.from("{}"),
+    write: async () => {},
+    delete: async () => {},
+    createUpload: async () => { uploaded = true; return { id: "temporary-id", url: "https://private.example/upload" }; },
+    downloadUrl: async () => "https://private.example/download",
+  };
+  Object.assign(globalThis, { broteBackups: new BackupManager(s.repo, tmpdir(), storage) });
+  try {
+    assert.equal((await upload(new Request(base + "/api/backups/uploads", { method: "POST" }))).status, 401);
+    await addUser(s.repo, "member-upload");
+    assert.equal((await upload(await authenticatedRequest(base + "/api/backups/uploads", { method: "POST" }, "member-upload"))).status, 403);
+    assert.equal(uploaded, false);
+    assert.equal((await upload(await authenticatedRequest(base + "/api/backups/uploads", { method: "POST", headers: { origin: "https://foreign.example" } }))).status, 403);
+    const response = await upload(await authenticatedRequest(base + "/api/backups/uploads", { method: "POST" }));
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { id: "temporary-id", url: "https://private.example/upload" });
+    const id = "brote-manual-2026-10-16T10-20-30-123Z-11111111-1111-4111-8111-111111111111.brote-backup.json";
+    const context = { params: Promise.resolve({ id }) };
+    const signed = await download(await authenticatedRequest(base + "/api/backups/" + id + "?url=1"), context);
+    assert.deepEqual(await signed.json(), { url: "https://private.example/download" });
+    assert.equal(signed.headers.get("cache-control"), "no-store");
+    const redirect = await download(await authenticatedRequest(base + "/api/backups/" + id), context);
+    assert.equal(redirect.status, 302);
+    assert.equal(redirect.headers.get("location"), "https://private.example/download");
+    const form = new FormData();
+    form.set("confirmation", "RESTAURAR");
+    form.set("backupBeforeRestore", "true");
+    form.set("backupId", id);
+    form.set("uploadId", "temporary-id");
+    const snapshot = await s.repo.getWorkspace(actor);
+    assert.equal((await restore(await formRequest(form))).status, 400);
+    assert.deepEqual(await s.repo.getWorkspace(actor), snapshot);
+  } finally { await s.cleanup(); }
+});
 test("API de respaldos: lista, genera, descarga y elimina con nombres seguros", async () => {
   const s = await setup();
   try {

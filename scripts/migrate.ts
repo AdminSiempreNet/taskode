@@ -4,12 +4,13 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { databaseSchema, databaseUrl } from "../src/server/database";
 import { migrationsFolder } from "../src/server/migration-info";
+import { databasePoolConfig } from "../src/server/database-config";
 
 loadEnvConfig(process.cwd());
 async function main() {
   const schema = databaseSchema();
   const pool = new Pool({
-    connectionString: databaseUrl(),
+    ...databasePoolConfig(databaseUrl()),
     max: 1,
     connectionTimeoutMillis: 5000,
     options: `-c search_path=${schema}`,

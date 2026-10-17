@@ -4,9 +4,13 @@ import { assertBackupOrigin, backupError } from "@/server/backup-http";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ id: string }> };
-async function handleGET(_request: Request, context: Context) {
+async function handleGET(request: Request, context: Context) {
   try {
     const { id } = await context.params;
+    if (new URL(request.url).searchParams.get("url") === "1")
+      return Response.json({ url: await backups().downloadUrl(id) }, { headers: { "Cache-Control": "no-store" } });
+    const url = await backups().downloadUrl(id);
+    if (url) return new Response(null, { status: 302, headers: { Location: url, "Cache-Control": "no-store" } });
     const bytes = await backups().download(id);
     return new Response(bytes, {
       headers: {
