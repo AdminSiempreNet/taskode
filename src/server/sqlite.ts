@@ -18,6 +18,7 @@ import { DatabaseStore } from "./database";
 import * as schema from "./schema";
 import type { Command, TrelloBoard } from "../lib/validation";
 import type { Actor, CurrentUser, ImportReport, Workspace } from "../lib/types";
+import { DEFAULT_TASK_TYPES, DEFAULT_IMPACTS } from "../lib/types";
 import { DomainError, type WorkspaceRepository } from "./repository";
 
 type Row = Record<string, string | number | null>;
@@ -45,6 +46,8 @@ const restoreTables = [
   "features",
   "statuses",
   "priorities",
+  "task_types",
+  "impacts",
   "labels",
   "tasks",
   "checklists",
@@ -59,6 +62,9 @@ const restoreTables = [
 ];
 
 export class SqliteRepository implements WorkspaceRepository {
+  // Incrementar al cambiar el contrato o las migraciones de una instancia cacheada.
+  static readonly cacheVersion = 3;
+  readonly cacheVersion = SqliteRepository.cacheVersion;
   readonly store: DatabaseStore;
   readonly db: DatabaseSync;
   private restoring = false;
@@ -274,9 +280,10 @@ export class SqliteRepository implements WorkspaceRepository {
         row = await this.get("tasks", String(row.taskId));
       projectId = String(table === "projects" ? row.id : row.projectId);
     }
-    const manage = /^(project\.|status\.|priority\.|label\.|trello\.)/.test(
-      c.type,
-    );
+    const manage =
+      /^(project\.|status\.|priority\.|taskType\.|impact\.|label\.|trello\.)/.test(
+        c.type,
+      );
     await this.requireProject(actor, projectId, manage);
   }
   private async accessCommand(command: Command): Promise<boolean> {
@@ -364,15 +371,25 @@ export class SqliteRepository implements WorkspaceRepository {
         .from(table)
         .where(inArray(column, values))) as Row[];
     };
-    const [modules, features, statuses, priorities, labels, tasks] =
-      await Promise.all([
-        rows("modules"),
-        rows("features"),
-        rows("statuses"),
-        rows("priorities"),
-        rows("labels"),
-        rows("tasks"),
-      ]);
+    const [
+      modules,
+      features,
+      statuses,
+      priorities,
+      taskTypes,
+      impacts,
+      labels,
+      tasks,
+    ] = await Promise.all([
+      rows("modules"),
+      rows("features"),
+      rows("statuses"),
+      rows("priorities"),
+      rows("task_types"),
+      rows("impacts"),
+      rows("labels"),
+      rows("tasks"),
+    ]);
     const taskIds = tasks.map((t) => String(t.id));
     const [lists, comments, history] = await Promise.all([
       rows("checklists", "taskId", taskIds),
@@ -408,6 +425,8 @@ export class SqliteRepository implements WorkspaceRepository {
         isDone: Boolean(s.isDone),
       })),
       priorities: sort(priorities),
+      taskTypes: sort(taskTypes),
+      impacts: sort(impacts),
       labels: sort(labels),
       tasks: sort(tasks).map((t) => {
         const { externalId: _, ...row } = t;
@@ -611,7 +630,7 @@ export class SqliteRepository implements WorkspaceRepository {
     ];
   }
   private async optionNamed(
-    table: "labels" | "priorities",
+    table: "labels" | "priorities" | "task_types" | "impacts",
     projectId: string,
     name: string,
   ) {
@@ -663,6 +682,19 @@ export class SqliteRepository implements WorkspaceRepository {
       ownerId: this.actorContext.getStore()!.id,
     });
     await this.defaultPriorities(id);
+    for (const [table, options] of [
+      ["task_types", DEFAULT_TASK_TYPES],
+      ["impacts", DEFAULT_IMPACTS],
+    ] as const) {
+      await each([...options], async (option, position) =>
+        this.insert(table, {
+          id: randomUUID(),
+          projectId: id,
+          ...option,
+          position,
+        }),
+      );
+    }
     await each(
       defaults,
       async (s, position) =>
@@ -1042,12 +1074,34 @@ export class SqliteRepository implements WorkspaceRepository {
                 "La prioridad debe pertenecer al proyecto.",
               );
             const labels = await this.ensureLabels(p, c.labels);
+            const typeId =
+              c.typeId === undefined ? (existing?.typeId ?? null) : c.typeId;
+            const impactId =
+              c.impactId === undefined
+                ? (existing?.impactId ?? null)
+                : c.impactId;
+            for (const [table, id, noun] of [
+              ["task_types", typeId, "El tipo"],
+              ["impacts", impactId, "El impacto"],
+            ] as const) {
+              if (
+                id !== null &&
+                !(await this.find(table, { id, projectId: p }, [], false))[0]
+              )
+                throw new DomainError(`${noun} debe pertenecer al proyecto.`);
+            }
             const fields = {
               featureId: c.featureId,
               statusId: c.statusId,
               title: c.title,
               description: c.description,
               priority: c.priority,
+              typeId,
+              impactId,
+              ticketNumber:
+                c.ticketNumber === undefined
+                  ? (existing?.ticketNumber ?? null)
+                  : c.ticketNumber?.trim() || null,
               dueDate: c.dueDate,
               startDate,
               startTime,
@@ -1135,11 +1189,19 @@ export class SqliteRepository implements WorkspaceRepository {
             break;
           case "priority.create":
           case "priority.update":
+          case "taskType.create":
+          case "taskType.update":
+          case "impact.create":
+          case "impact.update":
           case "label.create":
           case "label.update": {
             const table = c.type.startsWith("priority")
               ? "priorities"
-              : "labels";
+              : c.type.startsWith("taskType")
+                ? "task_types"
+                : c.type.startsWith("impact")
+                  ? "impacts"
+                  : "labels";
             const creating = c.type.endsWith("create");
             await this.get("projects", c.projectId);
             const existing = !creating
@@ -1186,9 +1248,17 @@ export class SqliteRepository implements WorkspaceRepository {
             return { createdId: id };
           }
           case "priority.delete":
+          case "taskType.delete":
+          case "impact.delete":
           case "label.delete": {
             const table =
-              c.type === "priority.delete" ? "priorities" : "labels";
+              c.type === "priority.delete"
+                ? "priorities"
+                : c.type === "taskType.delete"
+                  ? "task_types"
+                  : c.type === "impact.delete"
+                    ? "impacts"
+                    : "labels";
             await this.get("projects", c.projectId);
             const option = (
               await this.find(
@@ -1200,7 +1270,20 @@ export class SqliteRepository implements WorkspaceRepository {
             )[0];
             if (!option)
               throw new DomainError("La opción no pertenece al proyecto.", 404);
-            if (table === "priorities") {
+            if (table === "task_types" || table === "impacts") {
+              const field = table === "task_types" ? "typeId" : "impactId";
+              if (
+                (
+                  await this.countWhere("tasks", {
+                    projectId: c.projectId,
+                    [field]: c.id,
+                  })
+                )?.n
+              )
+                throw new DomainError(
+                  `Cambia o quita ${table === "task_types" ? "el tipo" : "el impacto"} de las tareas que lo usan, incluidas las archivadas, antes de eliminarlo.`,
+                );
+            } else if (table === "priorities") {
               if (
                 Number(
                   (

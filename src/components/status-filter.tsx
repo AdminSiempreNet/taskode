@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDown, SlidersHorizontal } from "lucide-react";
+import { useEffect, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -9,24 +10,82 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { Status } from "@/lib/types";
+import { UNASSIGNED_FILTER, validFilterIds } from "@/lib/task-filters";
 
-export function StatusFilter({
-  statuses,
+export function useProjectFilter(
+  projectId: string,
+  category: string,
+  options: { id: string }[],
+  optional = false,
+) {
+  const [selection, setSelection] = useState({
+    projectId,
+    ids: [] as string[],
+  });
+  useEffect(() => {
+    let ids: string[] = [];
+    try {
+      const saved: unknown = JSON.parse(
+        localStorage.getItem(`brote.${category}-filter.${projectId}`) ?? "[]",
+      );
+      if (Array.isArray(saved) && saved.every((id) => typeof id === "string"))
+        ids = saved;
+    } catch {
+      // Invalid or unavailable storage falls back to showing all values.
+    }
+    setSelection({ projectId, ids });
+  }, [projectId, category]);
+  function onChange(ids: string[]) {
+    setSelection({ projectId, ids });
+    try {
+      localStorage.setItem(
+        `brote.${category}-filter.${projectId}`,
+        JSON.stringify(ids),
+      );
+    } catch {
+      // Filtering also works when browser storage is unavailable.
+    }
+  }
+  return [
+    validFilterIds(
+      selection.projectId === projectId ? selection.ids : [],
+      options,
+      optional,
+    ),
+    onChange,
+  ] as const;
+}
+
+export function CatalogFilter({
+  options,
+  category,
+  allLabel,
+  shortLabel,
+  unassignedLabel,
   selectedIds,
   onChange,
 }: {
-  statuses: Status[];
+  options: { id: string; name: string; color: string }[];
+  category: string;
+  allLabel: string;
+  shortLabel: string;
+  unassignedLabel?: string;
   selectedIds: string[];
   onChange: (ids: string[]) => void;
 }) {
-  const selected = statuses.filter((status) => selectedIds.includes(status.id));
+  const entries = unassignedLabel
+    ? [
+        { id: UNASSIGNED_FILTER, name: unassignedLabel, color: "#64748b" },
+        ...options,
+      ]
+    : options;
+  const selected = entries.filter((option) => selectedIds.includes(option.id));
   const label =
     selected.length === 0
-      ? "Todos los estados"
+      ? allLabel
       : selected.length === 1
         ? selected[0].name
-        : `${selected.length} estados`;
+        : `${selected.length} ${category}`;
 
   return (
     <DropdownMenu>
@@ -34,7 +93,7 @@ export function StatusFilter({
         <button
           type="button"
           className="status-filter"
-          aria-label={`Filtrar por estados: ${label}`}
+          aria-label={`Filtrar por ${category}: ${label}`}
           title={
             selected.length
               ? selected.map((status) => status.name).join(", ")
@@ -43,7 +102,12 @@ export function StatusFilter({
           data-active={selected.length > 0 || undefined}
         >
           <SlidersHorizontal size={14} />
-          <span>{label}</span>
+          <span className={selected.length ? undefined : "filter-full-label"}>
+            {label}
+          </span>
+          {!selected.length && (
+            <span className="filter-short-label">{shortLabel}</span>
+          )}
           <ChevronDown size={14} />
         </button>
       </DropdownMenuTrigger>
@@ -52,16 +116,16 @@ export function StatusFilter({
         className="status-filter-menu"
         collisionPadding={8}
       >
-        <DropdownMenuLabel>Filtrar por estados</DropdownMenuLabel>
+        <DropdownMenuLabel>Filtrar por {category}</DropdownMenuLabel>
         <DropdownMenuCheckboxItem
           checked={!selected.length}
           onCheckedChange={() => onChange([])}
           onSelect={(event) => event.preventDefault()}
         >
-          Todos los estados
+          {allLabel}
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
-        {statuses.map((status) => (
+        {entries.map((status) => (
           <DropdownMenuCheckboxItem
             key={status.id}
             checked={selectedIds.includes(status.id)}

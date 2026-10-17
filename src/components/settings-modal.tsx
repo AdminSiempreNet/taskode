@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import {
@@ -13,6 +19,8 @@ import {
   Settings2,
   Sun,
   Tags,
+  Shapes,
+  Target,
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,7 +39,25 @@ import type {
   Workspace,
 } from "@/lib/types";
 
-type Section = "statuses" | "priorities" | "labels" | "appearance";
+type Section =
+  | "statuses"
+  | "priorities"
+  | "taskTypes"
+  | "impacts"
+  | "labels"
+  | "appearance";
+const catalogKinds = {
+  priorities: "priority",
+  taskTypes: "taskType",
+  impacts: "impact",
+  labels: "label",
+} as const;
+const catalogNouns = {
+  priority: { singular: "prioridad", article: "la", fresh: "Nueva prioridad" },
+  taskType: { singular: "tipo", article: "el", fresh: "Nuevo tipo" },
+  impact: { singular: "impacto", article: "el", fresh: "Nuevo impacto" },
+  label: { singular: "etiqueta", article: "la", fresh: "Nueva etiqueta" },
+} as const;
 const sections = {
   statuses: {
     title: "Estados del proyecto",
@@ -44,6 +70,18 @@ const sections = {
     description:
       "Personaliza los niveles de importancia de las tareas de este proyecto.",
     icon: Flag,
+  },
+  taskTypes: {
+    title: "Tipos",
+    description:
+      "Personaliza los tipos de tarea de este proyecto. Su asignación es opcional.",
+    icon: Shapes,
+  },
+  impacts: {
+    title: "Impactos",
+    description:
+      "Define los ámbitos de impacto de este proyecto. Su asignación es opcional.",
+    icon: Target,
   },
   labels: {
     title: "Etiquetas",
@@ -78,7 +116,10 @@ export function SettingsModal({
   const mutate = useCallback<Mutate>(
     (command) => {
       const result = mutationQueue.current.then(() => mutateWorkspace(command));
-      mutationQueue.current = result.then(() => undefined, () => undefined);
+      mutationQueue.current = result.then(
+        () => undefined,
+        () => undefined,
+      );
       return result;
     },
     [mutateWorkspace],
@@ -112,7 +153,15 @@ export function SettingsModal({
               ? `${project.icon} ${project.name}`
               : "Selecciona un proyecto"}
           </p>
-          {(["statuses", "priorities", "labels"] as const).map((id) => {
+          {(
+            [
+              "statuses",
+              "priorities",
+              "taskTypes",
+              "impacts",
+              "labels",
+            ] as const
+          ).map((id) => {
             const Icon = sections[id].icon;
             return (
               <button
@@ -154,33 +203,26 @@ export function SettingsModal({
               busy={busy}
             />
           )}
-          {(section === "priorities" || section === "labels") && project && (
+          {section !== "statuses" && section !== "appearance" && project && (
             <div className="form-stack settings-editor" key={section}>
               <p className="info-note">
-                {section === "priorities"
-                  ? "Los cambios de nombre y color se reflejan en todas las tareas. Para eliminar una prioridad, cambia antes las tareas que la usan."
-                  : "Las etiquetas se comparten dentro de este proyecto. Al renombrar una etiqueta se actualizan sus tareas; al eliminarla se retira de ellas."}
+                {section === "labels"
+                  ? "Las etiquetas se comparten dentro de este proyecto. Al renombrar una etiqueta se actualizan sus tareas; al eliminarla se retira de ellas."
+                  : "Los cambios de nombre y color se reflejan en todas las tareas. Para eliminar una opción, cambia o quita antes su asignación en las tareas que la usan, incluidas las archivadas."}
               </p>
               <div
                 className="status-editor"
                 role="region"
-                aria-label={
-                  section === "priorities"
-                    ? "Lista de prioridades"
-                    : "Lista de etiquetas"
-                }
+                aria-label={`Lista de ${sections[section].title.toLocaleLowerCase("es")}`}
                 tabIndex={0}
               >
-                {(section === "priorities"
-                  ? workspace.priorities
-                  : workspace.labels
-                )
+                {(workspace[section] ?? [])
                   .filter((option) => option.projectId === project.id)
                   .map((option) => (
                     <OptionRow
                       key={option.id}
                       option={option}
-                      kind={section === "priorities" ? "priority" : "label"}
+                      kind={catalogKinds[section]}
                       projectId={project.id}
                       mutate={mutate}
                       busy={busy}
@@ -190,7 +232,7 @@ export function SettingsModal({
               </div>
               <OptionRow
                 key={`new-${section}`}
-                kind={section === "priorities" ? "priority" : "label"}
+                kind={catalogKinds[section]}
                 projectId={project.id}
                 mutate={mutate}
                 busy={busy}
@@ -262,7 +304,7 @@ function OptionRow({
   confirm,
 }: {
   option?: ProjectPriority | ProjectLabel;
-  kind: "priority" | "label";
+  kind: "priority" | "taskType" | "impact" | "label";
   projectId: string;
   mutate: Mutate;
   busy: boolean;
@@ -271,7 +313,7 @@ function OptionRow({
   const [name, setName] = useState(option?.name ?? "");
   const [color, setColor] = useState(option?.color ?? "#3b82f6");
   const lastSubmitted = useRef({ name, color });
-  const noun = kind === "priority" ? "prioridad" : "etiqueta";
+  const { singular: noun, article, fresh } = catalogNouns[kind];
   async function save() {
     const values = { name: name.trim(), color };
     if (!values.name) {
@@ -289,13 +331,17 @@ function OptionRow({
     }
     const previous = lastSubmitted.current;
     lastSubmitted.current = values;
-    if (await mutate({
-      type: `${kind}.${option ? "update" : "create"}`,
-      projectId,
-      id: option?.id,
-      ...values,
-    })) {
-      setName((current) => current === name ? (option ? values.name : "") : current);
+    if (
+      await mutate({
+        type: `${kind}.${option ? "update" : "create"}`,
+        projectId,
+        id: option?.id,
+        ...values,
+      })
+    ) {
+      setName((current) =>
+        current === name ? (option ? values.name : "") : current,
+      );
     } else if (lastSubmitted.current === values) {
       lastSubmitted.current = previous;
     }
@@ -312,7 +358,7 @@ function OptionRow({
           value={color}
           onChange={(e) => setColor(e.target.value)}
           onBlur={option ? () => void save() : undefined}
-          aria-label={`Color de ${option?.name ?? `nueva ${noun}`}`}
+          aria-label={`Color de ${option?.name ?? fresh.toLocaleLowerCase("es")}`}
         />
         <Input
           value={name}
@@ -320,8 +366,8 @@ function OptionRow({
           onBlur={option ? () => void save() : undefined}
           maxLength={60}
           required
-          placeholder={`Nueva ${noun}`}
-          aria-label={`Nombre de ${option?.name ?? `nueva ${noun}`}`}
+          placeholder={fresh}
+          aria-label={`Nombre de ${option?.name ?? fresh.toLocaleLowerCase("es")}`}
         />
         {!option && (
           <Button
@@ -343,11 +389,11 @@ function OptionRow({
             aria-label={`Eliminar ${option.name}`}
             onClick={() =>
               confirm({
-                title: `¿Eliminar la ${noun} «${option.name}»?`,
+                title: `¿Eliminar ${article} ${noun} «${option.name}»?`,
                 description:
                   kind === "label"
                     ? "Se quitará de todas las tareas de este proyecto."
-                    : "Solo se puede eliminar si ninguna tarea la utiliza.",
+                    : "Solo se puede eliminar si ninguna tarea utiliza esta opción, incluidas las archivadas.",
                 action: () =>
                   mutate({ type: `${kind}.delete`, projectId, id: option.id }),
               })

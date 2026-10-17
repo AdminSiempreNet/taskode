@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -21,8 +21,10 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  Box,
   ChevronDown,
   Layers3,
+  ListTodo,
   MoreHorizontal,
   Pin,
   PinOff,
@@ -33,7 +35,19 @@ import {
 import { Popover } from "radix-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { Feature, ProjectModule } from "@/lib/types";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuPortal,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import type { Feature, ProjectModule, ProjectTaskType } from "@/lib/types";
 import { formatFeatureNumber } from "@/lib/features";
 import type { Mutate } from "./forms";
 
@@ -48,12 +62,14 @@ export function FeatureSidebar({
   projectId,
   features,
   modules,
+  taskTypes,
   selectedId,
   counts,
   busy,
   select,
-  create,
+  createFeature,
   createModule,
+  createTask,
   edit,
   editModule,
   mutate,
@@ -61,12 +77,14 @@ export function FeatureSidebar({
   projectId?: string;
   features: Feature[];
   modules: ProjectModule[];
+  taskTypes: ProjectTaskType[];
   selectedId: string;
   counts: Record<string, number>;
   busy: boolean;
   select: (id: string) => void;
-  create: () => void;
+  createFeature: () => void;
   createModule: () => void;
+  createTask: (typeId?: string) => void;
   edit: (feature: Feature) => void;
   editModule: (module: ProjectModule) => void;
   mutate: Mutate;
@@ -75,6 +93,11 @@ export function FeatureSidebar({
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [dragged, setDragged] = useState<Feature | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const openingCreateDialog = useRef(false);
+  function openCreateDialog(create: () => void) {
+    openingCreateDialog.current = true;
+    create();
+  }
   const helpId = useId();
   const normalizedQuery = normalize(query.trim());
   const matches = (feature: Feature) =>
@@ -174,18 +197,84 @@ export function FeatureSidebar({
 
   return (
     <section className="feature-section" aria-label="Features del proyecto">
-      <div className="sidebar-section-label features-label">
-        <span>FEATURES</span>
-        <Button
-          size="icon"
-          variant="ghost"
-          disabled={!projectId || busy}
-          onClick={create}
-          aria-label="Nueva feature"
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            className="sidebar-new-button"
+            size="sm"
+            variant="outline"
+            disabled={!projectId || busy}
+          >
+            <Plus size={15} />
+            <span>Nuevo</span>
+            <ChevronDown size={14} className="ml-auto" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          className="sidebar-new-menu"
+          align="start"
+          collisionPadding={12}
+          onCloseAutoFocus={(event) => {
+            if (openingCreateDialog.current) {
+              event.preventDefault();
+              openingCreateDialog.current = false;
+            }
+          }}
         >
-          <Plus size={15} />
-        </Button>
-      </div>
+          <DropdownMenuItem onSelect={() => openCreateDialog(createModule)}>
+            <Box />
+            Módulo
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => openCreateDialog(createFeature)}>
+            <Layers3 />
+            Feature
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {taskTypes.length > 0 ? (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger
+                disabled={!features.length}
+                title={!features.length ? "Crea una feature primero" : undefined}
+              >
+                <ListTodo />
+                Tarea
+              </DropdownMenuSubTrigger>
+              <DropdownMenuPortal>
+                <DropdownMenuSubContent
+                  className="sidebar-task-types-menu"
+                  collisionPadding={12}
+                >
+                  <DropdownMenuLabel>Tipo de tarea</DropdownMenuLabel>
+                  {taskTypes.map((type) => (
+                    <DropdownMenuItem
+                      key={type.id}
+                      onSelect={() =>
+                        openCreateDialog(() => createTask(type.id))
+                      }
+                    >
+                      <span
+                        className="sidebar-task-type-color"
+                        style={{ background: type.color }}
+                        aria-hidden="true"
+                      />
+                      {type.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuPortal>
+            </DropdownMenuSub>
+          ) : (
+            <DropdownMenuItem
+              disabled={!features.length}
+              title={!features.length ? "Crea una feature primero" : undefined}
+              onSelect={() => openCreateDialog(() => createTask())}
+            >
+              <ListTodo />
+              Tarea
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
       <div className="feature-search-desktop">
         <FeatureSearch
           value={query}
@@ -417,18 +506,6 @@ export function FeatureSidebar({
                   : "Añade tu primera feature."}
               </p>
             )}
-          {projectId && (
-            <button
-              className="sidebar-add"
-              aria-label="Crear módulo"
-              title="Crear módulo"
-              disabled={busy}
-              onClick={createModule}
-            >
-              <Plus size={15} />
-              <span>Crear módulo</span>
-            </button>
-          )}
         </div>
         <DragOverlay>
           {dragged && (

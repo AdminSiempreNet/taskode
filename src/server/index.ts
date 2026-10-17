@@ -12,13 +12,23 @@ export function databasePath() {
   );
 }
 export function repository(): SqliteRepository {
+  const previous = globalDatabase.broteRepository;
+  if (previous && previous.cacheVersion !== SqliteRepository.cacheVersion) {
+    // Fast Refresh conserva globalThis incluso cuando cambia la implementación.
+    globalDatabase.broteRepository = undefined;
+    globalDatabase.broteBackups = undefined;
+    void previous.close().catch((error) => {
+      console.error("No se pudo cerrar la conexión anterior.", error);
+    });
+  }
   return (globalDatabase.broteRepository ??= new SqliteRepository(
     databasePath(),
   ));
 }
 export function backups() {
+  const repo = repository();
   return (globalDatabase.broteBackups ??= new BackupManager(
-    repository(),
+    repo,
     databasePath(),
   ));
 }

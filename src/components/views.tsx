@@ -33,7 +33,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "./markdown-content";
 import type { Feature, Status, Task } from "@/lib/types";
-import { LabelChip, colorStyle, useProjectCatalog } from "./project-catalog";
+import {
+  LabelChip,
+  TaskCategoryChip,
+  colorStyle,
+  useProjectCatalog,
+} from "./project-catalog";
 import type { Mutate } from "./forms";
 import { dateKey, taskScheduleLabel } from "@/lib/calendar";
 import { boardDropTarget, type BoardDropTarget } from "@/lib/board-drop";
@@ -79,6 +84,8 @@ function CardContent({
     <>
       <div className="card-labels">
         <Priority priority={task.priority} />
+        <TaskCategoryChip kind="type" id={task.typeId} />
+        <TaskCategoryChip kind="impact" id={task.impactId} />
         {task.labels.slice(0, 2).map((l, i) => (
           <LabelChip name={l} key={i} />
         ))}
@@ -688,6 +695,8 @@ export function ListView({
                     <th>Tarea</th>
                     <th>Estado</th>
                     <th>Prioridad</th>
+                    <th>Tipo</th>
+                    <th>Impacto</th>
                     <th>Fecha de entrega</th>
                   </tr>
                 </thead>
@@ -724,6 +733,14 @@ export function ListView({
                       </td>
                       <td>
                         <Priority priority={t.priority} />
+                      </td>
+                      <td>
+                        <TaskCategoryChip kind="type" id={t.typeId} />
+                        {!t.typeId && "Sin tipo"}
+                      </td>
+                      <td>
+                        <TaskCategoryChip kind="impact" id={t.impactId} />
+                        {!t.impactId && "Sin impacto"}
                       </td>
                       <td className="table-date" title={taskScheduleLabel(t)}>
                         {t.startDate && (

@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/dialog";
 import { Field, type Confirmation, type Mutate } from "./forms";
 import { useProjectCatalog } from "./project-catalog";
+import { CatalogCombobox } from "./catalog-combobox";
 import { InlineTaskTitle, TaskLabelPicker } from "./task-heading";
 import { FeatureCombobox } from "./feature-combobox";
 import { DescriptionEditor } from "./description-editor";
@@ -54,6 +55,7 @@ import type {
 
 export type TaskDefaults = {
   featureId?: string;
+  typeId?: string;
   statusId?: string;
   startDate?: string;
   startTime?: string;
@@ -120,7 +122,7 @@ export function TaskDetail({
 }) {
   const router = useRouter();
   const view = getProjectView(useSearchParams().get("view"));
-  const { priorities } = useProjectCatalog();
+  const { priorities, taskTypes, impacts } = useProjectCatalog();
   const features = workspace.features.filter(
     (feature) => feature.projectId === project.id,
   );
@@ -148,6 +150,14 @@ export function TaskDetail({
       priorities[0]?.id ??
       "",
   );
+  const [typeId, setTypeId] = useState(
+    task?.typeId ??
+      (taskTypes.some((option) => option.id === defaults.typeId)
+        ? defaults.typeId!
+        : ""),
+  );
+  const [impactId, setImpactId] = useState(task?.impactId ?? "");
+  const [ticketNumber, setTicketNumber] = useState(task?.ticketNumber ?? "");
   const [dueDate, setDueDate] = useState(
     task?.dueDate ?? defaults.dueDate ?? "",
   );
@@ -184,6 +194,9 @@ export function TaskDetail({
       featureId !== task.featureId ||
       statusId !== task.statusId ||
       priority !== task.priority ||
+      typeId !== (task.typeId ?? "") ||
+      impactId !== (task.impactId ?? "") ||
+      ticketNumber.trim() !== (task.ticketNumber ?? "") ||
       startDate !== (task.startDate ?? "") ||
       startTime !== (task.startTime ?? "") ||
       dueDate !== (task.dueDate ?? "") ||
@@ -230,6 +243,9 @@ export function TaskDetail({
       featureId,
       statusId,
       priority,
+      typeId: typeId || null,
+      impactId: impactId || null,
+      ticketNumber: ticketNumber.trim() || null,
       startDate: startDate || null,
       startTime: startDate ? startTime || null : null,
       dueDate: dueDate || null,
@@ -294,7 +310,9 @@ export function TaskDetail({
             variant="ghost"
             disabled={busy}
             onClick={() =>
-              requestNavigation(() => router.push(projectPath(project.id, view)))
+              requestNavigation(() =>
+                router.push(projectPath(project.id, view)),
+              )
             }
           >
             <ArrowLeft size={17} />
@@ -503,42 +521,95 @@ export function TaskDetail({
                       />
                     </Field>
                     <Field label="Estado" htmlFor="task-status">
-                      <select
+                      <CatalogCombobox
                         id="task-status"
                         name="statusId"
                         form="task-detail-form"
-                        required
+                        label="Estado"
+                        options={statuses}
                         value={statusId}
-                        onChange={(e) => {
-                          setStatusId(e.target.value);
+                        disabled={busy}
+                        onChange={(value) => {
+                          setStatusId(value);
                           setDirty(true);
                         }}
-                      >
-                        {statuses.map((status) => (
-                          <option key={status.id} value={status.id}>
-                            {status.name}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </Field>
                     <Field label="Prioridad" htmlFor="task-priority">
-                      <select
+                      <CatalogCombobox
                         id="task-priority"
                         name="priority"
                         form="task-detail-form"
-                        required
+                        label="Prioridad"
+                        options={priorities}
                         value={priority}
-                        onChange={(e) => {
-                          setPriority(e.target.value);
+                        disabled={busy}
+                        onChange={(value) => {
+                          setPriority(value);
                           setDirty(true);
                         }}
-                      >
-                        {priorities.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
+                      />
+                    </Field>
+                    {(
+                      [
+                        {
+                          field: "typeId",
+                          label: "Tipo",
+                          empty: "Sin tipo",
+                          options: taskTypes,
+                          value: typeId,
+                          setValue: setTypeId,
+                        },
+                        {
+                          field: "impactId",
+                          label: "Impacto",
+                          empty: "Sin impacto",
+                          options: impacts,
+                          value: impactId,
+                          setValue: setImpactId,
+                        },
+                      ] as const
+                    ).map(
+                      ({ field, label, empty, options, value, setValue }) => (
+                        <Field
+                          key={field}
+                          label={`${label} (opcional)`}
+                          htmlFor={`task-${field}`}
+                        >
+                          <CatalogCombobox
+                            id={`task-${field}`}
+                            name={field}
+                            form="task-detail-form"
+                            label={label}
+                            options={options}
+                            emptyLabel={empty}
+                            value={value}
+                            disabled={busy}
+                            onChange={(value) => {
+                              setValue(value);
+                              setDirty(true);
+                            }}
+                          />
+                        </Field>
+                      ),
+                    )}
+                    <Field
+                      label="Ticket (opcional)"
+                      htmlFor="task-ticket"
+                    >
+                      <Input
+                        id="task-ticket"
+                        name="ticketNumber"
+                        form="task-detail-form"
+                        placeholder="Ej. 001234"
+                        maxLength={100}
+                        value={ticketNumber}
+                        disabled={busy}
+                        onChange={(event) => {
+                          setTicketNumber(event.target.value);
+                          setDirty(true);
+                        }}
+                      />
                     </Field>
                     <div className="task-schedule-group">
                       <span>

@@ -214,6 +214,39 @@ export const priorities = sqliteTable(
     uniqueIndex("priority_name").on(t.projectId, sql`${t.name} collate nocase`),
   ],
 );
+export const taskTypes = sqliteTable(
+  "task_types",
+  {
+    id: text().primaryKey(),
+    projectId: text()
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    color: text().notNull(),
+    position: real().notNull(),
+  },
+  (t) => [
+    uniqueIndex("task_type_name").on(
+      t.projectId,
+      sql`${t.name} collate nocase`,
+    ),
+  ],
+);
+export const impacts = sqliteTable(
+  "impacts",
+  {
+    id: text().primaryKey(),
+    projectId: text()
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    name: text().notNull(),
+    color: text().notNull(),
+    position: real().notNull(),
+  },
+  (t) => [
+    uniqueIndex("impact_name").on(t.projectId, sql`${t.name} collate nocase`),
+  ],
+);
 export const labels = sqliteTable(
   "labels",
   {
@@ -241,6 +274,9 @@ export const tasks = sqliteTable(
     title: text().notNull(),
     description: text().notNull(),
     priority: text().notNull(),
+    typeId: text().references(() => taskTypes.id),
+    impactId: text().references(() => impacts.id),
+    ticketNumber: text(),
     dueDate: text(),
     dueTime: text(),
     startDate: text(),
@@ -354,6 +390,8 @@ export const domainTables = {
   features,
   statuses,
   priorities,
+  task_types: taskTypes,
+  impacts,
   labels,
   tasks,
   checklists,

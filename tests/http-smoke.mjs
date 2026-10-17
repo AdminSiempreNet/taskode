@@ -69,6 +69,13 @@ test("HTTP: página de tarea, inicio/fin, catálogos, checklist y comentarios pe
       title: "Tarea con duración",
       description: "Detalle persistente",
       priority,
+      ticketNumber: "001234",
+      typeId: created.workspace.taskTypes.find(
+        (option) => option.projectId === projectId,
+      ).id,
+      impactId: created.workspace.impacts.find(
+        (option) => option.projectId === projectId,
+      ).id,
       labels: ["Diseño"],
       startDate: "2026-10-15",
       startTime: "09:00",
@@ -121,6 +128,9 @@ test("HTTP: página de tarea, inicio/fin, catálogos, checklist y comentarios pe
     const saved = fresh.tasks.find((t) => t.id === taskId);
     assert.equal(saved.startDate, task.startDate);
     assert.equal(saved.startTime, task.startTime);
+    assert.equal(saved.typeId, task.typeId);
+    assert.equal(saved.impactId, task.impactId);
+    assert.equal(saved.ticketNumber, "001234");
     assert.equal(saved.checklists[0].items[0].completed, true);
     assert.equal(saved.comments[0].content, "Comentario editado");
     const reloaded = await fetch(base + route);
@@ -128,6 +138,8 @@ test("HTTP: página de tarea, inicio/fin, catálogos, checklist y comentarios pe
     const reloadedHtml = await reloaded.text();
     assert.match(reloadedHtml, /Comentario editado/);
     assert.match(reloadedHtml, /Verificado/);
+    assert.match(reloadedHtml, /Tipo \(opcional\)/);
+    assert.match(reloadedHtml, /Impacto \(opcional\)/);
     const renamed = await send({
       type: "task.rename",
       id: taskId,
@@ -139,6 +151,18 @@ test("HTTP: página de tarea, inicio/fin, catálogos, checklist y comentarios pe
     );
     await send({ ...task, startTime: "12:00" }, 400);
     await send({ type: "priority.delete", projectId, id: priority }, 400);
+    await send({ type: "taskType.delete", projectId, id: task.typeId }, 400);
+    await send({ type: "impact.delete", projectId, id: task.impactId }, 400);
+    const cleared = await send({
+      ...task,
+      type: "task.update",
+      id: taskId,
+      typeId: null,
+      impactId: null,
+    });
+    const clearedTask = cleared.workspace.tasks.find((t) => t.id === taskId);
+    assert.equal(clearedTask.typeId, null);
+    assert.equal(clearedTask.impactId, null);
     await send({ type: "comment.delete", id: commentId });
     await send({ type: "checklist.delete", id: listId });
     const backup = await fetch(base + "/api/backup");

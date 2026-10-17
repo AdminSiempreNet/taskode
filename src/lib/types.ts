@@ -7,6 +7,8 @@ export interface ProjectPriority {
   position: number;
 }
 export interface ProjectLabel extends ProjectPriority {}
+export interface ProjectTaskType extends ProjectPriority {}
+export interface ProjectImpact extends ProjectPriority {}
 export interface ChecklistItem {
   id: string;
   title: string;
@@ -80,6 +82,9 @@ export interface Task {
   title: string;
   description: string;
   priority: Priority;
+  typeId: string | null;
+  impactId: string | null;
+  ticketNumber: string | null;
   dueDate: string | null;
   dueTime: string | null;
   startDate: string | null;
@@ -102,6 +107,8 @@ export interface Workspace {
   statuses: Status[];
   tasks: Task[];
   priorities: ProjectPriority[];
+  taskTypes: ProjectTaskType[];
+  impacts: ProjectImpact[];
   labels: ProjectLabel[];
 }
 export interface Actor {
@@ -126,6 +133,19 @@ export const PRIORITIES = {
   medium: "Media",
   high: "Alta",
 } as const;
+export const DEFAULT_TASK_TYPES = [
+  { name: "💡 Sugerencia", color: "#3b82f6" },
+  { name: "📋 Requerimiento", color: "#8b5cf6" },
+  { name: "⚠️ Falencia", color: "#f59e0b" },
+  { name: "🐛 Error", color: "#ef4444" },
+] as const;
+export const DEFAULT_IMPACTS = [
+  { name: "👤 Usuario", color: "#64748b" },
+  { name: "🏢 Cliente", color: "#3b82f6" },
+  { name: "✨ Feature", color: "#0d9488" },
+  { name: "🧩 Modulo", color: "#8b5cf6" },
+  { name: "🚀 Proyecto", color: "#ef4444" },
+] as const;
 export const COLORS = [
   "#059669",
   "#16a34a",

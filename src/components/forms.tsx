@@ -3,6 +3,7 @@ import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getProjectView, taskPath } from "@/lib/routes";
 import { FeatureCombobox } from "./feature-combobox";
+import { CatalogCombobox } from "./catalog-combobox";
 import { formatFeatureNumber } from "@/lib/features";
 import { DescriptionEditor } from "./description-editor";
 import { EmojiPicker } from "./emoji-picker";
@@ -293,7 +294,13 @@ export function WorkspaceModal({
         )}
         {modal.type === "import" && (
           <ImportForm
-            project={project && (workspace.currentUser.role === "admin" || project.ownerId === workspace.currentUser.id) ? project : undefined}
+            project={
+              project &&
+              (workspace.currentUser.role === "admin" ||
+                project.ownerId === workspace.currentUser.id)
+                ? project
+                : undefined
+            }
             mutate={mutate}
             busy={busy}
             close={close}
@@ -341,6 +348,25 @@ function TaskCreateForm({
   const priorities = workspace.priorities.filter(
     (priority) => priority.projectId === project.id,
   );
+  const [statusId, setStatusId] = useState(
+    statuses.some((status) => status.id === defaults.statusId)
+      ? defaults.statusId!
+      : (statuses[0]?.id ?? ""),
+  );
+  const [priority, setPriority] = useState(
+    priorities.find((option) => option.id === "medium")?.id ??
+      priorities[0]?.id ??
+      "",
+  );
+  const [typeId, setTypeId] = useState(
+    (workspace.taskTypes ?? []).some(
+      (option) =>
+        option.projectId === project.id && option.id === defaults.typeId,
+    )
+      ? defaults.typeId!
+      : "",
+  );
+  const [impactId, setImpactId] = useState("");
   const [startDate, setStartDate] = useState(defaults.startDate ?? "");
   const [description, setDescription] = useState("");
   const [descriptionEditing, setDescriptionEditing] = useState(false);
@@ -366,6 +392,9 @@ function TaskCreateForm({
       featureId: data.get("featureId"),
       statusId: data.get("statusId"),
       priority: data.get("priority"),
+      typeId: data.get("typeId") || null,
+      impactId: data.get("impactId") || null,
+      ticketNumber: String(data.get("ticketNumber") ?? "").trim() || null,
       startDate: startDate || null,
       startTime: startDate ? startTime || null : null,
       dueDate: dueDate || null,
@@ -416,39 +445,77 @@ function TaskCreateForm({
             />
           </Field>
           <Field label="Estado" htmlFor="create-task-status">
-            <select
+            <CatalogCombobox
               id="create-task-status"
               name="statusId"
-              required
-              defaultValue={
-                statuses.some((status) => status.id === defaults.statusId)
-                  ? defaults.statusId
-                  : statuses[0]?.id
-              }
-            >
-              {statuses.map((status) => (
-                <option key={status.id} value={status.id}>
-                  {status.name}
-                </option>
-              ))}
-            </select>
+              label="Estado"
+              options={statuses}
+              value={statusId}
+              onChange={setStatusId}
+              disabled={busy}
+            />
           </Field>
           <Field label="Prioridad" htmlFor="create-task-priority">
-            <select
+            <CatalogCombobox
               id="create-task-priority"
               name="priority"
-              required
-              defaultValue={
-                priorities.find((priority) => priority.id === "medium")?.id ??
-                priorities[0]?.id
-              }
+              label="Prioridad"
+              options={priorities}
+              value={priority}
+              onChange={setPriority}
+              disabled={busy}
+            />
+          </Field>
+          {(
+            [
+              {
+                field: "typeId",
+                label: "Tipo",
+                empty: "Sin tipo",
+                options: workspace.taskTypes ?? [],
+                value: typeId,
+                setValue: setTypeId,
+              },
+              {
+                field: "impactId",
+                label: "Impacto",
+                empty: "Sin impacto",
+                options: workspace.impacts ?? [],
+                value: impactId,
+                setValue: setImpactId,
+              },
+            ] as const
+          ).map(({ field, label, empty, options, value, setValue }) => (
+            <Field
+              key={field}
+              label={`${label} (opcional)`}
+              htmlFor={`create-task-${field}`}
             >
-              {priorities.map((priority) => (
-                <option key={priority.id} value={priority.id}>
-                  {priority.name}
-                </option>
-              ))}
-            </select>
+              <CatalogCombobox
+                id={`create-task-${field}`}
+                name={field}
+                label={label}
+                options={options.filter(
+                  (option) => option.projectId === project.id,
+                )}
+                emptyLabel={empty}
+                value={value}
+                onChange={setValue}
+                disabled={busy}
+              />
+            </Field>
+          ))}
+          <Field
+            label="Ticket (opcional)"
+            htmlFor="create-task-ticket"
+          >
+            <Input
+              id="create-task-ticket"
+              name="ticketNumber"
+              placeholder="Ej. 001234"
+              maxLength={100}
+              disabled={busy}
+            />
           </Field>
           <div className="task-schedule-group">
             <span>
@@ -663,7 +730,8 @@ function FeatureForm({
         type: feature ? "feature.update" : "feature.create",
         id: feature?.id,
         projectId,
-        moduleId: data.get("moduleId") || null,
+        moduleId:
+          data.get("moduleId") === "general" ? null : data.get("moduleId"),
         name: data.get("name"),
         description: data.get("description"),
       })
@@ -692,14 +760,18 @@ function FeatureForm({
           maxLength={30000}
         />
       </Field>
-      <Field label="Módulo (opcional)" htmlFor="feature-module">
+      <Field label="Módulo" htmlFor="feature-module">
         <select
           id="feature-module"
           name="moduleId"
-          defaultValue={feature?.moduleId ?? ""}
+          defaultValue={feature ? (feature.moduleId ?? "general") : ""}
+          required
           disabled={busy}
         >
-          <option value="">General (sin módulo)</option>
+          <option value="" disabled>
+            Selecciona un módulo
+          </option>
+          <option value="general">00 · General (sin módulo)</option>
           {modules.map((module, index) => (
             <option key={module.id} value={module.id}>
               {String(index + 1).padStart(2, "0")} · {module.name}
@@ -964,13 +1036,17 @@ function StatusRow({
     }
     const previous = lastSubmitted.current;
     lastSubmitted.current = values;
-    if (await mutate({
-      type: status ? "status.update" : "status.create",
-      id: status?.id,
-      projectId,
-      ...values,
-    })) {
-      setName((current) => current === name ? (status ? values.name : "") : current);
+    if (
+      await mutate({
+        type: status ? "status.update" : "status.create",
+        id: status?.id,
+        projectId,
+        ...values,
+      })
+    ) {
+      setName((current) =>
+        current === name ? (status ? values.name : "") : current,
+      );
       if (!status) {
         setDone(false);
       }

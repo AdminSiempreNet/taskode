@@ -28,6 +28,9 @@ const taskFields = {
   featureId: id,
   statusId: id,
   priority: id,
+  typeId: id.nullish(),
+  impactId: id.nullish(),
+  ticketNumber: z.string().trim().max(100).nullish(),
   dueDate: date,
   startDate: date.optional(),
   startTime: z
@@ -161,6 +164,22 @@ export const commandSchema = z.discriminatedUnion("type", [
     color,
   }),
   z.object({ type: z.literal("priority.delete"), projectId: id, id }),
+  ...(["taskType", "impact"] as const).flatMap((kind) => [
+    z.object({
+      type: z.literal(`${kind}.create`),
+      projectId: id,
+      name: name.max(60),
+      color,
+    }),
+    z.object({
+      type: z.literal(`${kind}.update`),
+      projectId: id,
+      id,
+      name: name.max(60),
+      color,
+    }),
+    z.object({ type: z.literal(`${kind}.delete`), projectId: id, id }),
+  ]),
   z.object({
     type: z.literal("label.create"),
     projectId: id,

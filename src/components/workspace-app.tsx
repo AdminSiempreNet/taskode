@@ -57,7 +57,8 @@ import { TaskDetail, type TaskDefaults } from "./task-detail";
 import { AccountMenu, ProfileModal } from "./account-menu";
 import { UsersModal } from "./invitation-manager";
 import { ProjectPeopleModal } from "./project-people";
-import { StatusFilter } from "./status-filter";
+import { CatalogFilter, useProjectFilter } from "./status-filter";
+import { matchesTaskFilters } from "@/lib/task-filters";
 
 export function WorkspaceApp({
   initialWorkspace,
@@ -80,10 +81,6 @@ export function WorkspaceApp({
   );
   const [featureId, setFeatureId] = useState("all");
   const [search, setSearch] = useState("");
-  const [statusSelection, setStatusSelection] = useState({
-    projectId,
-    ids: [] as string[],
-  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const sidebarTrigger = useRef<HTMLButtonElement>(null);
@@ -134,30 +131,6 @@ export function WorkspaceApp({
   useEffect(() => {
     void load();
   }, [load]);
-  useEffect(() => {
-    let ids: string[] = [];
-    try {
-      const saved: unknown = JSON.parse(
-        localStorage.getItem(`brote.status-filter.${projectId}`) ?? "[]",
-      );
-      if (Array.isArray(saved) && saved.every((id) => typeof id === "string"))
-        ids = saved;
-    } catch {
-      // Invalid or unavailable storage falls back to showing all statuses.
-    }
-    setStatusSelection({ projectId, ids });
-  }, [projectId]);
-  function setStatusIds(ids: string[]) {
-    setStatusSelection({ projectId, ids });
-    try {
-      localStorage.setItem(
-        `brote.status-filter.${projectId}`,
-        JSON.stringify(ids),
-      );
-    } catch {
-      // Filtering also works when browser storage is unavailable.
-    }
-  }
   useEffect(() => {
     try {
       setSidebarCollapsed(
@@ -248,11 +221,32 @@ export function WorkspaceApp({
     workspace?.features.filter((f) => f.projectId === projectId) ?? [];
   const statuses =
     workspace?.statuses.filter((s) => s.projectId === projectId) ?? [];
-  const statusIds =
-    statusSelection.projectId === projectId ? statusSelection.ids : [];
-  const selectedStatusIds = statusIds.filter((id) =>
-    statuses.some((status) => status.id === id),
+  const taskTypes =
+    workspace?.taskTypes?.filter((option) => option.projectId === projectId) ??
+    [];
+  const impacts =
+    workspace?.impacts?.filter((option) => option.projectId === projectId) ?? [];
+  const [selectedStatusIds, setStatusIds] = useProjectFilter(
+    projectId,
+    "status",
+    statuses,
   );
+  const [selectedTypeIds, setTypeIds] = useProjectFilter(
+    projectId,
+    "type",
+    taskTypes,
+    true,
+  );
+  const [selectedImpactIds, setImpactIds] = useProjectFilter(
+    projectId,
+    "impact",
+    impacts,
+    true,
+  );
+  const hasCategoryFilters =
+    selectedStatusIds.length > 0 ||
+    selectedTypeIds.length > 0 ||
+    selectedImpactIds.length > 0;
   const allTasks =
     workspace?.tasks.filter((t) => t.projectId === projectId) ?? [];
   const active = allTasks.filter((t) => !t.archived);
@@ -260,9 +254,13 @@ export function WorkspaceApp({
     (t) =>
       t.archived === archived &&
       (featureId === "all" || t.featureId === featureId) &&
-      (!selectedStatusIds.length || selectedStatusIds.includes(t.statusId)) &&
+      matchesTaskFilters(t, {
+        statusIds: selectedStatusIds,
+        typeIds: selectedTypeIds,
+        impactIds: selectedImpactIds,
+      }) &&
       (!search ||
-        `${t.title} ${t.description} ${t.labels.join(" ")}`
+        `${t.title} ${t.description} ${t.ticketNumber ?? ""} ${t.labels.join(" ")}`
           .toLocaleLowerCase("es")
           .includes(search.toLocaleLowerCase("es"))),
   );
@@ -336,6 +334,8 @@ export function WorkspaceApp({
   return (
     <ProjectCatalog.Provider
       value={{
+        taskTypes,
+        impacts,
         priorities:
           workspace?.priorities.filter((p) => p.projectId === projectId) ?? [],
         labels:
@@ -363,6 +363,7 @@ export function WorkspaceApp({
               key={projectId}
               projectId={project?.id}
               features={features}
+              taskTypes={taskTypes}
               modules={
                 workspace?.modules.filter(
                   (module) => module.projectId === projectId,
@@ -381,8 +382,17 @@ export function WorkspaceApp({
                 setMobileSidebarOpen(false);
                 if (taskId) router.push(projectPath(projectId, view));
               }}
-              create={() => setModal({ type: "feature" })}
+              createFeature={() => setModal({ type: "feature" })}
               createModule={() => setModal({ type: "module" })}
+              createTask={(typeId) =>
+                setModal({
+                  type: "task",
+                  defaults: {
+                    typeId,
+                    featureId: selectedFeature?.id ?? selectedTask?.featureId,
+                  },
+                })
+              }
               edit={(feature) => setModal({ type: "feature", feature })}
               editModule={(module) => setModal({ type: "module", module })}
               mutate={mutate}
@@ -520,6 +530,7 @@ export function WorkspaceApp({
                       <Input
                         aria-label="Buscar tareas"
                         placeholder="Buscar tareas…"
+                        title="Buscar por título, descripción, etiquetas o número de ticket"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                       />
@@ -532,11 +543,34 @@ export function WorkspaceApp({
                         </button>
                       )}
                     </div>
-                    <StatusFilter
-                      statuses={statuses}
-                      selectedIds={selectedStatusIds}
-                      onChange={setStatusIds}
-                    />
+                    <div className="task-filters">
+                      <CatalogFilter
+                        category="estados"
+                        allLabel="Todos los estados"
+                        shortLabel="Estados"
+                        options={statuses}
+                        selectedIds={selectedStatusIds}
+                        onChange={setStatusIds}
+                      />
+                      <CatalogFilter
+                        category="tipos"
+                        allLabel="Todos los tipos"
+                        shortLabel="Tipos"
+                        unassignedLabel="Sin tipo"
+                        options={taskTypes}
+                        selectedIds={selectedTypeIds}
+                        onChange={setTypeIds}
+                      />
+                      <CatalogFilter
+                        category="impactos"
+                        allLabel="Todos los impactos"
+                        shortLabel="Impactos"
+                        unassignedLabel="Sin impacto"
+                        options={impacts}
+                        selectedIds={selectedImpactIds}
+                        onChange={setImpactIds}
+                      />
+                    </div>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -625,7 +659,7 @@ export function WorkspaceApp({
                 {(archived ||
                   selectedFeature ||
                   search ||
-                  selectedStatusIds.length > 0) && (
+                  hasCategoryFilters) && (
                   <div className="content-context">
                     <div>
                       <h2>
@@ -639,12 +673,14 @@ export function WorkspaceApp({
                           ? ` · ${selectedFeature.description}`
                           : ""}
                       </span>
-                      {(search || selectedStatusIds.length > 0) && (
+                      {(search || hasCategoryFilters) && (
                         <button
                           className="clear-filters"
                           onClick={() => {
                             setSearch("");
                             setStatusIds([]);
+                            setTypeIds([]);
+                            setImpactIds([]);
                           }}
                         >
                           Limpiar filtros
