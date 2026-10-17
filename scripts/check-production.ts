@@ -10,8 +10,8 @@ try {
     if (process.env.VERCEL_GIT_COMMIT_REF && process.env.VERCEL_GIT_COMMIT_REF !== "main")
       throw new Error("La rama de producción de este proyecto debe ser main. Los push a dev no despliegan.");
   }
-  if (process.env.BETTER_AUTH_URL !== "https://tareas.siempre.net.co")
-    throw new Error("Configura BETTER_AUTH_URL=https://tareas.siempre.net.co.");
+  if (process.env.BETTER_AUTH_URL !== "https://taskode.siempre.net.co")
+    throw new Error("Configura BETTER_AUTH_URL=https://taskode.siempre.net.co.");
   if ((process.env.BETTER_AUTH_SECRET || "").length < 32)
     throw new Error("BETTER_AUTH_SECRET debe contener al menos 32 caracteres.");
   if (!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) &&

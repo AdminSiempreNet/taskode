@@ -1,11 +1,23 @@
 # Preparación de producción
 
-Este cambio prepara el código; no crea recursos, cambia DNS, hace push ni despliega.
+Esta guía describe la configuración y los pasos para publicar Taskode en Vercel con PostgreSQL en Dokploy.
+
+## Archivo privado para configurar Vercel
+
+Guarda las variables reales de producción en `.env.production.local`, en la raíz del repositorio. Este archivo está excluido de Git y del código enviado a Vercel mediante `.vercelignore`. `.env.production.example` enumera las variables permitidas; la carga debe limitarse a esa lista y al entorno **Production**.
+
+La preparación de producción reutiliza las credenciales OAuth y Resend de `.env.local`, genera un `BETTER_AUTH_SECRET` independiente y toma la conexión TLS de `.dokploy/vercel-database.env`. No cargar en Vercel `DOKPLOY_API_KEY`, `VERCEL_OIDC_TOKEN`, `TEST_DATABASE_URL`, contraseñas del administrador PostgreSQL ni identificadores Docker locales.
+
+Completa `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID` y `S3_SECRET_ACCESS_KEY` en `.env.production.local`. Configura `S3_REGION` con la región del proveedor (`auto` para R2), `S3_PREFIX=taskode/production/` y `S3_FORCE_PATH_STYLE` según corresponda. El bucket debe ser privado y tener la configuración CORS descrita más adelante. El build exige estos valores y no se debe publicar con credenciales de ejemplo.
+
+En esta instalación, PostgreSQL está en `dbtaskode.siempre.net.co:5440`, base y usuario `taskode`. `DATABASE_SSL=verify-full` y `DATABASE_SSL_CA` son obligatorios. El certificado de CA es público; su clave privada nunca se carga en Vercel. Conserva las credenciales de producción en el archivo privado.
+
+Los identificadores locales `brote-dev` y `brote-dev_brote-postgres-dev` corresponden al contenedor y volumen existentes que contienen datos. No cambiarlos mediante una sustitución de texto. `DATABASE_PATH` es una variable SQLite retirada. Las referencias Brote para respaldos, invitaciones, preferencias y bloqueos se mantienen por compatibilidad con datos existentes.
 
 | Entorno | Aplicación Next.js y API | PostgreSQL | Respaldos |
 | --- | --- | --- | --- |
 | Desarrollo | `npm run dev`, http://localhost:5010 | Docker Desktop, `compose.dev.yaml`, 127.0.0.1:5432 | Archivos locales; S3 opcional con bucket/prefijo separado |
-| Producción | Vercel, workspace `siemprenet`, https://tareas.siempre.net.co | Dokploy, `compose.dokploy.yaml`, TLS obligatorio | Bucket privado S3 compatible: R2 o Backblaze B2 |
+| Producción | Vercel, workspace `siemprenet`, https://taskode.siempre.net.co | Dokploy, `compose.dokploy.yaml`, TLS obligatorio | Bucket privado S3 compatible: R2 o Backblaze B2 |
 
 ## Git y Vercel
 
@@ -13,12 +25,12 @@ Este cambio prepara el código; no crea recursos, cambia DNS, hace push ni despl
 
 Al desplegar:
 
-1. Crear o elegir el repositorio remoto y subir el código cuando se autorice. Actualmente este checkout no tiene remoto configurado.
+1. El remoto es `https://github.com/AdminSiempreNet/taskode.git`. Publicar los cambios de producción en `main`.
 2. Importar el repositorio en el workspace **siemprenet** y crear el proyecto **tareas**. Crear/importar un proyecto puede iniciar un primer despliegue: hacerlo únicamente en la fase de despliegue.
 3. Framework **Next.js**, directorio raíz del repositorio, Node.js **24.x**, instalación `npm ci`, build `npm run build:vercel`. No configurar salida estática ni un comando `npm run dev` en Vercel.
 4. Seleccionar **main** como Production Branch en la configuración de producción del proyecto. Este ajuste de cuenta no se puede imponer con `vercel.json`. Mantener habilitada la integración Git. Confirmar que `dev` queda deshabilitada por la configuración del repositorio.
 5. Completar las variables de `.env.production.example` exclusivamente en **Production**. No copiar `.env.local`, `TEST_DATABASE_URL` ni contraseñas de desarrollo. Ningún secreto usa `NEXT_PUBLIC_`.
-6. Añadir `tareas.siempre.net.co` a Domains y crear exactamente el registro DNS que muestre Vercel. No fijar aquí una IP o CNAME asumido. Esperar la emisión HTTPS.
+6. Añadir `taskode.siempre.net.co` a Domains y crear exactamente el registro DNS que muestre Vercel. No fijar aquí una IP o CNAME asumido. Esperar la emisión HTTPS.
 
 Vercel aloja la interfaz y las rutas API/autenticación de Next.js. Solo el servidor accede a PostgreSQL; el navegador no recibe `DATABASE_URL`.
 
@@ -38,7 +50,7 @@ Genera `.dokploy/compose.yaml` sin secretos, sin empaquetar código de la aplica
 
 En el servidor, antes de arrancar PostgreSQL:
 
-1. Reservar un hostname DNS para la base, por ejemplo `db-tareas.siempre.net.co`, apuntando al servidor sin proxy HTTP. Su valor final debe coincidir con el certificado y con `DATABASE_URL`.
+1. Reservar un hostname DNS para la base, por ejemplo `dbtaskode.siempre.net.co`, apuntando al servidor sin proxy HTTP. Su valor final debe coincidir con el certificado y con `DATABASE_URL`.
 2. Obtener un certificado TLS para ese hostname (CA pública o privada). Colocar la cadena en `server.crt` y la clave en `server.key`, dentro de la ruta absoluta `POSTGRES_TLS_DIR` del servidor. El certificado HTTPS de la web no configura TLS de PostgreSQL.
 3. Dar acceso de lectura al usuario `postgres` del contenedor. Para la clave, PostgreSQL admite propietario `postgres` y modo `0600`, o propietario `root`, grupo del usuario PostgreSQL y modo `0640`. Consultar el UID/GID real de la imagen; no asumir el del host. Montar el directorio en solo lectura, renovar los certificados y recargar PostgreSQL antes de que expiren.
 4. Crear un servicio **Docker Compose** en Dokploy con `compose.dokploy.yaml`. Completar `.env.dokploy.example` en su entorno, con contraseñas nuevas y un puerto externo libre. No asignar un dominio HTTP/Traefik a PostgreSQL: Vercel conecta por TCP.
@@ -74,7 +86,7 @@ Crear el bucket privado y una credencial con permisos de listar, leer, escribir 
 ```json
 [
   {
-    "AllowedOrigins": ["https://tareas.siempre.net.co"],
+    "AllowedOrigins": ["https://taskode.siempre.net.co"],
     "AllowedMethods": ["PUT", "GET", "HEAD"],
     "AllowedHeaders": ["*"],
     "ExposeHeaders": ["ETag"],
@@ -95,10 +107,10 @@ Los respaldos de aplicación no sustituyen copias nativas de PostgreSQL. Program
 
 ## Variables, autenticación y migraciones
 
-Configurar `BETTER_AUTH_URL=https://tareas.siempre.net.co`, secreto nuevo de al menos 32 caracteres y uno o ambos proveedores OAuth. Registrar:
+Configurar `BETTER_AUTH_URL=https://taskode.siempre.net.co`, secreto nuevo de al menos 32 caracteres y uno o ambos proveedores OAuth. Registrar:
 
-- Google: `https://tareas.siempre.net.co/api/auth/callback/google`.
-- GitHub: `https://tareas.siempre.net.co/api/auth/callback/github`.
+- Google: `https://taskode.siempre.net.co/api/auth/callback/google`.
+- GitHub: `https://taskode.siempre.net.co/api/auth/callback/github`.
 
 Conservar los callbacks de localhost para desarrollo en credenciales separadas cuando el proveedor lo requiera. GitHub OAuth Apps tiene un único callback: usar otra App para producción. Para invitaciones por correo, configurar Resend y un remitente de dominio verificado.
 

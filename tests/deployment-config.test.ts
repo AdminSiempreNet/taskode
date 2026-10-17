@@ -14,7 +14,7 @@ test("Vercel: la configuración de producción se valida sin conectarse y rechaz
   const env = {
     ...process.env, VERCEL: "1", VERCEL_ENV: "production", VERCEL_GIT_COMMIT_REF: "main",
     DATABASE_URL: "postgresql://taskode:example@db.example.com:5432/taskode", DATABASE_SSL: "verify-full",
-    DATABASE_POOL_MAX: "5", BETTER_AUTH_URL: "https://tareas.siempre.net.co", BETTER_AUTH_SECRET: "x".repeat(32),
+    DATABASE_POOL_MAX: "5", BETTER_AUTH_URL: "https://taskode.siempre.net.co", BETTER_AUTH_SECRET: "x".repeat(32),
     GOOGLE_CLIENT_ID: "test", GOOGLE_CLIENT_SECRET: "test", BACKUP_STORAGE: "s3",
     S3_ENDPOINT: "https://example.r2.cloudflarestorage.com", S3_REGION: "auto", S3_BUCKET: "private",
     S3_ACCESS_KEY_ID: "example", S3_SECRET_ACCESS_KEY: "example", S3_PREFIX: "tareas/test/",

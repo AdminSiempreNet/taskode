@@ -80,7 +80,7 @@ El menú de usuario del pie del sidebar reúne **Mi perfil**, **Importar Trello*
 
 ## Producción: Vercel + Dokploy + S3
 
-- La aplicación Next.js (interfaz, autenticación y API) se ejecuta en **Vercel**, workspace **siemprenet**, dominio **https://tareas.siempre.net.co**.
+- La aplicación Next.js (interfaz, autenticación y API) se ejecuta en **Vercel**, workspace **siemprenet**, dominio **https://taskode.siempre.net.co**.
 - PostgreSQL con pgvector se ejecuta en **Dokploy**, con volumen persistente y conexión TLS verificada desde Vercel.
 - Los respaldos usan la interfaz `BackupStorage` y su adaptador S3, configurable para **Cloudflare R2** o **Backblaze B2**. Desarrollo conserva archivos locales por defecto.
 - Los push a **`dev` no despliegan**. `main` es la rama de producción prevista; `vercel.json` habilita despliegues automáticos únicamente para `main`.
