@@ -10,7 +10,7 @@ export default async function Login({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  if (await getActor()) redirect("/");
+  if (await getActor()) redirect("/projects");
   const state = await repository().store.state(),
     query = await searchParams;
   return (

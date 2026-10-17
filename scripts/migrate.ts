@@ -1,3 +1,4 @@
+// Keep advisory lock identifiers stable across the Taskode rename to coordinate with existing processes.
 import { loadEnvConfig } from "@next/env";
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -26,7 +27,7 @@ async function main() {
         migrationsFolder: migrationsFolder(),
         migrationsSchema: schema,
       });
-      console.log("Migraciones PostgreSQL de Brote aplicadas.");
+      console.log("Migraciones PostgreSQL de Taskode aplicadas.");
     } finally {
       client.release(true);
     }

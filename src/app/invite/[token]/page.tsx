@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AuthScreen } from "@/components/auth-screen";
+import { TaskodeBrand } from "@/components/taskode-brand";
 import { invitationService, providersConfigured } from "@/server/auth";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -29,7 +30,8 @@ export default async function Invite({
   } catch {
     return (
       <main className="auth-shell">
-        <section className="auth-card">
+        <section className="auth-card auth-message-card">
+          <TaskodeBrand />
           <h1>Invitación no disponible</h1>
           <p>
             El enlace venció, fue revocado o ya se utilizó. Solicita una nueva

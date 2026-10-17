@@ -46,8 +46,9 @@ function fixture() {
 test("S3: paginación, aislamiento por prefijo, metadatos, lectura y borrado", async () => {
   const { storage, objects } = fixture();
   const ids = [
-    "brote-manual-2026-10-16T10-20-30-123Z-11111111-1111-4111-8111-111111111111.brote-backup.json",
-    "brote-before-restore-2026-10-16T11-20-30-123Z-22222222-2222-4222-8222-222222222222.brote-backup.json",
+    "brote-before-restore-2026-10-15T10-20-30-123Z-33333333-3333-4333-8333-333333333333.brote-backup.json",
+    "taskode-manual-2026-10-16T10-20-30-123Z-11111111-1111-4111-8111-111111111111.taskode-backup.json",
+    "taskode-before-restore-2026-10-16T11-20-30-123Z-22222222-2222-4222-8222-222222222222.taskode-backup.json",
   ];
   for (const id of ids) await storage.write({ id, size: 2, kind: "manual", createdAt: "" }, Buffer.from("{}"));
   objects.set("tareas/test/uploads/temporary.json", Buffer.from("{}"));
@@ -57,8 +58,9 @@ test("S3: paginación, aislamiento por prefijo, metadatos, lectura y borrado", a
   assert.deepEqual(files.map((file) => file.id), [...ids].reverse());
   assert.equal(files[0].kind, "before-restore");
   assert.equal(files[0].createdAt, "2026-10-16T11:20:30.123Z");
-  assert.deepEqual(await storage.metadata(ids[0]), files[1]);
+  assert.deepEqual(await storage.metadata(ids[0]), files[2]);
   assert.equal((await storage.read(ids[0])).toString(), "{}");
+  assert.equal((await storage.metadata(ids[0])).kind, "before-restore");
   await storage.delete(ids[0]);
   await assert.rejects(storage.read(ids[0]), /no existe/);
   await assert.rejects(storage.metadata("../private"), /no existe/);
@@ -85,7 +87,7 @@ test("R2 y B2: enlaces firmados con el endpoint, región, prefijo y caducidad co
       assert.ok(url.pathname.includes(`/tareas/test/uploads/${upload.id}.json`));
       assert.equal(url.searchParams.get("X-Amz-Expires"), "300");
       assert.ok(url.searchParams.get("X-Amz-Credential")?.includes(`/${region}/s3/aws4_request`));
-      const id = "brote-manual-2026-10-16T10-20-30-123Z-11111111-1111-4111-8111-111111111111.brote-backup.json";
+      const id = "taskode-manual-2026-10-16T10-20-30-123Z-11111111-1111-4111-8111-111111111111.taskode-backup.json";
       assert.ok((await storage.downloadUrl(id)).includes("response-content-disposition="));
     } finally { client.destroy(); }
   }

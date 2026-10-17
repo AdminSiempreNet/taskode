@@ -82,7 +82,7 @@ test("la instalación vacía sólo contiene el estado inicial y repetir migracio
 
 test("health comprueba conexión y versión; el arranque no repara silenciosamente un esquema incompatible", async () => {
   const repo = await createEmptyRepository();
-  Object.assign(globalThis, { broteRepository: repo });
+  Object.assign(globalThis, { taskodeRepository: repo });
   let peer: PostgresRepository | undefined;
   try {
     assert.equal((await health()).status, 200);
@@ -105,7 +105,7 @@ test("health comprueba conexión y versión; el arranque no repara silenciosamen
     await peer.store.health();
     assert.equal((await peer.store.state()).adminId, null);
   } finally {
-    Reflect.deleteProperty(globalThis, "broteRepository");
+    Reflect.deleteProperty(globalThis, "taskodeRepository");
     await peer?.close();
     await repo.close();
   }
@@ -116,9 +116,9 @@ test("Fast Refresh retira el pool anterior y el cierre libera las conexiones", a
   const previousUrl = process.env.DATABASE_URL;
   const previousSchema = process.env.DATABASE_SCHEMA;
   const globals = globalThis as typeof globalThis & {
-    broteRepository?: PostgresRepository;
+    taskodeRepository?: PostgresRepository;
   };
-  const previous = globals.broteRepository;
+  const previous = globals.taskodeRepository;
   const stale = new PostgresRepository(fixture.store.connectionString, {
     schema: fixture.store.schemaName,
   });
@@ -126,7 +126,7 @@ test("Fast Refresh retira el pool anterior y el cierre libera las conexiones", a
   try {
     await stale.store.ready;
     Object.defineProperty(stale, "cacheVersion", { value: -1 });
-    globals.broteRepository = stale;
+    globals.taskodeRepository = stale;
     process.env.DATABASE_URL = fixture.store.connectionString;
     process.env.DATABASE_SCHEMA = fixture.store.schemaName;
     current = repository();
@@ -143,7 +143,7 @@ test("Fast Refresh retira el pool anterior y el cierre libera las conexiones", a
     else process.env.DATABASE_URL = previousUrl;
     if (previousSchema === undefined) delete process.env.DATABASE_SCHEMA;
     else process.env.DATABASE_SCHEMA = previousSchema;
-    globals.broteRepository = previous;
+    globals.taskodeRepository = previous;
     await stale.close();
     await current?.close();
     await fixture.close();

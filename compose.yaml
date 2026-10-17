@@ -2,12 +2,13 @@ services:
   postgres:
     image: pgvector/pgvector:0.8.7-pg18-bookworm
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-brote}
+      POSTGRES_DB: ${POSTGRES_DB:-taskode}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Required}
-      BROTE_DB_PASSWORD: ${BROTE_DB_PASSWORD:?Required}
+      TASKODE_DB_PASSWORD: ${TASKODE_DB_PASSWORD:?Required}
+      TASKODE_DB_USER: ${TASKODE_DB_USER:-taskode}
     volumes:
-      - brote-postgres:/var/lib/postgresql
-      - ./scripts/init-postgres.sh:/docker-entrypoint-initdb.d/10-brote.sh:ro
+      - taskode-postgres:/var/lib/postgresql
+      - ./scripts/init-postgres.sh:/docker-entrypoint-initdb.d/10-taskode.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d $${POSTGRES_DB}"]
       interval: 5s
@@ -20,12 +21,12 @@ services:
       dockerfile: Dockerfile
       target: migrator
     environment:
-      DATABASE_URL: postgresql://brote:${BROTE_DB_PASSWORD:?Required}@postgres:5432/${POSTGRES_DB:-brote}
+      DATABASE_URL: postgresql://${TASKODE_DB_USER:-taskode}:${TASKODE_DB_PASSWORD:?Required}@postgres:5432/${POSTGRES_DB:-taskode}
     depends_on:
       postgres:
         condition: service_healthy
     restart: "no"
-  brote:
+  taskode:
     build:
       context: .
       dockerfile: Dockerfile
@@ -33,7 +34,7 @@ services:
     ports:
       - "5010:5010"
     environment:
-      DATABASE_URL: postgresql://brote:${BROTE_DB_PASSWORD:?Required}@postgres:5432/${POSTGRES_DB:-brote}
+      DATABASE_URL: postgresql://${TASKODE_DB_USER:-taskode}:${TASKODE_DB_PASSWORD:?Required}@postgres:5432/${POSTGRES_DB:-taskode}
       BACKUP_DIR: /app/backups
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:?Required}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Required}
@@ -49,8 +50,10 @@ services:
       migrate:
         condition: service_completed_successfully
     volumes:
-      - brote-backups:/app/backups
+      - taskode-backups:/app/backups
     restart: unless-stopped
 volumes:
-  brote-postgres:
-  brote-backups:
+  taskode-postgres:
+    name: ${TASKODE_POSTGRES_VOLUME:-${COMPOSE_PROJECT_NAME:-tareas}_taskode-postgres}
+  taskode-backups:
+    name: ${TASKODE_BACKUP_VOLUME:-${COMPOSE_PROJECT_NAME:-tareas}_taskode-backups}

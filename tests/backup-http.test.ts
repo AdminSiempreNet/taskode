@@ -18,17 +18,17 @@ import type { BackupStorage } from "../src/server/backup-storage";
 const base = "http://localhost:5010";
 async function setup() {
   Object.assign(process.env, authConfig);
-  const dir = await mkdtemp(join(tmpdir(), "brote-backup-http-"));
+  const dir = await mkdtemp(join(tmpdir(), "taskode-backup-http-"));
   const path = dir;
   const repo = await createRepository();
   const manager = new BackupManager(repo, path);
-  Object.assign(globalThis, { broteRepository: repo, broteBackups: manager });
+  Object.assign(globalThis, { taskodeRepository: repo, taskodeBackups: manager });
   return {
     repo,
     manager,
     async cleanup() {
-      Reflect.deleteProperty(globalThis, "broteRepository");
-      Reflect.deleteProperty(globalThis, "broteBackups");
+      Reflect.deleteProperty(globalThis, "taskodeRepository");
+      Reflect.deleteProperty(globalThis, "taskodeBackups");
       await repo.close();
       await rm(dir, {
         recursive: true,
@@ -57,7 +57,7 @@ test("API S3: solo el administrador obtiene enlaces; las cargas ambiguas no rest
     createUpload: async () => { uploaded = true; return { id: "temporary-id", url: "https://private.example/upload" }; },
     downloadUrl: async () => "https://private.example/download",
   };
-  Object.assign(globalThis, { broteBackups: new BackupManager(s.repo, tmpdir(), storage) });
+  Object.assign(globalThis, { taskodeBackups: new BackupManager(s.repo, tmpdir(), storage) });
   try {
     assert.equal((await upload(new Request(base + "/api/backups/uploads", { method: "POST" }))).status, 401);
     await addUser(s.repo, "member-upload");
@@ -67,7 +67,7 @@ test("API S3: solo el administrador obtiene enlaces; las cargas ambiguas no rest
     const response = await upload(await authenticatedRequest(base + "/api/backups/uploads", { method: "POST" }));
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { id: "temporary-id", url: "https://private.example/upload" });
-    const id = "brote-manual-2026-10-16T10-20-30-123Z-11111111-1111-4111-8111-111111111111.brote-backup.json";
+    const id = "taskode-manual-2026-10-16T10-20-30-123Z-11111111-1111-4111-8111-111111111111.taskode-backup.json";
     const context = { params: Promise.resolve({ id }) };
     const signed = await download(await authenticatedRequest(base + "/api/backups/" + id + "?url=1"), context);
     assert.deepEqual(await signed.json(), { url: "https://private.example/download" });
@@ -103,11 +103,11 @@ test("API de respaldos: lista, genera, descarga y elimina con nombres seguros", 
     assert.equal(file.headers.get("cache-control"), "no-store");
     assert.match(
       file.headers.get("content-disposition")!,
-      /attachment; filename="brote-/,
+      /attachment; filename="taskode-/,
     );
     assert.equal(
       JSON.parse(Buffer.from(await file.arrayBuffer()).toString()).format,
-      "brote-backup",
+      "taskode-backup",
     );
     assert.equal(
       (await (await list(await authenticatedRequest(base))).json()).backups
@@ -210,7 +210,7 @@ test("API de restauración: exige confirmación y opción previa; valida multipa
     form.delete("backupBeforeRestore");
     assert.equal((await restore(await formRequest(form))).status, 400);
     form.set("backupBeforeRestore", "false");
-    form.set("file", new File(["invalid"], "invalid.brote-backup.json"));
+    form.set("file", new File(["invalid"], "invalid.taskode-backup.json"));
     assert.equal((await restore(await formRequest(form))).status, 400);
     form.delete("backupId");
     assert.equal((await restore(await formRequest(form))).status, 400);
@@ -251,7 +251,7 @@ test("API restaura copia del servidor y archivo adjunto con o sin respaldo previ
     assert.deepEqual(await s.repo.getWorkspace(actor), snapshot);
     await s.repo.execute({ type: "project.delete", id: project }, actor);
     form.delete("backupId");
-    form.set("file", new File([bytes], "backup.brote-backup.json"));
+    form.set("file", new File([bytes], "backup.taskode-backup.json"));
     form.set("backupBeforeRestore", "false");
     const uploaded = await restore(await formRequest(form));
     assert.equal(uploaded.status, 200);

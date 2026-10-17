@@ -46,6 +46,10 @@
 .dark .auth-brand {
   color: #72c5a7;
 }
+.taskode-mark {
+  flex-shrink: 0;
+  color: #77e6b5;
+}
 .auth-providers {
   display: grid;
   gap: 12px;

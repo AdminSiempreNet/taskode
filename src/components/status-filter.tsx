@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UNASSIGNED_FILTER, validFilterIds } from "@/lib/task-filters";
+import { readPreference } from "@/lib/preferences";
 
 export function useProjectFilter(
   projectId: string,
@@ -26,7 +27,7 @@ export function useProjectFilter(
     let ids: string[] = [];
     try {
       const saved: unknown = JSON.parse(
-        localStorage.getItem(`brote.${category}-filter.${projectId}`) ?? "[]",
+        readPreference(`taskode.${category}-filter.${projectId}`) ?? "[]",
       );
       if (Array.isArray(saved) && saved.every((id) => typeof id === "string"))
         ids = saved;
@@ -39,7 +40,7 @@ export function useProjectFilter(
     setSelection({ projectId, ids });
     try {
       localStorage.setItem(
-        `brote.${category}-filter.${projectId}`,
+        `taskode.${category}-filter.${projectId}`,
         JSON.stringify(ids),
       );
     } catch {

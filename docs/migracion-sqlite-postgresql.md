@@ -6,7 +6,7 @@ Actualización de alojamiento: la [preparación Vercel + Dokploy](despliegue-ver
 
 ## Contexto y alternativas
 
-Brote comparte una interfaz de gestión de proyectos, módulos, features y tareas.
+Taskode comparte una interfaz de gestión de proyectos, módulos, features y tareas.
 Se evaluaron las siguientes alternativas para ofrecerlo a desarrolladores
 individuales y equipos:
 
@@ -34,7 +34,7 @@ individuales y equipos:
 - El despliegue usa Docker Compose: base saludable, migraciones completadas y,
   finalmente, aplicación. La base no publica un puerto en producción.
 - Se conserva el panel de respaldos con un formato JSON versionado, validado
-  y propio de Brote. Las copias SQLite anteriores no son restaurables desde
+  y propio de Taskode. Las copias SQLite anteriores no son restaurables desde
   este panel. `pg_dump` y `pg_restore` complementan los respaldos de aplicación
   como herramientas operativas.
 - La aplicación conserva un repositorio común, tipos y reglas de negocio
@@ -67,7 +67,7 @@ archivos SQLite. El despliegue remoto se realiza sólo por instrucción expresa.
 - Las migraciones activas están en `drizzle/postgresql`; las anteriores se
   archivaron intactas en `drizzle/legacy-sqlite`. Las migraciones se ejecutan
   explícitamente y el servidor verifica la versión antes de atender datos.
-- Los respaldos de aplicación usan `.brote-backup.json`, versión 1, con
+- Los respaldos de aplicación usan `.taskode-backup.json`, versión 1, con
   validación de estructura, tipos, unicidad y referencias. La restauración es
   transaccional y conserva la copia previa, la confirmación y la invalidación
   de sesiones e invitaciones pendientes.

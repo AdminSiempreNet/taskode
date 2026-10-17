@@ -92,7 +92,7 @@ const sections = {
   appearance: {
     title: "Apariencia",
     description:
-      "Elige cómo se ve Brote en este navegador. Se aplica a todos tus proyectos.",
+      "Elige cómo se ve Taskode en este navegador. Se aplica a todos tus proyectos.",
     icon: Palette,
   },
 };
@@ -143,7 +143,7 @@ export function SettingsModal({
       >
         <DialogTitle className="sr-only">Configuración general</DialogTitle>
         <DialogDescription className="sr-only">
-          Configuración del proyecto y preferencias globales de Brote.
+          Configuración del proyecto y preferencias globales de Taskode.
         </DialogDescription>
         <nav className="settings-nav" aria-label="Secciones de configuración">
           <h2>Configuración</h2>

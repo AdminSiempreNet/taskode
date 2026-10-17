@@ -61,9 +61,7 @@ export class BackupManager {
         id,
         createdAt: stat.mtime.toISOString(),
         size: stat.size,
-        kind: id.startsWith("brote-before-restore-")
-          ? "before-restore"
-          : "manual",
+        kind: backupName.exec(id)![2] as BackupFile["kind"],
       };
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "ENOENT")
@@ -94,14 +92,14 @@ export class BackupManager {
   }
   private async save(kind: BackupFile["kind"]): Promise<BackupFile> {
     if (this.storage) {
-      const directory = await mkdtemp(join(tmpdir(), "brote-export-"));
+      const directory = await mkdtemp(join(tmpdir(), "taskode-export-"));
       try {
         const path = join(directory, "backup.json");
         await this.repository.exportBackup(path);
         const bytes = await readFile(/* turbopackIgnore: true */ path);
         const createdAt = new Date().toISOString();
         const file: BackupFile = {
-          id: `brote-${kind}-${createdAt.replace(/[:.]/g, "-")}-${randomUUID()}.brote-backup.json`,
+          id: `taskode-${kind}-${createdAt.replace(/[:.]/g, "-")}-${randomUUID()}.taskode-backup.json`,
           kind, createdAt, size: bytes.length,
         };
         await this.storage.write(file, bytes);
@@ -111,10 +109,10 @@ export class BackupManager {
       }
     }
     await mkdir(this.directory, { recursive: true, mode: 0o700 });
-    const id = `brote-${kind}-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID()}.brote-backup.json`;
+    const id = `taskode-${kind}-${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID()}.taskode-backup.json`;
     const pending = join(
       this.directory,
-      `.pending-${randomUUID()}.brote-backup.json`,
+      `.pending-${randomUUID()}.taskode-backup.json`,
     );
     try {
       await this.repository.exportBackup(pending);
@@ -170,13 +168,13 @@ export class BackupManager {
         (!source.file.length || source.file.length > MAX_BACKUP_BYTES)
       )
         throw new DomainError(
-          "Adjunta un respaldo JSON de Brote de hasta 100 MB.",
+          "Adjunta un respaldo JSON de Taskode de hasta 100 MB.",
           413,
         );
-      const dir = await mkdtemp(join(tmpdir(), "brote-restore-"));
+      const dir = await mkdtemp(join(tmpdir(), "taskode-restore-"));
       let safetyBackup: BackupFile | undefined;
       try {
-        const path = join(dir, "restore.brote-backup.json");
+        const path = join(dir, "restore.taskode-backup.json");
         if (source.uploadId !== undefined) {
           if (!this.storage?.readUpload) throw new DomainError("La carga directa requiere almacenamiento S3.");
           await writeFile(path, await this.storage.readUpload(source.uploadId), { flag: "wx", mode: 0o600 });

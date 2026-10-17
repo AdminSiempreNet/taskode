@@ -110,7 +110,7 @@ export function BackupModal({ close }: { close: () => void }) {
   }, [load]);
   function dismiss() {
     if (operation.current) return;
-    if (restored) window.location.assign("/");
+    if (restored) window.location.assign("/login");
     else close();
   }
   async function run(name: string, action: () => Promise<void>) {
@@ -478,12 +478,12 @@ export function BackupModal({ close }: { close: () => void }) {
                 ) : (
                   <div className="field">
                     <label htmlFor="restore-file">
-                      Archivo de respaldo JSON de Brote
+                      Archivo de respaldo JSON de Taskode
                     </label>
                     <Input
                       id="restore-file"
                       type="file"
-                      accept=".brote-backup.json,application/json"
+                      accept=".taskode-backup.json,application/json"
                       disabled={busy}
                       aria-describedby="restore-file-help"
                       onChange={(event) => {
@@ -496,15 +496,15 @@ export function BackupModal({ close }: { close: () => void }) {
                         ) {
                           setFile(null);
                           setError(
-                            "Adjunta un respaldo JSON de Brote de hasta 100 MB.",
+                            "Adjunta un respaldo JSON de Taskode de hasta 100 MB.",
                           );
                           event.target.value = "";
                         } else setFile(selectedFile);
                       }}
                     />
                     <p id="restore-file-help" className="backup-hint">
-                      Adjunta una copia exportada desde Brote
-                      (.brote-backup.json), de hasta 100 MB.
+                      Adjunta una copia exportada desde Taskode
+                      (.taskode-backup.json), de hasta 100 MB.
                     </p>
                     {file && (
                       <p className="backup-selected-file">

@@ -1,6 +1,6 @@
-# Brote · Proyectos y tareas
+# Taskode · Proyectos y tareas de desarrollo
 
-Aplicación en español con Next.js, React, TypeScript, shadcn/ui y PostgreSQL mediante Drizzle ORM. Better Auth gestiona el acceso con Google/GitHub y las invitaciones.
+Gestión de proyectos de software, módulos, features y tareas en español. Del backlog al siguiente deploy. Construida con Next.js, React, TypeScript, shadcn/ui y PostgreSQL mediante Drizzle ORM. Better Auth gestiona el acceso con Google/GitHub y las invitaciones.
 
 La [decisión de arquitectura y sus fases](docs/migracion-sqlite-postgresql.md) documenta las alternativas analizadas. Esta edición usa exclusivamente PostgreSQL y comienza con una base vacía. Los archivos y volúmenes SQLite anteriores se conservan, sin importarlos ni modificarlos.
 
@@ -18,28 +18,29 @@ npm run dev
 
 Copia `.env.example` solamente en una instalación nueva: conserva tu `.env.local` si ya contiene credenciales. Completa sus variables antes de arrancar.
 
-- `DATABASE_URL`: conexión obligatoria del servidor. En desarrollo usa `127.0.0.1:5432/brote`.
+- `DATABASE_URL`: conexión obligatoria del servidor. En desarrollo usa `127.0.0.1:5432/taskode`.
 - `POSTGRES_PASSWORD`: contraseña de inicialización de PostgreSQL.
-- `BROTE_DB_PASSWORD`: contraseña del rol `brote`, que **no es superusuario**. Debe coincidir con la contraseña de `DATABASE_URL`.
-- `POSTGRES_DB`: `brote` por defecto.
-- `TEST_DATABASE_URL`: conexión a `brote_test`; nunca puede apuntar a la base de desarrollo.
+- `TASKODE_DB_PASSWORD`: contraseña del rol `taskode`, que **no es superusuario**. Debe coincidir con la contraseña de `DATABASE_URL`.
+- `TASKODE_DB_USER`: rol de aplicación (`taskode` en instalaciones nuevas). Permite conservar el rol de una instalación existente.
+- `POSTGRES_DB`: `taskode` por defecto.
+- `TEST_DATABASE_URL`: conexión a `taskode_test`; nunca puede apuntar a la base de desarrollo.
 - `BACKUP_DIR`: carpeta de respaldos (`./data/backups` por defecto).
 
 Las credenciales de ejemplo son sólo para desarrollo. Para producción genera contraseñas independientes con `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"`. Los caracteres base64url permiten utilizarlas en la URL de conexión sin escapes adicionales.
 
 La web abre en **http://localhost:5010**. Si otro servicio ocupa 5010, detenlo antes de ejecutar `npm run dev`.
 
-`npm run db:up` levanta solamente PostgreSQL y espera a que esté saludable. El contenedor publica únicamente `127.0.0.1:5432`, usa el volumen `brote-dev_brote-postgres-dev` y crea también `brote_test`. No reutiliza otras bases del equipo. `npm run db:down` detiene PostgreSQL y conserva el volumen.
+`npm run db:up` levanta solamente PostgreSQL y espera a que esté saludable. El contenedor publica únicamente `127.0.0.1:5432`, usa el volumen `taskode-dev_taskode-postgres-dev` y crea también `taskode_test`. No reutiliza otras bases del equipo. `npm run db:down` detiene PostgreSQL y conserva el volumen.
 
 Las variables de inicialización sólo se aplican al crear un volumen vacío. Para modificar contraseñas en una base existente hay que modificar el rol y actualizar las conexiones; editar el archivo env no cambia la contraseña guardada en PostgreSQL.
 
-El script de inicialización activa la extensión `vector` en la base de aplicación y en `brote_test`. Lo hace con el usuario de inicialización; `brote` sigue siendo un rol sin privilegios de superusuario. La aplicación conserva sus funciones actuales; las búsquedas vectoriales se podrán incorporar en una fase posterior.
+El script de inicialización activa la extensión `vector` en la base de aplicación y en `taskode_test`. Lo hace con el usuario de inicialización; `taskode` sigue siendo un rol sin privilegios de superusuario. La aplicación conserva sus funciones actuales; las búsquedas vectoriales se podrán incorporar en una fase posterior.
 
 Si el volumen ya existía con PostgreSQL 18 sin pgvector, `npm run db:up` cambia la imagen conservando los datos. Después activa la extensión una vez en cada base:
 
 ```powershell
 docker compose --env-file .env.local -f compose.dev.yaml exec -T postgres sh -c 'psql -v ON_ERROR_STOP=1 -U postgres -d "$POSTGRES_DB" -c "CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;"'
-docker compose --env-file .env.local -f compose.dev.yaml exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d brote_test -c 'CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;'
+docker compose --env-file .env.local -f compose.dev.yaml exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d taskode_test -c 'CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;'
 ```
 
 En un despliegue Compose existente, ejecuta el primer comando sin `-f compose.dev.yaml`. Las actualizaciones futuras de pgvector se fijarán explícitamente en los tres Compose; al cambiar de versión de la extensión se deberá ejecutar también `ALTER EXTENSION vector UPDATE` con el usuario administrador en cada base.
@@ -47,6 +48,14 @@ En un despliegue Compose existente, ejecuta el primer comando sin `-f compose.de
 Las migraciones activas están en `drizzle/postgresql`. `npm run db:generate` genera cambios futuros y `npm run db:migrate` los aplica explícitamente. El arranque comprueba la versión y no repara esquemas ni ejecuta migraciones automáticamente. La migración inicial contiene todos los campos y catálogos actuales; los catálogos se crean al crear un proyecto. No se vuelve a sembrar un proyecto existente.
 
 La compilación (`npm run build`) no requiere una base disponible. La ejecución sí requiere una conexión y un esquema actualizado.
+
+### Instalaciones anteriores al cambio de marca
+
+Taskode conserva la compatibilidad con respaldos JSON, enlaces de invitación pendientes y preferencias de navegador de Brote. Los nuevos archivos e invitaciones usan Taskode; las preferencias existentes se copian al nuevo nombre al leerlas. Los identificadores de bloqueo PostgreSQL se conservan para coordinar procesos de ambas versiones.
+
+La instalación local de este proyecto usa las bases `taskode` y `taskode_test` y el rol `taskode`, renombrados directamente en PostgreSQL sin recrear los datos. `.env.local` tiene actualizados `POSTGRES_DB`, `TASKODE_DB_USER`, `DATABASE_URL` y `TEST_DATABASE_URL`; la contraseña se configura con `TASKODE_DB_PASSWORD`. `COMPOSE_PROJECT_NAME` y `TASKODE_DEV_POSTGRES_VOLUME` conservan el proyecto Compose y el volumen que ya contienen los datos.
+
+En otra instalación, el código no renombra automáticamente las bases ni los roles. Conserva `POSTGRES_DB`, `DATABASE_URL` y `TEST_DATABASE_URL` y configura `TASKODE_DB_USER` con el rol actual, o actualiza estas variables después de renombrarlos en PostgreSQL. Antes de iniciar Compose, fija `TASKODE_DEV_POSTGRES_VOLUME` al volumen de desarrollo existente, o `TASKODE_POSTGRES_VOLUME` y `TASKODE_BACKUP_VOLUME` a los volúmenes de producción existentes. Conserva también el nombre del proyecto Compose con `COMPOSE_PROJECT_NAME`. No uses volúmenes nuevos para sustituir datos existentes.
 
 ## Acceso y configuración inicial
 
@@ -89,9 +98,9 @@ docker compose --env-file .env.local config --quiet
 docker compose --env-file .env.local up -d --build --wait
 ```
 
-El Compose incluye `postgres`, `migrate` y `brote`: espera el healthcheck de PostgreSQL y la finalización correcta de las migraciones antes de iniciar la web. Un error de migración bloquea el arranque. Las migraciones tienen una imagen independiente con su ejecutable y dependencias, sin necesitar archivos del equipo al ejecutarse.
+El Compose incluye `postgres`, `migrate` y `taskode`: espera el healthcheck de PostgreSQL y la finalización correcta de las migraciones antes de iniciar la web. Un error de migración bloquea el arranque. Las migraciones tienen una imagen independiente con su ejecutable y dependencias, sin necesitar archivos del equipo al ejecutarse.
 
-PostgreSQL no publica puertos. La aplicación conecta al servicio `postgres:5432`; el puerto web es 5010. El volumen `brote-postgres` se monta en `/var/lib/postgresql` (ubicación de la imagen oficial a partir de PostgreSQL 18). `brote-backups` conserva los respaldos en `/app/backups`. `docker compose down` conserva ambos volúmenes; `down -v` los elimina y no forma parte del procedimiento normal.
+PostgreSQL no publica puertos. La aplicación conecta al servicio `postgres:5432`; el puerto web es 5010. El volumen `taskode-postgres` se monta en `/var/lib/postgresql` (ubicación de la imagen oficial a partir de PostgreSQL 18). `taskode-backups` conserva los respaldos en `/app/backups`. `docker compose down` conserva ambos volúmenes; `down -v` los elimina y no forma parte del procedimiento normal.
 
 `/api/health` responde 200 sólo si la conexión y el esquema están disponibles; de lo contrario responde 503. Las escrituras se serializan inicialmente mediante un bloqueo transaccional de PostgreSQL, también entre procesos. Las lecturas de espacios y respaldos usan snapshots consistentes. El despliegue incluye una instancia web y un volumen compartido de respaldos.
 
@@ -99,7 +108,9 @@ La primera cuenta que acceda a la base nueva será administradora y realizará e
 
 ## Uso
 
-- Cambia de proyecto desde el selector desplegable en la parte superior del sidebar. Muestra el icono y nombre del proyecto actual y permite crear uno nuevo con «Nuevo proyecto». Puedes navegar por las opciones con el teclado o escribir el nombre para saltar a un proyecto. Cada proyecto tiene su propia URL `/projects/<projectId>`; puedes abrirla directamente, recargarla y usar Atrás/Adelante. `/` abre el primer proyecto disponible o la pantalla de creación si el espacio está vacío. Los enlaces antiguos `/?project=<id>` redirigen a la nueva ruta; un identificador inexistente muestra una página 404.
+La ruta `/` muestra una landing pública con la presentación y funciones de Taskode. `/login` ofrece acceso con Google y GitHub; después de acceder, `/projects` abre el espacio de trabajo y deriva al asistente inicial cuando corresponde. Los proyectos siguen requiriendo sesión.
+
+- Cambia de proyecto desde el selector desplegable en la parte superior del sidebar. Muestra el icono y nombre del proyecto actual y permite crear uno nuevo con «Nuevo proyecto». Puedes navegar por las opciones con el teclado o escribir el nombre para saltar a un proyecto. Cada proyecto tiene su propia URL `/projects/<projectId>`; puedes abrirla directamente, recargarla y usar Atrás/Adelante. `/projects` abre el primer proyecto disponible o la pantalla de creación si el espacio está vacío. Los enlaces antiguos `/?project=<id>` redirigen a través de `/projects?project=<id>`; un identificador inexistente en la ruta de proyecto muestra una página 404.
 - La barra superior reúne las vistas, la búsqueda y el filtro por estados. El filtro permite marcar varios estados sin cerrar el menú y muestra las tareas de cualquiera de ellos en las tres vistas. La selección se guarda por proyecto en este navegador y se recupera al recargar, cambiar de proyecto o volver del detalle de una tarea. «Todos los estados» o «Limpiar filtros» restablecen la vista completa; desmarcar el último estado también muestra todos. Crea tareas desde el «+» de una columna, la lista o un espacio del calendario. La creación abre un modal con título, descripción y propiedades. **Crear** es la acción por defecto y cierra el modal; **Crear y editar** abre el detalle de la tarea guardada. Las etiquetas, checklists y comentarios se añaden desde ese detalle. El menú de tres puntos permite editar el proyecto, consultar su descripción y acceder a las tareas archivadas.
 - El dropdown «Nuevo» de la barra lateral permite crear módulos, features y tareas. Para crear una tarea se elige su tipo; el modal permite elegir la feature. Al crear una feature se debe elegir su módulo, incluido **General**. Al editarla, las flechas permiten subirla o bajarla dentro de su módulo y guardan el orden al pulsarlas, igual que en los módulos. «Todas las features» reúne las tareas del proyecto; selecciona una para concentrarte en ella.
 - «Nuevo → Módulo» permite añadir módulos con nombre y descripción. Cada módulo es una sección contraíble, expandida por defecto, con código de al menos dos dígitos (01, 02, …). Su menú permite editarlo, cambiar el orden con las flechas o eliminarlo; al eliminar un módulo, sus features pasan a General y conservan sus tareas.
@@ -128,7 +139,7 @@ La primera cuenta que acceda a la base nueva será administradora y realizará e
 ## Importar desde Trello
 
 1. En el tablero de Trello, abre **Imprimir y exportar → Exportar como JSON**.
-2. En Brote, pulsa **Importar Trello** y selecciona el `.json` (hasta 12 MB, 10.000 tarjetas y 200 listas).
+2. En Taskode, pulsa **Importar Trello** y selecciona el `.json` (hasta 12 MB, 10.000 tarjetas y 200 listas).
 3. Revisa el resumen y elige crear un proyecto o importar al proyecto actual.
 
 Cada lista se convierte en un estado, reutilizando nombres existentes sin distinguir mayúsculas. Las tarjetas se agrupan en una feature con el nombre del tablero. Se conservan títulos, descripciones, fechas de entrega (día UTC de la fecha de Trello), etiquetas y archivo; las tarjetas de listas archivadas también quedan archivadas. Las listas importadas no se marcan automáticamente como finalizadas: puedes hacerlo en Configuración → Estados.
@@ -141,7 +152,8 @@ Referencia: [Exportar datos desde Trello](https://support.atlassian.com/trello/d
 
 El administrador conserva el panel **Respaldo**: permite listar, generar, descargar, eliminar y restaurar desde una copia del servidor o un archivo adjunto.
 
-- Formato: `.brote-backup.json`, con identificador `brote-backup`, versión 1, fecha y una lista explícita de tablas.
+- Formato: `.taskode-backup.json`, con identificador `taskode-backup`, versión 1, fecha y una lista explícita de tablas.
+- Las copias anteriores `.brote-backup.json` de versión 1 siguen disponibles para listar, descargar y restaurar, tanto en archivos locales como en S3. Las exportaciones nuevas usan exclusivamente Taskode.
 - Incluye usuarios, cuentas OAuth vinculadas, propietarios, participantes, configuración inicial, invitaciones y todos los datos de negocio, incluidas tareas archivadas, comentarios, checklist e historial.
 - Excluye sesiones, verificaciones temporales y metadatos de migraciones. El archivo puede contener información sensible de las cuentas y debe conservarse protegido.
 - La exportación lee un snapshot consistente y la carpeta se configura con `BACKUP_DIR`.
@@ -160,20 +172,20 @@ La instalación mantiene el modelo actual de usuarios globales y permisos por pr
 Estos comandos se ejecutan sobre un despliegue propio; no forman parte del panel. Exportan una copia nativa dentro del contenedor y luego la copian al equipo, evitando redirigir archivos binarios con PowerShell:
 
 ```powershell
-docker compose --env-file .env.local exec -T postgres sh -c 'PGPASSWORD="$BROTE_DB_PASSWORD" pg_dump -h 127.0.0.1 -U brote -d "$POSTGRES_DB" -Fc -f /tmp/brote.dump'
-docker compose --env-file .env.local cp postgres:/tmp/brote.dump ./brote.dump
+docker compose --env-file .env.local exec -T postgres sh -c 'PGPASSWORD="$TASKODE_DB_PASSWORD" pg_dump -h 127.0.0.1 -U taskode -d "$POSTGRES_DB" -Fc -f /tmp/taskode.dump'
+docker compose --env-file .env.local cp postgres:/tmp/taskode.dump ./taskode.dump
 ```
 
-Para recuperar una copia nativa de confianza, detén la aplicación y usa las herramientas de la misma versión PostgreSQL. La restauración operativa usa el usuario de inicialización para recrear `vector` y conservar los propietarios y permisos del respaldo; el rol `brote` debe existir, como sucede tras ejecutar el script de inicialización:
+Para recuperar una copia nativa de confianza, detén la aplicación y usa las herramientas de la misma versión PostgreSQL. La restauración operativa usa el usuario de inicialización para recrear `vector` y conservar los propietarios y permisos del respaldo; el rol `taskode` debe existir, como sucede tras ejecutar el script de inicialización:
 
 ```powershell
-docker compose --env-file .env.local stop brote
-docker compose --env-file .env.local cp ./brote.dump postgres:/tmp/brote.dump
-docker compose --env-file .env.local exec -T postgres sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_restore -h 127.0.0.1 -U postgres -d "$POSTGRES_DB" --clean --if-exists --exit-on-error --single-transaction /tmp/brote.dump'
+docker compose --env-file .env.local stop taskode
+docker compose --env-file .env.local cp ./taskode.dump postgres:/tmp/taskode.dump
+docker compose --env-file .env.local exec -T postgres sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" pg_restore -h 127.0.0.1 -U postgres -d "$POSTGRES_DB" --clean --if-exists --exit-on-error --single-transaction /tmp/taskode.dump'
 docker compose --env-file .env.local up -d --wait
 ```
 
-`pg_dump` incluye las sesiones; antes de reabrir acceso tras una restauración operativa invalida sesiones y verificaciones y revoca invitaciones pendientes. El panel de Brote realiza esa invalidación automáticamente.
+`pg_dump` incluye las sesiones; antes de reabrir acceso tras una restauración operativa invalida sesiones y verificaciones y revoca invitaciones pendientes. El panel de Taskode realiza esa invalidación automáticamente.
 
 ## Arquitectura y comprobaciones
 

@@ -163,19 +163,26 @@ test("HTTP: página de tarea, inicio/fin, catálogos, checklist y comentarios pe
     await send({ type: "checklist.delete", id: listId });
     const backup = await fetch(base + "/api/backup");
     assert.equal(backup.status, 200);
-    assert.equal((await backup.json()).format, "brote-backup");
+    assert.equal((await backup.json()).format, "taskode-backup");
     await send({ type: "task.delete", id: taskId });
     assert.equal((await fetch(base + route)).status, 404);
   } finally {
     if (projectId) await send({ type: "project.delete", id: projectId });
   }
 });
-test("HTTP: página y todos sus assets JS/CSS responden correctamente", async () => {
+test("HTTP: la landing es pública, conserva la marca y todos sus assets JS/CSS responden", async () => {
   const r = await fetch(base);
   assert.equal(r.status, 200);
   const html = await r.text();
   assert.match(html, /<html lang="es"/);
-  assert.match(html, /Brote/);
+  assert.match(html, /Taskode/);
+  assert.match(html, /Tu próximo deploy empieza con/);
+  assert.match(html, /id="funciones"/);
+  assert.match(html, /id="como-funciona"/);
+  assert.match(html, /href="\/login"/);
+  const publicPage = await globalThis.fetch(base);
+  assert.equal(publicPage.status, 200);
+  assert.match(await publicPage.text(), /Tu próximo deploy empieza con/);
   const assets = [
     ...new Set(
       [...html.matchAll(/(?:src|href)="([^\"]*\/_next\/static\/[^\"]+)"/g)].map(
@@ -201,7 +208,7 @@ test("HTTP: rutas de proyectos, enlaces antiguos, recarga y proyecto eliminado",
     });
     projectId = created.createdId;
     const path = `/projects/${encodeURIComponent(projectId)}`;
-    for (const entry of ["/", "/projects"]) {
+    for (const entry of ["/projects"]) {
       const root = await fetch(new URL(entry, base), { redirect: "manual" });
       assert.equal(root.status, 307);
       assert.equal(
@@ -224,7 +231,10 @@ test("HTTP: rutas de proyectos, enlaces antiguos, recarga y proyecto eliminado",
       redirect: "manual",
     });
     assert.equal(legacy.status, 307);
-    assert.equal(legacy.headers.get("location"), path);
+    assert.equal(legacy.headers.get("location"), `/projects?project=${projectId}`);
+    const legacyProject = await fetch(new URL(legacy.headers.get("location"), base), { redirect: "manual" });
+    assert.equal(legacyProject.status, 307);
+    assert.equal(legacyProject.headers.get("location"), path);
 
     const missing = await fetch(base + `/projects/${randomUUID()}`);
     assert.equal(missing.status, 404);
@@ -234,7 +244,7 @@ test("HTTP: rutas de proyectos, enlaces antiguos, recarga y proyecto eliminado",
     const removedPath = path;
     projectId = undefined;
     assert.equal((await fetch(base + removedPath)).status, 404);
-    const landing = await fetch(base, { redirect: "manual" });
+    const landing = await fetch(base + "/projects", { redirect: "manual" });
     if (deleted.workspace.projects.length) {
       assert.equal(landing.status, 307);
       assert.equal(
@@ -421,10 +431,10 @@ test("HTTP: crear, editar, mover, archivar, restaurar, importar, respaldar y eli
     assert.equal(response.status, 200);
     assert.match(
       response.headers.get("content-disposition"),
-      /\.brote-backup\.json/,
+      /\.taskode-backup\.json/,
     );
     const copy = await response.json();
-    assert.equal(copy.format, "brote-backup");
+    assert.equal(copy.format, "taskode-backup");
     assert.equal(
       copy.tables.tasks.filter((task) => task.projectId === projectId).length,
       2,
@@ -445,7 +455,7 @@ test("HTTP: crear, editar, mover, archivar, restaurar, importar, respaldar y eli
   }
 });
 
-test("HTTP: páginas y API requieren sesión; healthcheck y login son públicos", async () => {
+test("HTTP: proyectos y API requieren sesión; landing, healthcheck y login son públicos", async () => {
   for (const path of [
     "/api/workspace",
     "/api/backup",
@@ -457,13 +467,19 @@ test("HTTP: páginas y API requieren sesión; healthcheck y login son públicos"
     assert.equal(r.status, 401, path);
   }
   const home = await globalThis.fetch(base, { redirect: "manual" });
-  assert.equal(home.status, 307);
-  assert.equal(new URL(home.headers.get("location"), base).pathname, "/login");
+  assert.equal(home.status, 200);
+  const projects = await globalThis.fetch(base + "/projects", { redirect: "manual" });
+  assert.equal(projects.status, 307);
+  assert.equal(new URL(projects.headers.get("location"), base).pathname, "/login");
   const login = await globalThis.fetch(base + "/login");
   assert.equal(login.status, 200);
   const html = await login.text();
   assert.match(html, /Continuar con Google/);
   assert.match(html, /Continuar con GitHub/);
+  assert.match(html, /Vuelve a tu proyecto/);
+  const signedInLogin = await fetch(base + "/login", { redirect: "manual" });
+  assert.equal(signedInLogin.status, 307);
+  assert.equal(signedInLogin.headers.get("location"), "/projects");
   assert.equal((await globalThis.fetch(base + "/api/health")).status, 200);
 });
 

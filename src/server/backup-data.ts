@@ -64,13 +64,14 @@ for (const [name, table] of Object.entries(backupTables)) {
   tableValidators[name] = z.array(z.strictObject(fields));
 }
 const fileSchema = z.strictObject({
-  format: z.literal("brote-backup"),
+  // Existing backups remain restorable; all new exports use the Taskode format.
+  format: z.enum(["taskode-backup", "brote-backup"]).transform(() => "taskode-backup" as const),
   version: z.literal(1),
   createdAt: z.iso.datetime(),
   tables: z.strictObject(tableValidators),
 });
 export type ApplicationBackup = {
-  format: "brote-backup";
+  format: "taskode-backup";
   version: 1;
   createdAt: string;
   tables: Record<string, BackupRow[]>;
@@ -85,7 +86,7 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
   const parsed = fileSchema.safeParse(input);
   if (!parsed.success)
     invalid(
-      "El archivo no es un respaldo JSON compatible de Brote (versión 1).",
+      "El archivo no es un respaldo JSON compatible de Taskode (versión 1).",
     );
   const backup = parsed.data as ApplicationBackup;
   const data = backup.tables;
@@ -251,7 +252,7 @@ export async function exportApplicationBackup(
       tables[name] = await store.db.select().from(table);
   });
   const text = JSON.stringify({
-    format: "brote-backup",
+    format: "taskode-backup",
     version: 1,
     createdAt: new Date().toISOString(),
     tables,
@@ -269,7 +270,7 @@ export async function restoreApplicationBackup(
   const bytes = await readFile(source);
   if (!bytes.length || bytes.length > MAX_BACKUP_BYTES)
     throw new DomainError(
-      "Adjunta un respaldo JSON de Brote de hasta 100 MB.",
+      "Adjunta un respaldo JSON de Taskode de hasta 100 MB.",
       413,
     );
   if (bytes.subarray(0, 16).toString().startsWith("SQLite format"))
@@ -280,7 +281,7 @@ export async function restoreApplicationBackup(
   try {
     input = JSON.parse(bytes.toString("utf8"));
   } catch {
-    invalid("El archivo no contiene un respaldo JSON válido de Brote.");
+    invalid("El archivo no contiene un respaldo JSON válido de Taskode.");
   }
   const backup = validateApplicationBackup(input);
   await store.restore(async () => {

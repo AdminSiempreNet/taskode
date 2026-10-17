@@ -58,7 +58,7 @@ export class S3BackupStorage implements BackupStorage {
     return `${this.prefix}uploads/${id}.json`;
   }
   private file(id: string, size: number): BackupFile {
-    const match = id.match(/^brote-(manual|before-restore)-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z-/)!;
+    const match = id.match(/^(?:taskode|brote)-(manual|before-restore)-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z-/)!;
     return { id, size, kind: match[1] as BackupFile["kind"], createdAt: `${match[2]}T${match[3]}:${match[4]}:${match[5]}.${match[6]}Z` };
   }
   private rethrow(error: unknown): never {
@@ -92,7 +92,7 @@ export class S3BackupStorage implements BackupStorage {
       if (!object.Body) throw new DomainError("El respaldo está vacío.");
       if (!object.ContentLength || object.ContentLength > MAX_BACKUP_BYTES) {
         (object.Body as { destroy?: () => void }).destroy?.();
-        throw new DomainError("Adjunta un respaldo JSON de Brote de hasta 100 MB.", 413);
+        throw new DomainError("Adjunta un respaldo JSON de Taskode de hasta 100 MB.", 413);
       }
       const bytes = Buffer.from(await object.Body.transformToByteArray());
       if (bytes.length > MAX_BACKUP_BYTES) throw new DomainError("El respaldo supera los 100 MB.", 413);

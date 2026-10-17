@@ -2,6 +2,8 @@
 @import "./calendar.css";
 @import "./details.css";
 @import "./account.css";
+@import "./login.css";
+@import "./landing.css";
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {

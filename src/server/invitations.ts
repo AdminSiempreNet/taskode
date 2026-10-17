@@ -40,9 +40,9 @@ export async function sendInvitationEmail(data: {
   const result = await new Resend(process.env.RESEND_API_KEY).emails.send({
     from: process.env.RESEND_FROM_EMAIL,
     to: data.to,
-    subject: "Te han invitado a Brote",
-    text: `${data.inviter} te invita a Brote. Acepta con Google o GitHub usando este correo. El enlace vence en 7 días: ${data.url}`,
-    html: `<h1>Te han invitado a Brote</h1><p>${escape(data.inviter)} te invita a colaborar.</p><p>Accede con Google o GitHub usando el correo de esta invitación.</p><p><a href="${escape(data.url)}">Aceptar invitación</a></p><p>El enlace vence en 7 días.</p>`,
+    subject: "Te han invitado a Taskode",
+    text: `${data.inviter} te invita a Taskode. Acepta con Google o GitHub usando este correo. El enlace vence en 7 días: ${data.url}`,
+    html: `<h1>Te han invitado a Taskode</h1><p>${escape(data.inviter)} te invita a colaborar.</p><p>Accede con Google o GitHub usando el correo de esta invitación.</p><p><a href="${escape(data.url)}">Aceptar invitación</a></p><p>El enlace vence en 7 días.</p>`,
   });
   if (result.error) throw new Error(result.error.message);
 }
@@ -53,9 +53,9 @@ export class InvitationService {
     private baseURL: string,
     private mailer: Mailer = sendInvitationEmail,
   ) {}
-  private signature(id: string, expiresAt: number) {
+  private signature(id: string, expiresAt: number, brand = "taskode") {
     return createHmac("sha256", this.secret)
-      .update(`brote-invitation:${id}:${expiresAt}`)
+      .update(`${brand}-invitation:${id}:${expiresAt}`)
       .digest("base64url");
   }
   token(row: typeof s.invitations.$inferSelect) {
@@ -70,9 +70,13 @@ export class InvitationService {
     if (!id || !/^\d+$/.test(expiration ?? "") || !signature || extra.length)
       throw new DomainError("La invitación no es válida.", 400);
     const expiresAt = Number(expiration),
-      expected = Buffer.from(this.signature(id, expiresAt)),
       actual = Buffer.from(signature);
-    if (expected.length !== actual.length || !timingSafeEqual(expected, actual))
+    // Previously emailed links remain valid until their original expiration.
+    const valid = ["taskode", "brote"].some((brand) => {
+      const expected = Buffer.from(this.signature(id, expiresAt, brand));
+      return expected.length === actual.length && timingSafeEqual(expected, actual);
+    });
+    if (!valid)
       throw new DomainError("La invitación no es válida.", 400);
     const row = (
       await this.repo.store.db

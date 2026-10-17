@@ -20,7 +20,7 @@ import {
   Plus,
   Search,
   Settings2,
-  Sprout,
+  Code2,
   Upload,
   Users,
   X,
@@ -59,6 +59,7 @@ import { UsersModal } from "./invitation-manager";
 import { ProjectPeopleModal } from "./project-people";
 import { CatalogFilter, useProjectFilter } from "./status-filter";
 import { matchesTaskFilters } from "@/lib/task-filters";
+import { readPreference } from "@/lib/preferences";
 
 export function WorkspaceApp({
   initialWorkspace,
@@ -120,7 +121,7 @@ export function WorkspaceApp({
       const w: Workspace = await r.json();
       setWorkspace(w);
       if (!w.projects.some((project) => project.id === projectId)) {
-        const destination = w.projects[0] ? projectPath(w.projects[0].id) : "/";
+        const destination = w.projects[0] ? projectPath(w.projects[0].id) : "/projects";
         if (projectId || w.projects.length)
           router.replace(destination, { scroll: false });
       }
@@ -134,7 +135,7 @@ export function WorkspaceApp({
   useEffect(() => {
     try {
       setSidebarCollapsed(
-        localStorage.getItem("brote.sidebar-collapsed") === "true",
+        readPreference("taskode.sidebar-collapsed") === "true",
       );
     } catch {
       // The sidebar also works when browser storage is unavailable.
@@ -156,7 +157,7 @@ export function WorkspaceApp({
     setSidebarCollapsed(collapsed);
     window.requestAnimationFrame(() => desktopSidebarTrigger.current?.focus());
     try {
-      localStorage.setItem("brote.sidebar-collapsed", String(collapsed));
+      localStorage.setItem("taskode.sidebar-collapsed", String(collapsed));
     } catch {
       // Keep the current preference for this session.
     }
@@ -184,7 +185,7 @@ export function WorkspaceApp({
           projectId &&
           !w.projects.some((project) => project.id === projectId)
         ) {
-          router.replace(w.projects[0] ? projectPath(w.projects[0].id) : "/", {
+          router.replace(w.projects[0] ? projectPath(w.projects[0].id) : "/projects", {
             scroll: false,
           });
         }
@@ -437,7 +438,7 @@ export function WorkspaceApp({
               </div>
             ) : !project ? (
               <Empty
-                icon={<Sprout />}
+                icon={<Code2 />}
                 title="Todo empieza con una idea"
                 description="Crea tu primer proyecto o trae tus tareas desde Trello. Tu próximo logro empieza aquí."
                 action={

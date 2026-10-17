@@ -196,7 +196,7 @@ test("los cambios rechazados no añaden historial ni modifican la tarea", async 
   }
 });
 test("el historial conserva nombres y colores históricos, persiste en respaldo y se elimina con la tarea", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "brote-history-"));
+  const dir = await mkdtemp(join(tmpdir(), "taskode-history-"));
   let { repo, id, statuses } = await setup();
   try {
     await repo.execute(
@@ -226,7 +226,7 @@ test("el historial conserva nombres y colores históricos, persiste en respaldo 
     );
     assert.equal(history[0].fromStatusColor, statuses[0].color);
     const snapshot = await repo.getWorkspace(actor);
-    const backupPath = join(dir, "backup.brote-backup.json");
+    const backupPath = join(dir, "backup.taskode-backup.json");
     await repo.exportBackup(backupPath);
     const peer = new PostgresRepository(repo.store.connectionString, {
       schema: repo.store.schemaName,

@@ -10,7 +10,7 @@ export default function ProjectNotFound() {
       </span>
       <h1>Proyecto no encontrado</h1>
       <p>Este proyecto no existe o fue eliminado.</p>
-      <Link href="/" className={buttonVariants()}>
+      <Link href="/projects" className={buttonVariants()}>
         Volver a mis proyectos
       </Link>
     </main>

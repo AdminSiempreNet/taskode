@@ -3,9 +3,9 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "Brote · Proyectos y tareas",
+  title: "Taskode · Proyectos y tareas de desarrollo",
   description:
-    "Un espacio para tus proyectos, de la primera idea al siguiente logro.",
+    "Organiza proyectos de software, features y tareas con tu equipo. Del backlog al siguiente deploy.",
 };
 export const maxDuration = 60;
 export default function RootLayout({

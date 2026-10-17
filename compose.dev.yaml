@@ -1,17 +1,18 @@
-name: brote-dev
+name: taskode-dev
 services:
   postgres:
     image: pgvector/pgvector:0.8.7-pg18-bookworm
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-brote}
+      POSTGRES_DB: ${POSTGRES_DB:-taskode}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD}
-      BROTE_DB_PASSWORD: ${BROTE_DB_PASSWORD:?Configura BROTE_DB_PASSWORD}
-      BROTE_CREATE_TEST_DB: "1"
+      TASKODE_DB_PASSWORD: ${TASKODE_DB_PASSWORD:?Configura TASKODE_DB_PASSWORD}
+      TASKODE_DB_USER: ${TASKODE_DB_USER:-taskode}
+      TASKODE_CREATE_TEST_DB: "1"
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
-      - brote-postgres-dev:/var/lib/postgresql
-      - ./scripts/init-postgres.sh:/docker-entrypoint-initdb.d/10-brote.sh:ro
+      - taskode-postgres-dev:/var/lib/postgresql
+      - ./scripts/init-postgres.sh:/docker-entrypoint-initdb.d/10-taskode.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d $${POSTGRES_DB}"]
       interval: 5s
@@ -19,4 +20,5 @@ services:
       retries: 20
     restart: unless-stopped
 volumes:
-  brote-postgres-dev:
+  taskode-postgres-dev:
+    name: ${TASKODE_DEV_POSTGRES_VOLUME:-${COMPOSE_PROJECT_NAME:-taskode-dev}_taskode-postgres-dev}

@@ -690,7 +690,7 @@ test("validación rechaza fechas imposibles y títulos vacíos", async () => {
   }
 });
 test("el respaldo JSON conserva los datos confirmados y restaura en otra base", async () => {
-  const dir = await mkdtemp(join(tmpdir(), "brote-test-"));
+  const dir = await mkdtemp(join(tmpdir(), "taskode-test-"));
   const repo = await createRepository();
   const copy = await createRepository();
   try {
@@ -706,11 +706,11 @@ test("el respaldo JSON conserva los datos confirmados y restaura en otra base", 
         actor,
       )
     ).createdId!;
-    const path = join(dir, "backup.brote-backup.json");
+    const path = join(dir, "backup.taskode-backup.json");
     await repo.exportBackup(path);
     assert.equal(
       JSON.parse(await readFile(path, "utf8")).format,
-      "brote-backup",
+      "taskode-backup",
     );
     await copy.restoreBackup(path);
     assert.equal((await copy.getWorkspace(actor)).projects[0].id, p);

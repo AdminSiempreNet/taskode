@@ -24,9 +24,9 @@ export function testDatabaseUrl() {
 }
 export async function createEmptyRepository() {
   const connectionString = testDatabaseUrl();
-  const schema = `brote_test_${randomUUID().replaceAll("-", "")}`;
+  const schema = `taskode_test_${randomUUID().replaceAll("-", "")}`;
   const dropSchema = async () => {
-    if (!/^brote_test_[a-f0-9]{32}$/.test(schema))
+    if (!/^taskode_test_[a-f0-9]{32}$/.test(schema))
       throw new Error("Esquema de prueba inválido.");
     const cleanup = new Pool({
       connectionString,

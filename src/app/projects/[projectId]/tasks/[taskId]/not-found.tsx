@@ -10,7 +10,7 @@ export default function TaskNotFound() {
       </span>
       <h1>Tarea no encontrada</h1>
       <p>Esta tarea no existe en este proyecto o fue eliminada.</p>
-      <Link href="/" className={buttonVariants()}>
+      <Link href="/projects" className={buttonVariants()}>
         Volver a mis proyectos
       </Link>
     </main>

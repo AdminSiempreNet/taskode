@@ -3,9 +3,10 @@ services:
   postgres:
     image: pgvector/pgvector:0.8.7-pg18-bookworm
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-brote}
+      POSTGRES_DB: ${POSTGRES_DB:-taskode}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD}
-      BROTE_DB_PASSWORD: ${BROTE_DB_PASSWORD:?Configura BROTE_DB_PASSWORD}
+      TASKODE_DB_PASSWORD: ${TASKODE_DB_PASSWORD:?Configura TASKODE_DB_PASSWORD}
+      TASKODE_DB_USER: ${TASKODE_DB_USER:-taskode}
     ports:
       - "${POSTGRES_BIND_ADDRESS:-0.0.0.0}:${POSTGRES_PORT:-5432}:5432"
     command:
@@ -19,11 +20,11 @@ services:
       - -c
       - hba_file=/etc/postgresql/pg_hba.conf
     volumes:
-      - brote-postgres:/var/lib/postgresql
+      - taskode-postgres:/var/lib/postgresql
       - ${POSTGRES_TLS_DIR:?Configura POSTGRES_TLS_DIR}:/etc/postgresql/tls:ro
     configs:
       - source: postgres-init
-        target: /docker-entrypoint-initdb.d/10-brote.sh
+        target: /docker-entrypoint-initdb.d/10-taskode.sh
       - source: postgres-hba
         target: /etc/postgresql/pg_hba.conf
     healthcheck:
@@ -33,17 +34,18 @@ services:
       retries: 20
     restart: unless-stopped
 volumes:
-  brote-postgres:
+  taskode-postgres:
+    name: ${TASKODE_POSTGRES_VOLUME:-${COMPOSE_PROJECT_NAME:-tareas}_taskode-postgres}
 configs:
   postgres-init:
     content: |
       #!/bin/sh
       set -eu
       psql -v ON_ERROR_STOP=1 --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB" \
-        --set=app_password="$$BROTE_DB_PASSWORD" --set=app_db="$$POSTGRES_DB" <<'SQL'
-      SELECT format('CREATE ROLE brote LOGIN PASSWORD %L', :'app_password') \gexec
-      SELECT format('GRANT CONNECT, CREATE ON DATABASE %I TO brote', :'app_db') \gexec
-      GRANT USAGE, CREATE ON SCHEMA public TO brote;
+        --set=app_user="$${TASKODE_DB_USER:-taskode}" --set=app_password="$$TASKODE_DB_PASSWORD" --set=app_db="$$POSTGRES_DB" <<'SQL'
+      SELECT format('CREATE ROLE %I LOGIN PASSWORD %L', :'app_user', :'app_password') \gexec
+      SELECT format('GRANT CONNECT, CREATE ON DATABASE %I TO %I', :'app_db', :'app_user') \gexec
+      SELECT format('GRANT USAGE, CREATE ON SCHEMA public TO %I', :'app_user') \gexec
       CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
       SQL
   postgres-hba:

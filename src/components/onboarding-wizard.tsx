@@ -1,12 +1,13 @@
 "use client";
 import { useState, type FormEvent } from "react";
-import { Sprout, Check, ArrowRight, Loader2 } from "lucide-react";
+import { Check, ArrowRight, Loader2 } from "lucide-react";
 import type { Workspace } from "@/lib/types";
 import { fetchJSON } from "@/lib/http-client";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { InvitationManager } from "./invitation-manager";
+import { TaskodeBrand } from "./taskode-brand";
 export function OnboardingWizard({ workspace }: { workspace: Workspace }) {
   const [step, setStep] = useState(workspace.onboarding.step),
     [projectId, setProjectId] = useState(workspace.onboarding.firstProjectId),
@@ -52,7 +53,7 @@ export function OnboardingWizard({ workspace }: { workspace: Workspace }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "finish" }),
       });
-      window.location.assign(projectId ? `/projects/${projectId}` : "/");
+      window.location.assign(projectId ? `/projects/${projectId}` : "/projects");
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo terminar.");
       setBusy(false);
@@ -61,10 +62,7 @@ export function OnboardingWizard({ workspace }: { workspace: Workspace }) {
   return (
     <main className="onboarding-shell">
       <div className="onboarding-container">
-        <div className="auth-brand">
-          <Sprout size={28} />
-          <span>Brote</span>
-        </div>
+        <TaskodeBrand />
         <ol className="onboarding-steps">
           <li aria-current={step === 0 ? "step" : undefined}>
             <span>{step > 0 ? <Check size={15} /> : "1"}</span>Tu primer

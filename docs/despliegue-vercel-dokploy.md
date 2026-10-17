@@ -24,7 +24,9 @@ Vercel aloja la interfaz y las rutas API/autenticación de Next.js. Solo el serv
 
 ## PostgreSQL en Dokploy
 
-El Compose de producción contiene solo `postgres`, usa `pgvector/pgvector:0.8.7-pg18-bookworm` y conserva el volumen `brote-postgres`. La web y el migrador ya no son servicios de Dokploy. El Compose completo `compose.yaml` sigue disponible como alternativa local.
+El Compose de producción contiene solo `postgres`, usa `pgvector/pgvector:0.8.7-pg18-bookworm` y conserva el volumen `taskode-postgres`. La web y el migrador ya no son servicios de Dokploy. El Compose completo `compose.yaml` sigue disponible como alternativa local.
+
+En instalaciones anteriores al cambio de marca, establece `TASKODE_POSTGRES_VOLUME` con el nombre físico del volumen existente y conserva el proyecto Compose, la base y el rol mediante `COMPOSE_PROJECT_NAME`, `POSTGRES_DB` y `TASKODE_DB_USER`. La variable de contraseña ahora es `TASKODE_DB_PASSWORD`. No cambies el volumen por uno vacío; el [README](../README.md#instalaciones-anteriores-al-cambio-de-marca) detalla la compatibilidad.
 
 Preparar sin desplegar:
 
@@ -41,9 +43,9 @@ En el servidor, antes de arrancar PostgreSQL:
 3. Dar acceso de lectura al usuario `postgres` del contenedor. Para la clave, PostgreSQL admite propietario `postgres` y modo `0600`, o propietario `root`, grupo del usuario PostgreSQL y modo `0640`. Consultar el UID/GID real de la imagen; no asumir el del host. Montar el directorio en solo lectura, renovar los certificados y recargar PostgreSQL antes de que expiren.
 4. Crear un servicio **Docker Compose** en Dokploy con `compose.dokploy.yaml`. Completar `.env.dokploy.example` en su entorno, con contraseñas nuevas y un puerto externo libre. No asignar un dominio HTTP/Traefik a PostgreSQL: Vercel conecta por TCP.
 5. Configurar el firewall del servidor/proveedor y el acceso saliente de Vercel. El puerto debe ser accesible desde el build y las funciones de Vercel. Si se restringen IP, usar los rangos salientes que correspondan a Static IPs/Secure Compute del proyecto; las IP de salida normales de Vercel son dinámicas. No asumir una IP fija de Vercel.
-6. Desplegar la base y verificar TLS, autenticación y `vector`. La configuración `pg_hba` del Compose rechaza TCP sin TLS. El rol `brote` puede migrar su esquema y no es superusuario; `postgres` solo se usa para administrar e inicializar.
+6. Desplegar la base y verificar TLS, autenticación y `vector`. La configuración `pg_hba` del Compose rechaza TCP sin TLS. El rol `taskode` puede migrar su esquema y no es superusuario; `postgres` solo se usa para administrar e inicializar.
 
-`DATABASE_URL` de Vercel debe usar el hostname y puerto externos, usuario `brote` y su contraseña (escapada como URL si contiene caracteres especiales). No usar `postgres:5432`, `localhost` ni la IP interna de Docker. Mantener `DATABASE_SSL=verify-full`; si la CA es privada, configurar el PEM en `DATABASE_SSL_CA`. No añadir `sslmode`, `sslrootcert`, `sslcert` o `sslkey` a la URL: sobrescribirían la configuración TLS del driver.
+`DATABASE_URL` de Vercel debe usar el hostname y puerto externos, usuario `taskode` y su contraseña (escapada como URL si contiene caracteres especiales). No usar `postgres:5432`, `localhost` ni la IP interna de Docker. Mantener `DATABASE_SSL=verify-full`; si la CA es privada, configurar el PEM en `DATABASE_SSL_CA`. No añadir `sslmode`, `sslrootcert`, `sslcert` o `sslkey` a la URL: sobrescribirían la configuración TLS del driver.
 
 El pool se reutiliza por instancia, se registra con `attachDatabasePool` y usa un máximo inicial de cinco conexiones en Vercel. `DATABASE_POOL_MAX` acepta 3–50. El total crece con las instancias; dimensionar PostgreSQL y reservar conexiones para migraciones y administración. Si se añade PgBouncer, usar modo **session**: el proyecto utiliza bloqueos de sesión y `search_path` por conexión.
 

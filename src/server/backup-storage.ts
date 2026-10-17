@@ -1,6 +1,7 @@
 import type { BackupFile } from "../lib/backups";
 
-export const backupName = /^brote-(manual|before-restore)-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[a-f0-9-]{36}\.brote-backup\.json$/;
+// Keep access to files created before the rename, both locally and in S3.
+export const backupName = /^(taskode|brote)-(manual|before-restore)-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[a-f0-9-]{36}\.\1-backup\.json$/;
 
 export interface BackupStorage {
   list(): Promise<BackupFile[]>;

@@ -9,7 +9,7 @@ import { serializeSignedCookie } from "better-call";
 import { actor, authConfig, createRepository } from "./helpers";
 import { session } from "../src/server/schema";
 export async function startHttpFixture(external = false) {
-  const directory = await mkdtemp(join(tmpdir(), "brote-http-")),
+  const directory = await mkdtemp(join(tmpdir(), "taskode-http-")),
     backupDirectory = join(directory, "backups");
   const repo = await createRepository(),
     token = randomUUID(),

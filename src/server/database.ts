@@ -1,3 +1,4 @@
+// Keep advisory lock identifiers stable across the Taskode rename to coordinate with existing processes.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { Pool } from "pg";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
@@ -13,7 +14,7 @@ export type DatabaseOptions = { schema?: string; max?: number };
 export function databaseUrl() {
   const url = process.env.DATABASE_URL;
   if (!url)
-    throw new Error("Configura DATABASE_URL para conectar Brote a PostgreSQL.");
+    throw new Error("Configura DATABASE_URL para conectar Taskode a PostgreSQL.");
   return url;
 }
 export function databaseSchema(

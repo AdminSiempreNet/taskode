@@ -14,10 +14,11 @@ import {
 import { Dialog } from "radix-ui";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { readPreference } from "@/lib/preferences";
 
 const MIN_WIDTH = 240;
 const MAX_WIDTH = 305;
-const STORAGE_KEY = "brote.sidebar-width";
+const STORAGE_KEY = "taskode.sidebar-width";
 const MOBILE_QUERY = "(max-width: 800px)";
 
 function subscribeToViewport(onChange: () => void) {
@@ -79,7 +80,7 @@ export function ResizableSidebar({
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = readPreference(STORAGE_KEY);
       if (saved === null || !Number.isFinite(Number(saved))) return;
       const restored = clampWidth(Number(saved));
       widthRef.current = restored;

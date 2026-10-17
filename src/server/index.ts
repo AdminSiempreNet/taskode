@@ -5,28 +5,28 @@ import { databaseUrl, databaseSchema } from "./database";
 import { BackupManager } from "./backups";
 import { createBackupStorage } from "./s3-backup-storage";
 const globalDatabase = globalThis as typeof globalThis & {
-  broteRepository?: PostgresRepository;
-  broteBackups?: BackupManager;
+  taskodeRepository?: PostgresRepository;
+  taskodeBackups?: BackupManager;
 };
 export function repository(): PostgresRepository {
-  const previous = globalDatabase.broteRepository;
+  const previous = globalDatabase.taskodeRepository;
   if (previous && previous.cacheVersion !== PostgresRepository.cacheVersion) {
-    globalDatabase.broteRepository = undefined;
-    globalDatabase.broteBackups = undefined;
+    globalDatabase.taskodeRepository = undefined;
+    globalDatabase.taskodeBackups = undefined;
     void previous
       .close()
       .catch(() => console.error("No se pudo cerrar la conexión anterior."));
   }
-  return (globalDatabase.broteRepository ??= new PostgresRepository(
+  return (globalDatabase.taskodeRepository ??= new PostgresRepository(
     databaseUrl(),
     { schema: databaseSchema() },
   ));
 }
 export function backups() {
   const repo = repository();
-  if (globalDatabase.broteBackups) return globalDatabase.broteBackups;
+  if (globalDatabase.taskodeBackups) return globalDatabase.taskodeBackups;
   const storage = createBackupStorage();
-  return (globalDatabase.broteBackups ??= new BackupManager(
+  return (globalDatabase.taskodeBackups ??= new BackupManager(
     repo,
     resolve(
       /* turbopackIgnore: true */ storage ? tmpdir() : process.env.BACKUP_DIR || "./data/backups",

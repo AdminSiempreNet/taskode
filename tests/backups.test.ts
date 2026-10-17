@@ -12,7 +12,7 @@ import type { ApplicationBackup } from "../src/server/backup-data";
 import { session, invitations } from "../src/server/schema";
 import { randomUUID } from "node:crypto";
 async function setup() {
-  const dir = await mkdtemp(join(tmpdir(), "brote-backup-test-"));
+  const dir = await mkdtemp(join(tmpdir(), "taskode-backup-test-"));
   const path = dir;
   const repo = await createRepository();
   const manager = new BackupManager(repo, path);
@@ -113,7 +113,7 @@ test("respaldo JSON: lista, descarga, restaura con copia previa y elimina; reaju
     const file = JSON.parse(
       (await s.manager.download(backup.id)).toString(),
     ) as ApplicationBackup;
-    assert.equal(file.format, "brote-backup");
+    assert.equal(file.format, "taskode-backup");
     assert.equal(file.version, 1);
     assert.equal(file.tables.session, undefined);
     assert.equal(file.tables.verification, undefined);

@@ -141,7 +141,7 @@ export function createProjectAuth(
     });
   };
   const instance = betterAuth({
-    appName: "Brote",
+    appName: "Taskode",
     baseURL: config.BETTER_AUTH_URL || "http://localhost:5010",
     secret: config.BETTER_AUTH_SECRET,
     database: adapter,
@@ -274,11 +274,11 @@ export function createProjectAuth(
 }
 type AuthBundle = ReturnType<typeof createProjectAuth>;
 const globalAuth = globalThis as typeof globalThis & {
-  broteAuth?: { repo: PostgresRepository; bundle: AuthBundle };
+  taskodeAuth?: { repo: PostgresRepository; bundle: AuthBundle };
 };
 export function getAuth() {
   const repo = repository();
-  if (!globalAuth.broteAuth || globalAuth.broteAuth.repo !== repo)
-    globalAuth.broteAuth = { repo, bundle: createProjectAuth(repo) };
-  return globalAuth.broteAuth.bundle;
+  if (!globalAuth.taskodeAuth || globalAuth.taskodeAuth.repo !== repo)
+    globalAuth.taskodeAuth = { repo, bundle: createProjectAuth(repo) };
+  return globalAuth.taskodeAuth.bundle;
 }
