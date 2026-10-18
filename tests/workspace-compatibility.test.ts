@@ -60,6 +60,8 @@ test("el proyecto renderiza snapshots anteriores sin los catálogos de tipos e i
     ),
   );
   assert.match(html, /Proyecto anterior/);
-  assert.match(html, /Filtrar por tipos: Todos los tipos/);
-  assert.match(html, /Filtrar por impactos: Todos los impactos/);
+  assert.match(html, /aria-label="Usuarios"/);
+  assert.match(html, /aria-label="Estados y etiquetas"/);
+  assert.match(html, /aria-label="Prioridad, tipo e impacto"/);
+  assert.equal((html.match(/role="combobox"/g) ?? []).length, 3);
 });

@@ -47,6 +47,8 @@ En un despliegue Compose existente, ejecuta el primer comando sin `-f compose.de
 
 Las migraciones activas están en `drizzle/postgresql`. `npm run db:generate` genera cambios futuros y `npm run db:migrate` los aplica explícitamente. El arranque comprueba la versión y no repara esquemas ni ejecuta migraciones automáticamente. La migración inicial contiene todos los campos y catálogos actuales; los catálogos se crean al crear un proyecto. No se vuelve a sembrar un proyecto existente.
 
+Para poblar el proyecto local existente **Tareas** con ejemplos basados en este repositorio, ejecuta `npm run db:seed:tareas` para ver el resumen y `npm run db:seed:tareas -- --apply` para guardarlos. Crea 8 módulos, 24 features y 72 tareas con referencias al código, criterios de aceptación y checklists. Los estados, fechas y avances son simulados y las tareas llevan la etiqueta **Ejemplo**. Usa al líder existente y conserva los datos previos; volver a ejecutar el comando omite los ejemplos ya cargados. La carga es transaccional, exige una base local y no forma parte del arranque ni de las migraciones. Puedes fijar la fecha de referencia con `--date=2026-10-18`.
+
 La compilación (`npm run build`) no requiere una base disponible. La ejecución sí requiere una conexión y un esquema actualizado.
 
 ### Instalaciones anteriores al cambio de marca

@@ -1,5 +1,5 @@
 "use client";
-import { EntityTable } from "./entity-table";
+import styles from "./task-list.module.css";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   DndContext,
@@ -678,84 +678,108 @@ export function ListView({
       />
     );
   return (
-    <div className="list-view">
+    <div className={`list-view ${styles.list}`}>
       {features.map((f) => {
         const rows = tasks.filter((t) => t.featureId === f.id);
         if (!rows.length) return null;
         return (
-          <EntityTable
-            key={f.id}
-            title={f.name}
-            icon={<Layers3 size={16} />}
-            count={rows.length}
-            countLabel={`${rows.length} ${rows.length === 1 ? "tarea" : "tareas"}`}
-            columns={[
-              "Tarea",
-              "Estado",
-              "Prioridad",
-              "Tipo",
-              "Impacto",
-              "Fecha de entrega",
-            ]}
-          >
-            {rows.map((t) => (
-              <tr key={t.id} onClick={() => open(t)}>
-                <td>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      open(t);
-                    }}
-                    className="table-task"
-                  >
-                    {statuses.find((s) => s.id === t.statusId)?.isDone ? (
-                      <CircleCheck size={16} className="completed-icon" />
-                    ) : (
-                      <span className="task-circle" />
-                    )}
-                    {t.title}
-                  </button>
-                  <TaskPeopleSummary
-                    leader={t.leader}
-                    teamMembers={t.teamMembers}
-                  />
-                  {t.labels.length > 0 && (
-                    <div className="table-labels">
-                      {t.labels.map((l, i) => (
-                        <LabelChip name={l} key={i} />
-                      ))}
+          <section key={f.id} className={styles.group} aria-label={f.name}>
+            <header className={styles.groupHeader}>
+              <Layers3 size={16} aria-hidden="true" />
+              <h2>{f.name}</h2>
+              <span className={styles.count}>
+                {rows.length} {rows.length === 1 ? "tarea" : "tareas"}
+              </span>
+            </header>
+            <ul className={styles.rows} aria-label={`Tareas de ${f.name}`}>
+              {rows.map((task) => {
+                const status = statuses.find((s) => s.id === task.statusId);
+                const overdue = !!task.dueDate &&
+                  task.dueDate < dateKey(new Date()) && !status?.isDone && !archived;
+                return (
+                  <li key={task.id} className={styles.row} onClick={() => open(task)}>
+                    <div className={styles.heading}>
+                      <button
+                        type="button"
+                        className={styles.title}
+                        aria-label={`Abrir tarea: ${task.title}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          open(task);
+                        }}
+                      >
+                        {status?.isDone ? (
+                          <CircleCheck size={17} className={styles.completed} aria-hidden="true" />
+                        ) : (
+                          <span className="task-circle" aria-hidden="true" />
+                        )}
+                        <span>{task.title}</span>
+                      </button>
+                      <div className={styles.status}>
+                        <StatusPill status={status} />
+                      </div>
                     </div>
-                  )}
-                </td>
-                <td>
-                  <StatusPill
-                    status={statuses.find((s) => s.id === t.statusId)}
-                  />
-                </td>
-                <td>
-                  <Priority priority={t.priority} />
-                </td>
-                <td>
-                  <TaskCategoryChip kind="type" id={t.typeId} />
-                  {!t.typeId && "Sin tipo"}
-                </td>
-                <td>
-                  <TaskCategoryChip kind="impact" id={t.impactId} />
-                  {!t.impactId && "Sin impacto"}
-                </td>
-                <td className="table-date" title={taskScheduleLabel(t)}>
-                  {t.startDate && (
-                    <span className="table-start-date">
-                      Inicio: {shortDate(t.startDate)}
-                      {t.startTime && ` · ${t.startTime}`}
-                    </span>
-                  )}
-                  {t.dueDate ? shortDate(t.dueDate) : "Sin fecha"}
-                  {t.dueTime && ` · ${t.dueTime}`}
-                </td>
-              </tr>
-            ))}
-          </EntityTable>
+                    {(task.leader || task.labels.length > 0) && (
+                      <div className={styles.context}>
+                        <TaskPeopleSummary leader={task.leader} teamMembers={task.teamMembers} />
+                        {task.labels.length > 0 && (
+                          <div className={styles.labels} aria-label="Etiquetas">
+                            {task.labels.map((label) => <LabelChip name={label} key={label} />)}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className={styles.details}>
+                      <dl className={styles.properties}>
+                        <div>
+                          <dt>Prioridad</dt>
+                          <dd><Priority priority={task.priority} /></dd>
+                        </div>
+                        <div>
+                          <dt>Tipo</dt>
+                          <dd>
+                            <TaskCategoryChip kind="type" id={task.typeId} />
+                            {!task.typeId && <span className={styles.unset}>Sin tipo</span>}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Impacto</dt>
+                          <dd>
+                            <TaskCategoryChip kind="impact" id={task.impactId} />
+                            {!task.impactId && <span className={styles.unset}>Sin impacto</span>}
+                          </dd>
+                        </div>
+                      </dl>
+                      <dl className={styles.schedule} title={taskScheduleLabel(task)}>
+                        {task.startDate && (
+                          <div>
+                            <dt>Inicio</dt>
+                            <dd>
+                              <time dateTime={`${task.startDate}${task.startTime ? `T${task.startTime}` : ""}`}>
+                                {shortDate(task.startDate)}
+                                {task.startTime && ` · ${task.startTime}`}
+                              </time>
+                            </dd>
+                          </div>
+                        )}
+                        <div className={overdue ? styles.overdue : undefined}>
+                          <dt>Entrega{overdue && <span> · Vencida</span>}</dt>
+                          <dd>
+                            {task.dueDate ? (
+                              <time dateTime={`${task.dueDate}${task.dueTime ? `T${task.dueTime}` : ""}`}>
+                                {shortDate(task.dueDate)}
+                                {task.dueTime && ` · ${task.dueTime}`}
+                              </time>
+                            ) : <span className={styles.unset}>Sin fecha</span>}
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
         );
       })}
     </div>

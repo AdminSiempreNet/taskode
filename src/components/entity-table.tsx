@@ -9,6 +9,7 @@ export function EntityTable({
   columns,
   children,
   action,
+  className = "",
 }: {
   title: string;
   icon?: ReactNode;
@@ -17,9 +18,10 @@ export function EntityTable({
   columns: string[];
   children: ReactNode;
   action?: ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="feature-table">
+    <section className={`feature-table ${className}`}>
       <div className="feature-table-header">
         {icon}
         <h2>{title}</h2>

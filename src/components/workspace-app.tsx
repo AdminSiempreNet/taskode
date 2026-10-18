@@ -73,8 +73,10 @@ import { ClientsManager } from "./clients-manager";
 import { AccountMenu, ProfileModal } from "./account-menu";
 import { UsersModal } from "./invitation-manager";
 import { ProjectPeopleModal } from "./project-people";
-import { CatalogFilter, useProjectFilter } from "./status-filter";
-import { MINE_FILTER, matchesTaskFilters } from "@/lib/task-filters";
+import { useProjectFilter } from "./status-filter";
+import { TaskFilterControls } from "./task-filter-controls";
+import { MINE_FILTER, UNASSIGNED_FILTER, matchesTaskFilters } from "@/lib/task-filters";
+import { filterGroupValues, groupedFilterIds, taskFilterOptions } from "@/lib/task-filter-options";
 import { readPreference } from "@/lib/preferences";
 import {
   readProjectPreferences,
@@ -298,6 +300,9 @@ export function WorkspaceApp({
   const impacts =
     workspace?.impacts?.filter((option) => option.projectId === projectId) ??
     [];
+  const priorities = workspace?.priorities.filter((option) => option.projectId === projectId) ?? [];
+  const labels = workspace?.labels.filter((option) => option.projectId === projectId) ?? [];
+  const filterOptions = taskFilterOptions(workspace, projectId);
   const [selectedStatusIds, setStatusIds] = useProjectFilter(
     projectId,
     "status",
@@ -315,34 +320,39 @@ export function WorkspaceApp({
     impacts,
     true,
   );
-  const userOptions = [
-    { id: MINE_FILTER, name: "Mías", color: "#0d9488" },
-    ...(workspace?.people ?? [])
-      .filter((p) => p.projectId === projectId)
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        email: p.email,
-        image: p.image,
-        color: "#64748b",
-      })),
-  ];
+  const [selectedPriorityIds, setPriorityIds] = useProjectFilter(projectId, "priority", priorities);
+  const [selectedLabelIds, setLabelIds] = useProjectFilter(projectId, "label", labels, true);
   const [selectedUserIds, setUserIds] = useProjectFilter(
     `${currentUserId ?? ""}.${projectId}`,
     "user",
-    userOptions,
+    filterOptions.userOptions,
     false,
     [MINE_FILTER],
   );
+  // Keep the existing per-category preferences while combining their controls.
+  const stateFilterIds = [
+    ...groupedFilterIds(selectedStatusIds, "status"),
+    ...groupedFilterIds(selectedLabelIds, "label"),
+  ];
+  const classificationFilterIds = [
+    ...groupedFilterIds(selectedPriorityIds, "priority"),
+    ...groupedFilterIds(selectedTypeIds, "type"),
+    ...groupedFilterIds(selectedImpactIds, "impact"),
+  ];
   const hasCategoryFilters =
     selectedUserIds.length !== 1 ||
     selectedUserIds[0] !== MINE_FILTER ||
     selectedStatusIds.length > 0 ||
     selectedTypeIds.length > 0 ||
-    selectedImpactIds.length > 0;
+    selectedImpactIds.length > 0 ||
+    selectedPriorityIds.length > 0 ||
+    selectedLabelIds.length > 0;
   const allTasks =
     workspace?.tasks.filter((t) => t.projectId === projectId) ?? [];
   const active = allTasks.filter((t) => !t.archived);
+  const selectedLabelNames = labels
+    .filter((label) => selectedLabelIds.includes(label.id))
+    .map((label) => label.name);
   const tasks = allTasks.filter(
     (t) =>
       t.archived === archived &&
@@ -353,6 +363,9 @@ export function WorkspaceApp({
         statusIds: selectedStatusIds,
         typeIds: selectedTypeIds,
         impactIds: selectedImpactIds,
+        priorityIds: selectedPriorityIds,
+        labelNames: selectedLabelNames,
+        includeUnlabeled: selectedLabelIds.includes(UNASSIGNED_FILTER),
       }) &&
       (!search ||
         `${t.title} ${t.description} ${t.ticketNumber ?? ""} ${t.labels.join(" ")}`
@@ -760,42 +773,24 @@ export function WorkspaceApp({
                     )}
                   </div>
                   <div className="view-tools">
-                    <div className="task-filters">
-                      <CatalogFilter
-                        category="usuarios"
-                        allLabel="Todos los usuarios"
-                        shortLabel="Usuarios"
-                        options={userOptions}
-                        selectedIds={selectedUserIds}
-                        onChange={setUserIds}
-                      />
-                      <CatalogFilter
-                        category="estados"
-                        allLabel="Todos los estados"
-                        shortLabel="Estados"
-                        options={statuses}
-                        selectedIds={selectedStatusIds}
-                        onChange={setStatusIds}
-                      />
-                      <CatalogFilter
-                        category="tipos"
-                        allLabel="Todos los tipos"
-                        shortLabel="Tipos"
-                        unassignedLabel="Sin tipo"
-                        options={taskTypes}
-                        selectedIds={selectedTypeIds}
-                        onChange={setTypeIds}
-                      />
-                      <CatalogFilter
-                        category="impactos"
-                        allLabel="Todos los impactos"
-                        shortLabel="Impactos"
-                        unassignedLabel="Sin impacto"
-                        options={impacts}
-                        selectedIds={selectedImpactIds}
-                        onChange={setImpactIds}
-                      />
-                    </div>
+                    <TaskFilterControls
+                      idPrefix="workspace"
+                      className="task-filters"
+                      options={filterOptions}
+                      userIds={selectedUserIds}
+                      stateIds={stateFilterIds}
+                      classificationIds={classificationFilterIds}
+                      changeUsers={setUserIds}
+                      changeState={(ids) => {
+                        setStatusIds(filterGroupValues(ids, "status"));
+                        setLabelIds(filterGroupValues(ids, "label"));
+                      }}
+                      changeClassification={(ids) => {
+                        setPriorityIds(filterGroupValues(ids, "priority"));
+                        setTypeIds(filterGroupValues(ids, "type"));
+                        setImpactIds(filterGroupValues(ids, "impact"));
+                      }}
+                    />
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -901,9 +896,6 @@ export function WorkspaceApp({
                       </h2>
                       <span>
                         {tasks.length} {tasks.length === 1 ? "tarea" : "tareas"}
-                        {selectedFeature?.description
-                          ? ` · ${selectedFeature.description}`
-                          : ""}
                       </span>
                       {(search || hasCategoryFilters) && (
                         <button
@@ -914,6 +906,8 @@ export function WorkspaceApp({
                             setStatusIds([]);
                             setTypeIds([]);
                             setImpactIds([]);
+                            setPriorityIds([]);
+                            setLabelIds([]);
                           }}
                         >
                           Limpiar filtros

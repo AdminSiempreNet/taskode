@@ -1,0 +1,129 @@
+.table {
+  container: module-features / inline-size;
+  min-width: 0;
+  width: 100%;
+}
+
+.table table {
+  table-layout: fixed;
+}
+
+.table th,
+.table td {
+  padding-inline: 12px;
+  vertical-align: middle;
+}
+
+.table th:first-child,
+.table td:first-child:not([colspan]) {
+  width: 56px;
+  min-width: 0;
+  padding-left: 16px;
+  padding-right: 8px;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.table th:nth-child(2),
+.table td:nth-child(2) {
+  width: auto;
+  min-width: 0;
+}
+
+.table th:nth-child(3),
+.table td:nth-child(3) {
+  width: 190px;
+}
+
+.table th:last-child,
+.table td:last-child:not([colspan]) {
+  width: 64px;
+  padding-left: 8px;
+  padding-right: 16px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :global(.table-task) {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  border-radius: 4px;
+  padding: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.leader {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+
+.leaderName {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.unset {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.table td[colspan] {
+  width: auto;
+  padding: 24px 16px;
+  text-align: center;
+  white-space: normal;
+  color: var(--muted-foreground);
+}
+
+@container module-features (max-width: 600px) {
+  .table th,
+  .table td {
+    padding-inline: 8px;
+  }
+
+  .table th:first-child,
+  .table td:first-child:not([colspan]) {
+    width: 44px;
+    padding-left: 12px;
+    padding-right: 4px;
+  }
+
+  .table th:nth-child(3),
+  .table td:nth-child(3) {
+    width: 52px;
+    text-align: center;
+  }
+
+  .table th:last-child,
+  .table td:last-child:not([colspan]) {
+    width: 56px;
+    padding-right: 12px;
+  }
+
+  .leader {
+    justify-content: center;
+  }
+
+  .leaderName {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .unset {
+    font-size: 10px;
+  }
+}

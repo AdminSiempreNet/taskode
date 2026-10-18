@@ -1,0 +1,55 @@
+.section {
+  container: feature-tasks / inline-size;
+  min-width: 0;
+  width: 100%;
+}
+
+.toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.filters {
+  flex: 1 1 540px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+  margin-left: auto;
+}
+
+.results {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.results > span,
+.results > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.results > button {
+  border: 0;
+  border-radius: 4px;
+  padding: 4px 0;
+  background: transparent;
+  color: var(--primary);
+}
+

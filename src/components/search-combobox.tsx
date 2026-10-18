@@ -14,6 +14,7 @@ export type SearchOption = {
   secondary?: string;
   group?: string;
   image?: string | null;
+  color?: string;
 };
 
 function OptionContent({ option }: { option: SearchOption }) {
@@ -21,6 +22,9 @@ function OptionContent({ option }: { option: SearchOption }) {
     <span className="search-option-content">
       {option.image !== undefined && (
         <UserAvatar name={option.name} image={option.image} />
+      )}
+      {option.color && (
+        <i className="catalog-combobox-color" style={{ background: option.color }} aria-hidden="true" />
       )}
       <span className="client-option-text">
         <span>{option.name}</span>
@@ -41,6 +45,9 @@ export function SearchCombobox({
   onCreate,
   triggerRef,
   placeholder,
+  searchPlaceholder,
+  clearLabel,
+  preserveOrder = false,
 }: {
   id: string;
   label: string;
@@ -52,6 +59,9 @@ export function SearchCombobox({
   onCreate?: (query: string) => void;
   triggerRef?: RefObject<HTMLButtonElement | null>;
   placeholder?: string;
+  searchPlaceholder?: string;
+  clearLabel?: string;
+  preserveOrder?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -59,13 +69,13 @@ export function SearchCombobox({
   const input = useRef<HTMLInputElement>(null);
   const creating = useRef(false);
   const listId = useId();
-  const filtered = options
-    .filter((option) =>
-      normalizeClientText(
-        `${option.name} ${option.secondary ?? ""} ${option.group ?? ""}`,
-      ).includes(normalizeClientText(query)),
-    )
-    .sort(
+  const filtered = options.filter((option) =>
+    normalizeClientText(
+      `${option.name} ${option.secondary ?? ""} ${option.group ?? ""}`,
+    ).includes(normalizeClientText(query)),
+  );
+  if (!preserveOrder)
+    filtered.sort(
       (a, b) =>
         (a.group ?? "").localeCompare(b.group ?? "", "es") ||
         a.name.localeCompare(b.name, "es"),
@@ -160,6 +170,7 @@ export function SearchCombobox({
               role="combobox"
               aria-label={`Buscar ${label.toLocaleLowerCase("es")}`}
               placeholder={
+                searchPlaceholder ??
                 placeholder ??
                 (multiple
                   ? "Buscar cliente, ciudad o departamento…"
@@ -242,6 +253,17 @@ export function SearchCombobox({
             ))}
             {!filtered.length && <p>No se encontraron opciones.</p>}
           </div>
+          {clearLabel && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="client-create-option"
+              disabled={disabled || !values.length}
+              onClick={() => onChange([])}
+            >
+              {clearLabel}
+            </Button>
+          )}
           {onCreate && (
             <Button
               type="button"

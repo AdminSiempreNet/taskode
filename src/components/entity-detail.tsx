@@ -4,7 +4,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Tabs } from "radix-ui";
 import {
-  Archive,
   ArrowDown,
   ArrowLeft,
   ArrowUp,
@@ -55,7 +54,9 @@ import { EntityComments } from "./task-comments";
 import { ResizableTaskPanels } from "./resizable-task-panels";
 import { useEntityComments } from "./use-task-comments";
 import { useUnsavedChanges } from "./unsaved-changes";
-import { ListView } from "./views";
+import { FeatureTaskList } from "./feature-task-list";
+import { UserAvatar } from "./user-avatar";
+import styles from "./module-features.module.css";
 
 export function EntityDetail({
   scope,
@@ -367,9 +368,10 @@ export function EntityDetail({
       <div className="list-view">
         <EntityTable
           title="Features"
+          className={styles.table}
           count={childFeatures.length}
           icon={<Layers3 size={16} />}
-          columns={["Número", "Feature", "Líder", "Tareas"]}
+          columns={["N.º", "Feature", "Líder", "Tareas"]}
           action={
             <Button
               type="button"
@@ -382,31 +384,47 @@ export function EntityDetail({
             </Button>
           }
         >
-          {childFeatures.map((f) => (
-            <tr key={f.id} onClick={() => open("feature", f.id)}>
-              <td>{formatFeatureNumber(f.number)}</td>
-              <td>
-                <button
-                  type="button"
-                  className="table-task"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    open("feature", f.id);
-                  }}
-                >
-                  {f.name}
-                </button>
-              </td>
-              <td>{leaderName(f.leaderId)}</td>
-              <td>
-                {
-                  workspace.tasks.filter(
-                    (t) => t.featureId === f.id && !t.archived,
-                  ).length
-                }
-              </td>
-            </tr>
-          ))}
+          {childFeatures.map((f) => {
+            const leader =
+              people.find((person) => person.id === f.leaderId) ??
+              (f.leaderId === workspace.currentUser.id
+                ? workspace.currentUser
+                : undefined);
+            return (
+              <tr key={f.id} onClick={() => open("feature", f.id)}>
+                <td>{formatFeatureNumber(f.number)}</td>
+                <td>
+                  <button
+                    type="button"
+                    className="table-task"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      open("feature", f.id);
+                    }}
+                  >
+                    {f.name}
+                  </button>
+                </td>
+                <td>
+                  {leader ? (
+                    <span className={styles.leader} title={leader.name}>
+                      <UserAvatar name={leader.name} image={leader.image} />
+                      <span className={styles.leaderName}>{leader.name}</span>
+                    </span>
+                  ) : (
+                    <span className={styles.unset}>Sin líder</span>
+                  )}
+                </td>
+                <td>
+                  {
+                    workspace.tasks.filter(
+                      (t) => t.featureId === f.id && !t.archived,
+                    ).length
+                  }
+                </td>
+              </tr>
+            );
+          })}
           {!childFeatures.length && (
             <tr>
               <td colSpan={4}>Todavía no hay features en este grupo.</td>
@@ -415,44 +433,16 @@ export function EntityDetail({
         </EntityTable>
       </div>
     ) : (
-      <>
-        <div className="entity-list-actions">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            aria-pressed={archived}
-            onClick={() => setArchived(!archived)}
-          >
-            <Archive size={15} />
-            {archived ? "Ver activas" : "Ver archivadas"}
-          </Button>
-          {!archived && (
-            <Button
-              type="button"
-              size="sm"
-              onClick={() =>
-                create({ type: "task", defaults: { featureId: scope.id } })
-              }
-            >
-              <Plus size={15} />
-              Nueva tarea
-            </Button>
-          )}
-        </div>
-        <ListView
-          tasks={featureTasks.filter((t) => t.archived === archived)}
-          features={features.filter((f) => f.id === scope.id)}
-          statuses={workspace.statuses.filter(
-            (s) => s.projectId === project.id,
-          )}
-          open={(task) => open("task", task.id)}
-          add={() =>
-            create({ type: "task", defaults: { featureId: scope.id } })
-          }
-          archived={archived}
-        />
-      </>
+      <FeatureTaskList
+        projectId={project.id}
+        featureId={scope.id}
+        workspace={workspace}
+        tasks={featureTasks}
+        archived={archived}
+        changeArchived={setArchived}
+        open={(task) => open("task", task.id)}
+        add={() => create({ type: "task", defaults: { featureId: scope.id } })}
+      />
     );
   const main = (
     <section
