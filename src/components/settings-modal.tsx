@@ -301,7 +301,7 @@ export function SettingsModal({
                 required
               />
               <p className="field-hint">
-                Entre 1 y 100 MB. Se aplica a documentos e imágenes pegadas. Los
+                Entre 1 y 100 MB. Se aplica a archivos e imágenes pegadas. Los
                 archivos existentes se conservan.
               </p>
               <Button disabled={busy} type="submit">

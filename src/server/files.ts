@@ -4,7 +4,7 @@ import { fileTypeFromBuffer } from "file-type";
 import type { Actor, EntityRef } from "../lib/types";
 import { entityColumns, rowScope, sameEntity } from "../lib/entities";
 import { fileTypes } from "../lib/files";
-import { files, comments } from "./schema";
+import { files, comments, documents } from "./schema";
 import type { PostgresRepository } from "./postgres";
 import { DomainError } from "./repository";
 import {
@@ -72,7 +72,7 @@ export class FileManager {
       scope?: EntityRef;
       name: string;
       size: number;
-      purpose: "image" | "document";
+      purpose: "image" | "file";
     },
   ) {
     return this.repo.store.transaction(async () => {
@@ -97,9 +97,9 @@ export class FileManager {
           scope.id,
           input.projectId,
         );
-        if (input.purpose === "document" && !permissions.canManageDocuments)
+        if (input.purpose === "file" && !permissions.canManageFiles)
           throw new DomainError(
-            "No puedes gestionar los documentos de este elemento.",
+            "No puedes gestionar los archivos de este elemento.",
             403,
           );
       }
@@ -191,9 +191,9 @@ export class FileManager {
         );
         if (scope.projectId !== file.projectId)
           throw new DomainError("El archivo pertenece a otro proyecto.");
-        if (file.purpose === "document" && !permissions.canManageDocuments)
+        if (file.purpose === "file" && !permissions.canManageFiles)
           throw new DomainError(
-            "No puedes gestionar los documentos de este elemento.",
+            "No puedes gestionar los archivos de este elemento.",
             403,
           );
       }
@@ -303,9 +303,9 @@ export class FileManager {
           scope.id,
           scope.projectId,
         );
-        if (!permissions.canManageDocuments)
+        if (!permissions.canManageFiles)
           throw new DomainError(
-            "No puedes gestionar los documentos de este elemento.",
+            "No puedes gestionar los archivos de este elemento.",
             403,
           );
         const notes = await this.repo.store.db
@@ -324,13 +324,17 @@ export class FileManager {
                     : undefined,
             ),
           );
+        const docs = await this.repo.store.db.select({ content: documents.content }).from(documents).where(and(
+          eq(documents.projectId, scope.projectId), eq(documents.scopeType, scope.kind),
+          scope.kind === "task" ? eq(documents.taskId, scope.id) : scope.kind === "module" ? eq(documents.moduleId, scope.id) : scope.kind === "feature" ? eq(documents.featureId, scope.id) : undefined,
+        ));
         if (
-          [String(entity.description), ...notes.map((c) => c.content)].some(
+          [String(entity.description), ...notes.map((c) => c.content), ...docs.map((d) => d.content)].some(
             (c) => c.includes(`/api/files/${id}/content`),
           )
         )
           throw new DomainError(
-            "Retira primero la imagen de la descripción y los comentarios.",
+            "Retira primero la imagen de la descripción, los comentarios y los documentos.",
             409,
           );
       }

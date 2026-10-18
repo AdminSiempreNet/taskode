@@ -98,7 +98,7 @@ test("detalles: lectura por proyecto, gestión por propietarios superiores y ren
       );
       assert.equal(view.permissions.canEdit, false);
       assert.equal(view.permissions.canComment, true);
-      assert.equal(view.permissions.canManageDocuments, false);
+      assert.equal(view.permissions.canManageFiles, false);
       for (const user of [actor, f.owner])
         assert.equal(
           (await f.repo.entityDetail(user, scope.kind, scope.id)).permissions
@@ -270,7 +270,7 @@ test("archivos: documentos por entidad, imágenes de participantes, referencias 
   const upload = async (
     who: { id: string },
     scope: EntityRef | undefined,
-    purpose: "document" | "image",
+    purpose: "file" | "image",
   ) => {
     const result = await manager.begin(who, {
       projectId: f.projectId,
@@ -287,7 +287,7 @@ test("archivos: documentos por entidad, imágenes de participantes, referencias 
     await manager.complete(
       who,
       result.id,
-      purpose === "document" ? scope : undefined,
+      purpose === "file" ? scope : undefined,
     );
     return result.id;
   };
@@ -299,11 +299,11 @@ test("archivos: documentos por entidad, imágenes de participantes, referencias 
           scope,
           name: "imagen.png",
           size: png.length,
-          purpose: "document",
+          purpose: "file",
         }),
         { status: 403 },
       );
-      const id = await upload(f.owner, scope, "document");
+      const id = await upload(f.owner, scope, "file");
       assert.equal(
         (await manager.content(f.participant, id, false)).status,
         200,
@@ -359,7 +359,7 @@ test("archivos: documentos por entidad, imágenes de participantes, referencias 
     const temporaryDocument = await upload(
       f.participant,
       undefined,
-      "document",
+      "file",
     );
     await assert.rejects(
       f.repo.execute(
@@ -428,7 +428,7 @@ test("respaldo actual conserva los niveles y v4 normaliza comentarios y archivos
     const path = join(directory, "v5.json");
     await f.repo.exportBackup(path);
     const backup = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(backup.version, 8);
+    assert.equal(backup.version, 9);
     validateApplicationBackup(backup);
     for (const mutation of [
       (copy: typeof backup) => {
@@ -458,7 +458,7 @@ test("respaldo actual conserva los niveles y v4 normaliza comentarios y archivos
       (comment: { taskId: string | null }) => comment.taskId !== null,
     );
     stripEntityColumns(legacy.tables);
-    assert.equal(validateApplicationBackup(legacy).version, 8);
+    assert.equal(validateApplicationBackup(legacy).version, 9);
     const legacyPath = join(directory, "v4.json");
     await writeFile(legacyPath, JSON.stringify(legacy));
     await f.repo.restoreBackup(legacyPath);

@@ -53,8 +53,9 @@ import { EmojiPicker } from "./emoji-picker";
 import { EntityAssignmentControl } from "./project-people";
 import { DetailTabs, type DetailSection } from "./detail-tabs";
 import { EntityDiagrams, type DiagramPending } from "./diagrams";
+import { EntityDocuments, type DocumentPending } from "./documents";
 import { EntityTable } from "./entity-table";
-import { EntityDocuments } from "./task-documents";
+import { EntityFiles } from "./task-files";
 import { EntityComments } from "./task-comments";
 import { ResizableTaskPanels } from "./resizable-task-panels";
 import { useEntityComments } from "./use-task-comments";
@@ -107,11 +108,12 @@ export function EntityDetail({
   );
   const [editing, setEditing] = useState(false);
   const [uploading, setUploading] = useState(0);
-  const [documentCount, setDocumentCount] = useState(detail?.files.length ?? 0);
+  const [fileCount, setFileCount] = useState(detail?.files.length ?? 0);
   const [archived, setArchived] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [mobile, setMobile] = useState(false);
   const [draft, setDraft] = useState("");
+  const [documentState, setDocumentState] = useState<DocumentPending>({ pending: false, busy: false });
   const [diagramState, setDiagramState] = useState<DiagramPending>({ pending: false, busy: false });
   const conversation = useEntityComments(
     general ? undefined : scope,
@@ -131,9 +133,9 @@ export function EntityDetail({
       (scope.kind === "feature" &&
         moduleId !== ((entity as Feature).moduleId ?? "general")));
   const { requestNavigation, leaveDialog } = useUnsavedChanges(
-    pending || !!draft.trim() || diagramState.pending,
-    busy || uploading > 0 || diagramState.busy,
-    diagramState.pending ? "diagrama" : entityNames[scope.kind],
+    pending || !!draft.trim() || diagramState.pending || documentState.pending,
+    busy || uploading > 0 || diagramState.busy || documentState.busy,
+    documentState.pending ? "documento" : diagramState.pending ? "diagrama" : entityNames[scope.kind],
   );
   const childTab =
     scope.kind === "project"
@@ -151,11 +153,12 @@ export function EntityDetail({
         },
         { id: "properties", label: "Propiedades", icon: <Layers3 size={17} /> },
         {
-          id: "documents",
-          label: "Documentos",
+          id: "files",
+          label: "Archivos",
           icon: <Paperclip size={17} />,
-          count: documentCount,
+          count: fileCount,
         },
+        { id: "documents", label: "Documentos", icon: <FileText size={17} /> },
         { id: "diagrams", label: "Diagramas", icon: <GitBranch size={17} /> },
       ];
   const childFeatures = features.filter(
@@ -211,7 +214,7 @@ export function EntityDetail({
     navigate(entityPath(project.id, kind, id, view, undefined, currentPath));
 
   useEffect(() => {
-    setDocumentCount(detail?.files.length ?? 0);
+    setFileCount(detail?.files.length ?? 0);
   }, [detail?.files]);
   useEffect(() => {
     const media = window.matchMedia("(max-width: 900px)");
@@ -288,7 +291,7 @@ export function EntityDetail({
       title: `¿Eliminar ${scope.kind === "feature" ? "esta" : "este"} ${entityNames[scope.kind]}?`,
       description:
         scope.kind === "module"
-          ? "Sus features pasarán a General y conservarán sus tareas. Se eliminarán los comentarios y documentos propios del módulo."
+          ? "Sus features pasarán a General y conservarán sus tareas. Se eliminarán los comentarios, archivos y documentos propios del módulo."
           : "Se eliminarán el elemento, sus comentarios, documentos y todos sus elementos dependientes, incluidas las tareas archivadas. Esta acción es permanente.",
       action: async () => {
         if (await mutate({ type: `${scope.kind}.delete`, id: scope.id }))
@@ -471,20 +474,24 @@ export function EntityDetail({
         <DetailTabs
           value={tab}
           change={(value) => {
-            if (diagramState.busy) return;
+            if (diagramState.busy || documentState.busy) return;
             requestNavigation(() => {
               const next = new URLSearchParams(query.toString());
               next.set("tab", value);
               next.delete("diagram");
+              next.delete("document");
               window.history.replaceState(null, "", `${pathname}?${next}`);
               setEditing(false);
-            }, diagramState.pending);
+            }, diagramState.pending || documentState.pending);
           }}
           label="Secciones del detalle"
           sections={sections}
         >
           {!general && (
             <>
+              <Tabs.Content value="documents" className="task-tab-panel">
+                {tab === "documents" && <EntityDocuments scope={scope} guard={(action) => requestNavigation(action, documentState.pending)} onPendingChange={setDocumentState} />}
+              </Tabs.Content>
               <Tabs.Content value="diagrams" className="task-tab-panel">
                 {tab === "diagrams" && <EntityDiagrams scope={scope} guard={(action) => requestNavigation(action, diagramState.pending)} onPendingChange={setDiagramState} />}
               </Tabs.Content>
@@ -611,17 +618,18 @@ export function EntityDetail({
                 </section>
               </Tabs.Content>
               <Tabs.Content
-                value="documents"
+                value="files"
                 forceMount
-                hidden={tab !== "documents"}
+                hidden={tab !== "files"}
                 className="task-tab-panel"
               >
-                <EntityDocuments
+                <EntityFiles
                   scope={scope}
+                  active={tab === "files"}
                   files={detail?.files}
-                  canEdit={detail?.permissions.canManageDocuments ?? false}
+                  canEdit={detail?.permissions.canManageFiles ?? false}
                   limit={workspace.settings?.maxAttachmentBytes ?? 10485760}
-                  onCountChange={setDocumentCount}
+                  onCountChange={setFileCount}
                 />
               </Tabs.Content>
             </>

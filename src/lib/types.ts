@@ -76,7 +76,7 @@ export interface EntityRef {
 }
 export interface EntityPermissions extends TaskPermissions {
   canComment: boolean;
-  canManageDocuments: boolean;
+  canManageFiles: boolean;
 }
 export interface EntityDetailSnapshot {
   scope: EntityRef;

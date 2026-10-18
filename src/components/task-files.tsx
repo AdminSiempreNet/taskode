@@ -20,7 +20,7 @@ import type { Task, TaskFile, EntityRef } from "@/lib/types";
 import { Button } from "./ui/button";
 import { useImagePreview } from "./image-preview";
 import { entityNames } from "@/lib/entities";
-import styles from "./task-documents.module.css";
+import styles from "./task-files.module.css";
 
 function formatSize(bytes: number) {
   if (bytes === 0) return "0 KB";
@@ -39,7 +39,7 @@ function fileAppearance(file: TaskFile) {
     return { kind: "sheet", label: "Excel", extension, Icon: FileSpreadsheet };
   if (["DOC", "DOCX"].includes(extension))
     return { kind: "word", label: "Word", extension, Icon: FileText };
-  return { kind: "file", label: "Documento", extension, Icon: FileIcon };
+  return { kind: "file", label: "Archivo", extension, Icon: FileIcon };
 }
 
 function FileThumbnail({ file }: { file: TaskFile }) {
@@ -74,16 +74,17 @@ function FileThumbnail({ file }: { file: TaskFile }) {
 }
 
 const noFiles: TaskFile[] = [];
-export function TaskDocuments({
+export function TaskFiles({
   task,
   ...props
 }: {
   task: Task;
   limit: number;
+  active?: boolean;
   onCountChange?: (count: number) => void;
 }) {
   return (
-    <EntityDocuments
+    <EntityFiles
       {...props}
       scope={{ kind: "task", id: task.id, projectId: task.projectId }}
       files={task.files}
@@ -92,17 +93,19 @@ export function TaskDocuments({
   );
 }
 
-export function EntityDocuments({
+export function EntityFiles({
   scope,
   files: sourceFiles,
   canEdit,
   limit,
   onCountChange,
+  active = true,
 }: {
   scope: EntityRef;
   files?: TaskFile[];
   canEdit: boolean;
   limit: number;
+  active?: boolean;
   onCountChange?: (count: number) => void;
 }) {
   const initialFiles = sourceFiles ?? noFiles;
@@ -128,6 +131,15 @@ export function EntityDocuments({
   useEffect(() => {
     onCountChange?.(files.length);
   }, [files.length, onCountChange]);
+  useEffect(() => {
+    if (!active) return;
+    let current = true;
+    fetch(`/api/entities/${scope.kind}/${encodeURIComponent(scope.id)}`, { cache: "no-store" })
+      .then(async (response) => { if (!response.ok) throw new Error("No se pudieron actualizar los archivos."); return response.json(); })
+      .then((detail) => { if (current) setFiles(detail.files); })
+      .catch((error) => { if (current) toast.error(error.message); });
+    return () => { current = false; };
+  }, [active, scope.kind, scope.id]);
 
   async function attachFiles(selected: File[]) {
     if (!canEdit || uploading.current || !selected.length) return;
@@ -154,7 +166,7 @@ export function EntityDocuments({
             file,
             scope.projectId,
             scope,
-            "document",
+            "file",
             (progress) =>
               setUpload((current) => current && { ...current, progress }),
           );
@@ -190,7 +202,7 @@ export function EntityDocuments({
 
   return (
     <section
-      className={styles.documents}
+      className={styles.files}
       aria-labelledby={headingId}
       onDragEnter={(event) => {
         if (!canEdit || !event.dataTransfer.types.includes("Files")) return;
@@ -251,7 +263,7 @@ export function EntityDocuments({
         className="sr-only"
         type="file"
         accept={FILE_ACCEPT}
-        aria-label="Adjuntar documentos"
+        aria-label="Adjuntar archivos"
         multiple
         disabled={!canEdit || upload !== null}
         onChange={(event) => {
@@ -411,8 +423,8 @@ export function EntityDocuments({
           <strong>Aún no hay archivos adjuntos</strong>
           <p>
             {canEdit
-              ? "Añade documentos, referencias o imágenes"
-              : "Aquí encontrarás los documentos compartidos"}{" "}
+              ? "Añade archivos, referencias o imágenes"
+              : "Aquí encontrarás los archivos compartidos"}{" "}
             para dar contexto a{" "}
             {scope.kind === "task" || scope.kind === "feature"
               ? "esta"

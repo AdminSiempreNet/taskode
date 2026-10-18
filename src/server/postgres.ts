@@ -352,7 +352,7 @@ export class PostgresRepository implements WorkspaceRepository {
       canModerateComments: manager,
       ...taskPermissions,
       canComment: true,
-      canManageDocuments: taskPermissions?.canEdit ?? (manager || teamMember),
+      canManageFiles: taskPermissions?.canEdit ?? (manager || teamMember),
     };
     return {
       scope: { kind, id, projectId } satisfies EntityRef,
@@ -596,7 +596,7 @@ export class PostgresRepository implements WorkspaceRepository {
         );
       if (file.scopeType === null) {
         if (
-          file.purpose === "document" &&
+          file.purpose === "file" &&
           !(
             await this.requireEntity(
               actor,
@@ -604,10 +604,10 @@ export class PostgresRepository implements WorkspaceRepository {
               scope.id,
               scope.projectId,
             )
-          ).permissions.canManageDocuments
+          ).permissions.canManageFiles
         )
           throw new DomainError(
-            "No puedes gestionar los documentos de este elemento.",
+            "No puedes gestionar los archivos de este elemento.",
             403,
           );
         await this.update("files", id, entityColumns(scope));

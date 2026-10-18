@@ -182,6 +182,27 @@ test(
       await page
         .getByLabel("Título del diagrama", { exact: true })
         .fill("Flujo de autenticación · revisado");
+      const editorHeader = page.locator('section[aria-label="Editor de diagrama"] > header');
+      const canvas = page.locator(".excalidraw canvas.interactive");
+      const expandedCanvas = await canvas.boundingBox();
+      assert.ok((await editorHeader.boundingBox()).height <= 64);
+      const descriptionBounds = await page.getByLabel("Descripción del diagrama", { exact: true }).boundingBox();
+      const titleBounds = await page.getByLabel("Título del diagrama", { exact: true }).boundingBox();
+      assert.ok(descriptionBounds.y >= titleBounds.y + titleBounds.height);
+      assert.ok(Math.abs(descriptionBounds.width - (await editorHeader.boundingBox()).width) <= 2);
+      await page.getByRole("button", { name: "Ocultar cabecera", exact: true }).click();
+      await editorHeader.waitFor({ state: "hidden" });
+      await page.waitForFunction((height) =>
+        document.querySelector(".excalidraw canvas.interactive").getBoundingClientRect().height > height + 40,
+        expandedCanvas.height,
+      );
+      assert.equal(await page.getByRole("alertdialog").count(), 0);
+      await page.screenshot({ path: "test-results/diagrams-editor-collapsed.png" });
+      await page.getByRole("button", { name: "Mostrar cabecera", exact: true }).click();
+      assert.equal(
+        await page.getByLabel("Título del diagrama", { exact: true }).inputValue(),
+        "Flujo de autenticación · revisado",
+      );
       await page
         .getByRole("button", { name: "Volver a diagramas", exact: true })
         .click();
@@ -312,6 +333,7 @@ test(
         })
         .waitFor();
       await page.screenshot({ path: "test-results/diagrams-editor-full.png" });
+      assert.equal(await page.getByLabel("Descripción del diagrama", { exact: true }).isVisible(), false);
       await page
         .getByRole("button", {
           name: "Salir de pantalla completa",
@@ -319,6 +341,7 @@ test(
         })
         .click();
       const popup = page.waitForEvent("popup");
+      assert.equal(await page.getByLabel("Descripción del diagrama", { exact: true }).isVisible(), true);
       await page
         .getByRole("button", { name: "Abrir en otra pestaña", exact: true })
         .click();
@@ -436,6 +459,10 @@ test(
         .click();
       await page.setViewportSize({ width: 390, height: 844 });
       await page.screenshot({ path: "test-results/diagrams-mobile.png" });
+      await page.getByRole("button", { name: "Ocultar cabecera", exact: true }).click();
+      await editorHeader.waitFor({ state: "hidden" });
+      await page.screenshot({ path: "test-results/diagrams-mobile-collapsed.png" });
+      await page.getByRole("button", { name: "Mostrar cabecera", exact: true }).click();
       assert.equal(
         await page.evaluate(
           () => document.documentElement.scrollWidth > innerWidth,

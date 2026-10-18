@@ -771,7 +771,7 @@ test("HTTP: clientes globales, geografía y relación opcional con tareas", asyn
     const edited = await send({ type: "client.update", id: clientId, name: "Cliente editado HTTP", cityId: "11001" });
     assert.equal(edited.workspace.clients.find((client) => client.id === clientId).departmentId, "11");
     const backup = await (await fetch(base + "/api/backup")).json();
-    assert.equal(backup.version, 8);
+    assert.equal(backup.version, 9);
     assert.ok(backup.tables.task_clients.some((link) => link.clientId === clientId && link.taskId === taskId));
     await send({ type: "task.clients.update", id: taskId, clientIds: [] });
   } finally {
@@ -820,7 +820,7 @@ test("HTTP: archivos mayores de 4,5 MB, documentos privados, comentarios y confi
     const fields = {projectId, featureId:created.workspace.features.find(f=>f.projectId===projectId).id, statusId:created.workspace.statuses.find(s=>s.projectId===projectId).id, title:"Documentos", description:"", priority:"medium", dueDate:null, labels:[]};
     const taskId = (await send({type:"task.create",...fields})).createdId;
     const bytes = Buffer.alloc(5*1024*1024); bytes.write("%PDF-1.7\n");
-    const initiate = await fetch(base+"/api/files/uploads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({projectId,taskId,name:"informe.pdf",size:bytes.length,purpose:"document"})});
+    const initiate = await fetch(base+"/api/files/uploads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({projectId,taskId,name:"informe.pdf",size:bytes.length,purpose:"file"})});
     assert.equal(initiate.status,200); const upload=await initiate.json(); assert.equal(upload.url,null);
     const put = await fetch(base+`/api/files/uploads/${upload.id}`,{method:"PUT",headers:{"Content-Type":"application/pdf"},body:bytes}); assert.equal(put.status,200);
     const complete = await fetch(base+`/api/files/uploads/${upload.id}/complete`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({taskId})}); assert.equal(complete.status,200);
@@ -832,7 +832,7 @@ test("HTTP: archivos mayores de 4,5 MB, documentos privados, comentarios y confi
     assert.equal((await fetch(base+`/api/files/${upload.id}`,{method:"DELETE"})).status,200);
     assert.equal((await fetch(base+`/api/files/${upload.id}/content`)).status,404);
     await send({type:"settings.update",maxAttachmentBytes:1048576});
-    const tooLarge=await fetch(base+"/api/files/uploads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({projectId,name:"large.pdf",size:bytes.length,purpose:"document"})}); assert.equal(tooLarge.status,413);
+    const tooLarge=await fetch(base+"/api/files/uploads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({projectId,name:"large.pdf",size:bytes.length,purpose:"file"})}); assert.equal(tooLarge.status,413);
   } finally {
     await send({type:"settings.update",maxAttachmentBytes:10485760});
     if(projectId) await send({type:"project.delete",id:projectId});
@@ -1050,12 +1050,12 @@ test("HTTP: equipos propios, contratos de liderazgo y documentos con permisos de
       const detail = await response.json();
       assert.deepEqual(detail.entity.teamMemberIds, [member.id]);
       assert.equal(detail.permissions.canEdit, true);
-      assert.equal(detail.permissions.canManageDocuments, true);
+      assert.equal(detail.permissions.canManageFiles, true);
       assert.equal(detail.permissions.canManageAccess, false);
       assert.equal((await asMember("/api/workspace", { type: `${kind}.rename`, id, name: "Edición de equipo" })).status, 200);
       assert.equal((await asMember("/api/workspace", { type: `${kind}.assignment.update`, id, leaderId: member.id, teamMemberIds: [] })).status, 403);
       assert.equal((await asMember("/api/workspace", { type: `${kind}.delete`, id })).status, 403);
-      const upload = { projectId, scope: { kind, id, projectId }, name: "documento.pdf", size: 10, purpose: "document" };
+      const upload = { projectId, scope: { kind, id, projectId }, name: "documento.pdf", size: 10, purpose: "file" };
       assert.equal((await asMember("/api/files/uploads", upload)).status, 200);
       await send({ type: `${kind}.assignment.update`, id, leaderId: "test-admin", teamMemberIds: [] });
       assert.equal((await asMember("/api/files/uploads", upload)).status, 403);
@@ -1087,7 +1087,7 @@ test("HTTP: notificaciones, lectura y PWA funcionan entre dos usuarios", async (
     assert.equal(snapshot.unreadCount, 1);
     const item = snapshot.items[0]; assert.equal(item.taskId, taskId);
     assert.equal((await fetch(base + `/api/notifications/${item.id}`)).status, 404);
-    const page = await asMember("/notifications"); assert.equal(page.status, 200); assert.match(await page.text(), /Notificaciones/);
+    const page = await asMember("/notifications"); assert.equal(page.status, 200, page.status >= 500 ? fixture.logs() : undefined); assert.match(await page.text(), /Notificaciones/);
     const read = await asMember(`/api/notifications/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Origin: base }, body: JSON.stringify({ read: true }) });
     assert.equal(read.status, 200, await read.text());
     assert.equal((await (await asMember("/api/notifications")).json()).unreadCount, 0);

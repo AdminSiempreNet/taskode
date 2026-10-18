@@ -1,0 +1,277 @@
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-height: 100%;
+  padding: 12px 14px 24px;
+}
+.editorHeader,
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.actions > span {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.metadata {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 8px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+.documentTitle {
+  margin: 0;
+  color: var(--foreground);
+  font-size: 21px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+.inlineText {
+  min-height: 1.7em;
+  padding: 4px 8px;
+  margin: -4px -8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  outline: none;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.inlineText[contenteditable="plaintext-only"]:hover {
+  background: var(--muted);
+}
+.inlineText[contenteditable="plaintext-only"]:focus {
+  background: var(--background);
+  border-color: var(--border);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 12%, transparent);
+}
+.inlineText:empty::before {
+  content: attr(data-placeholder);
+  color: var(--muted-foreground);
+  pointer-events: none;
+}
+.content {
+  min-height: 360px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.content :global(.description-editor) {
+  flex: 1;
+  min-height: 360px;
+}
+.content :global(.description-editor-content),
+.content :global(.description-rendered) {
+  min-height: 300px;
+}
+.error {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  color: var(--destructive);
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.deleteCard {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  color: var(--muted-foreground);
+}
+.diagramPreview {
+  margin: 12px 0;
+  width: 100%;
+  max-width: 560px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--background);
+}
+.diagramLink,
+.diagramState {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) 14px;
+  gap: 12px;
+  padding: 10px;
+  min-height: 80px;
+  align-items: center;
+}
+.diagramState {
+  grid-template-columns: 88px minmax(0, 1fr);
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.diagramThumbnail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 60px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: white;
+  color: var(--muted-foreground);
+}
+.diagramPreview a {
+  text-decoration: none !important;
+  color: inherit !important;
+}
+.diagramLink:hover {
+  background: var(--muted);
+}
+.diagramLink:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+.diagramThumbnail img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  margin: 0 !important;
+}
+.diagramText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.diagramTitle {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.diagramDescription {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted-foreground);
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.diagramOpenIcon {
+  color: var(--muted-foreground);
+}
+.diagramNode {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 22px;
+  gap: 6px;
+  align-items: center;
+  max-width: 612px;
+  margin: 12px 0;
+}
+.diagramNode > .diagramPreview {
+  margin: 0;
+}
+.diagramHandle,
+.diagramRemove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 28px;
+  border-radius: 4px;
+  color: var(--muted-foreground);
+}
+.diagramHandle {
+  cursor: grab;
+}
+.diagramHandle:active {
+  cursor: grabbing;
+}
+.diagramHandle:hover,
+.diagramRemove:hover {
+  color: var(--foreground);
+  background: var(--muted);
+}
+.diagramHandle:focus-visible,
+.diagramRemove:focus-visible {
+  outline: 2px solid var(--primary);
+}
+.selectedDiagram .diagramPreview {
+  outline: 2px solid var(--primary);
+}
+.pickerList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 380px;
+  overflow: auto;
+}
+.pickerList button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.pickerList button:hover {
+  background: var(--muted);
+}
+.pickerList span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.pickerList strong {
+  font-size: 13px;
+}
+.pickerList small {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+@media (max-width: 600px) {
+  .diagramLink,
+  .diagramState {
+    grid-template-columns: 64px minmax(0, 1fr) 14px;
+    gap: 8px;
+    padding: 8px;
+    min-height: 64px;
+  }
+  .diagramState {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+  .diagramThumbnail {
+    width: 64px;
+    height: 48px;
+  }
+
+  .editor {
+    padding: 8px 0 16px;
+  }
+  .actions {
+    width: 100%;
+  }
+  .actions > span {
+    width: 100%;
+  }
+}
+
+.pickerList section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pickerList h3 {
+  margin: 12px 0 2px;
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}

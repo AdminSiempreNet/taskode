@@ -46,10 +46,11 @@ import { ClientPicker } from "./client-picker";
 import { InlineTaskTitle, TaskLabelPicker } from "./task-heading";
 import { FeatureCombobox } from "./feature-combobox";
 import { TaskAssignments } from "./task-people";
-import { TaskDocuments } from "./task-documents";
+import { TaskFiles } from "./task-files";
 import { ResizableTaskPanels } from "./resizable-task-panels";
 import { DetailTabs } from "./detail-tabs";
 import { EntityDiagrams, type DiagramPending } from "./diagrams";
+import { EntityDocuments, type DocumentPending } from "./documents";
 import { TaskComments } from "./task-comments";
 import { uploadFile } from "@/lib/file-client";
 import { DescriptionEditor } from "./description-editor";
@@ -202,17 +203,19 @@ export function TaskDetail({
   const [dirty, setDirty] = useState(false);
   const [descriptionEditing, setDescriptionEditing] = useState(false);
   const requestedTab = searchParams.get("tab");
-  const activeTab = ["description", "properties", "checklists", "documents", "history", "diagrams"].includes(requestedTab ?? "") ? requestedTab! : "description";
+  const activeTab = ["description", "properties", "checklists", "files", "documents", "history", "diagrams"].includes(requestedTab ?? "") ? requestedTab! : "description";
+  const [documentState, setDocumentState] = useState<DocumentPending>({ pending: false, busy: false });
   const [diagramState, setDiagramState] = useState<DiagramPending>({ pending: false, busy: false });
   function setActiveTab(value: string) {
     const url = new URL(window.location.href);
     url.searchParams.set("tab", value);
     url.searchParams.delete("diagram");
+    url.searchParams.delete("document");
     window.history.replaceState(null, "", `${url.pathname}${url.search}`);
   }
-  const [documentCount, setDocumentCount] = useState(task?.files?.length ?? 0);
+  const [fileCount, setFileCount] = useState(task?.files?.length ?? 0);
   useEffect(() => {
-    setDocumentCount(task?.files?.length ?? 0);
+    setFileCount(task?.files?.length ?? 0);
   }, [task?.id, task?.files]);
   const [chatOpen, setChatOpen] = useState(false);
   const [mobileComments, setMobileComments] = useState(false);
@@ -251,9 +254,9 @@ export function TaskDetail({
       JSON.stringify(labels) !== JSON.stringify(task.labels)
     : dirty || !!title.trim() || !!description;
   const { requestNavigation, leaveDialog } = useUnsavedChanges(
-    pending || !!commentDraft.trim() || diagramState.pending,
-    busy || diagramState.busy,
-    diagramState.pending ? "diagrama" : "tarea",
+    pending || !!commentDraft.trim() || diagramState.pending || documentState.pending,
+    busy || diagramState.busy || documentState.busy,
+    documentState.pending ? "documento" : diagramState.pending ? "diagrama" : "tarea",
   );
   const previousLabels = useRef(task?.labels);
   useEffect(() => {
@@ -612,11 +615,11 @@ export function TaskDetail({
             <DetailTabs
               value={activeTab}
               change={(value) => {
-                if (diagramState.busy) return;
+                if (diagramState.busy || documentState.busy) return;
                 requestNavigation(() => {
                   setActiveTab(value);
                   if (value !== "description") setDescriptionEditing(false);
-                }, diagramState.pending);
+                }, diagramState.pending || documentState.pending);
               }}
               label="Secciones de la tarea"
               sections={[
@@ -637,11 +640,12 @@ export function TaskDetail({
                   count: task?.checklists[0]?.items.length,
                 },
                 {
-                  id: "documents",
-                  label: "Documentos",
+                  id: "files",
+                  label: "Archivos",
                   icon: <Paperclip size={16} />,
-                  count: documentCount,
+                  count: fileCount,
                 },
+                { id: "documents", label: "Documentos", icon: <FileText size={16} /> },
                 ...(task ? [{ id: "diagrams", label: "Diagramas", icon: <GitBranch size={17} /> }] : []),
                 {
                   id: "history",
@@ -651,6 +655,9 @@ export function TaskDetail({
                 },
               ]}
             >
+              <Tabs.Content value="documents" className="task-tab-panel">
+                {activeTab === "documents" && (task ? <EntityDocuments scope={{ kind: "task", id: task.id, projectId: project.id }} guard={(action) => requestNavigation(action, documentState.pending)} onPendingChange={setDocumentState} /> : <p className="field-hint">Guarda la tarea para crear documentos.</p>)}
+              </Tabs.Content>
               {task && <Tabs.Content value="diagrams" className="task-tab-panel">
                 {activeTab === "diagrams" && <EntityDiagrams scope={{ kind: "task", id: task.id, projectId: project.id }} guard={(action) => requestNavigation(action, diagramState.pending)} onPendingChange={setDiagramState} />}
               </Tabs.Content>}
@@ -876,21 +883,22 @@ export function TaskDetail({
                 </section>
               </Tabs.Content>
               <Tabs.Content
-                value="documents"
+                value="files"
                 forceMount
-                hidden={activeTab !== "documents"}
+                hidden={activeTab !== "files"}
                 className="task-tab-panel"
               >
                 <div>
                   {task ? (
-                    <TaskDocuments
+                    <TaskFiles
                       task={task}
-                      onCountChange={setDocumentCount}
+                      active={activeTab === "files"}
+                      onCountChange={setFileCount}
                       limit={workspace.settings?.maxAttachmentBytes ?? 10485760}
                     />
                   ) : (
                     <p className="field-hint">
-                      Guarda la tarea para adjuntar documentos.
+                      Guarda la tarea para adjuntar archivos.
                     </p>
                   )}
                 </div>

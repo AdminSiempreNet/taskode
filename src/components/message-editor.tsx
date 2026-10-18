@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { createMarkdownParser } from "@/lib/markdown-parser";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "@tiptap/markdown";
@@ -22,6 +23,7 @@ export function MessageEditor(props: {
   const latest = useRef(props);
   latest.current = props;
   const last = useRef(props.value);
+  const markdownParser = useMemo(createMarkdownParser, []);
   const editor = useEditor({
     immediatelyRender: false,
     content: props.value,
@@ -32,7 +34,10 @@ export function MessageEditor(props: {
         trailingNode: false,
         link: { openOnClick: false },
       }),
-      Markdown.configure({ markedOptions: { breaks: true } }),
+      Markdown.configure({
+        marked: markdownParser,
+        markedOptions: { breaks: true },
+      }),
       Image.configure({ allowBase64: false }),
       MarkdownYoutube,
       imagePasteExtension(

@@ -1,11 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Check,
+  ChevronDown,
+  ChevronUp,
   Copy,
   ExternalLink,
   GitBranch,
@@ -456,6 +458,8 @@ export function DiagramEditor({
   const [canvasDirty, setCanvasDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [full, setFull] = useState(false);
+  const [headerHidden, setHeaderHidden] = useState(false);
+  const headerId = useId();
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState("");
   const [conflict, setConflict] = useState(false);
@@ -562,7 +566,7 @@ export function DiagramEditor({
       className={`${styles.editor} ${full ? styles.fullscreen : ""} ${standalone ? styles.standaloneEditor : ""}`}
       aria-label="Editor de diagrama"
     >
-      <header className={styles.editorHeader}>
+      <header id={headerId} className={styles.editorHeader} hidden={headerHidden}>
         <Button
           variant="ghost"
           size="icon-sm"
@@ -579,19 +583,6 @@ export function DiagramEditor({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={160}
-            disabled={busy || !document.permissions.canEdit}
-          />
-          <textarea
-            aria-label="Descripción del diagrama"
-            placeholder={
-              document.permissions.canEdit
-                ? "Añade contexto a este diagrama…"
-                : "Sin descripción"
-            }
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={1}
-            maxLength={1000}
             disabled={busy || !document.permissions.canEdit}
           />
         </div>
@@ -680,7 +671,36 @@ export function DiagramEditor({
             </Button>
           )}
         </div>
+        <textarea
+          className={styles.editorDescription}
+          hidden={full}
+          aria-label="Descripción del diagrama"
+          placeholder={
+            document.permissions.canEdit
+              ? "Añade contexto a este diagrama…"
+              : "Sin descripción"
+          }
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={1}
+          maxLength={1000}
+          disabled={busy || !document.permissions.canEdit}
+        />
       </header>
+      {!headerHidden && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className={styles.hideHeader}
+          aria-label="Ocultar cabecera"
+          title="Ocultar cabecera"
+          aria-expanded={true}
+          aria-controls={headerId}
+          onClick={() => setHeaderHidden(true)}
+        >
+          <ChevronUp size={16} />
+        </Button>
+      )}
       {error && (
         <div className={styles.error} role="alert">
           <span>{error}</span>
@@ -739,6 +759,21 @@ export function DiagramEditor({
             </>
           )}
         </span>
+        {headerHidden && (
+          <Button
+            variant="outline"
+            size="sm"
+            className={styles.showHeader}
+            aria-label="Mostrar cabecera"
+            title="Mostrar cabecera"
+            aria-expanded={false}
+            aria-controls={headerId}
+            onClick={() => setHeaderHidden(false)}
+          >
+            <ChevronDown size={16} />
+            Mostrar cabecera
+          </Button>
+        )}
         <span>Hasta 3 MB · Imágenes incluidas</span>
       </footer>
       <Dialog

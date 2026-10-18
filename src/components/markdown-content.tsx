@@ -5,14 +5,19 @@ import remarkBreaks from "remark-breaks";
 import { Children, isValidElement, memo, useMemo } from "react";
 import { youtubeUrl } from "@/lib/files";
 import { parseImageTitle } from "@/lib/image-formatting";
+import type { EntityRef } from "@/lib/types";
+import { parseDiagramReference } from "@/lib/documents";
+import { DocumentDiagramPreview } from "./diagram-preview-loader";
 import { useImagePreview } from "./image-preview";
 
 export const MarkdownContent = memo(function MarkdownContent({
   children,
   compact = false,
+  diagramScope,
 }: {
   children: string;
   compact?: boolean;
+  diagramScope?: EntityRef;
 }) {
   const openImage = useImagePreview();
   const components = useMemo<Components>(
@@ -26,6 +31,8 @@ export const MarkdownContent = memo(function MarkdownContent({
             : isValidElement<{ href?: string }>(first)
               ? first.props.href
               : undefined;
+        const reference = diagramScope && !compact ? parseDiagramReference(url) : null;
+        if (reference && diagramScope) return <DocumentDiagramPreview scope={diagramScope} projectId={reference.projectId} diagramId={reference.diagramId} />;
         const embed = !compact && url ? youtubeUrl(url) : null;
         return embed ? (
           <div className="youtube-video">
@@ -93,7 +100,7 @@ export const MarkdownContent = memo(function MarkdownContent({
           </a>
         ),
     }),
-    [compact, openImage],
+    [compact, openImage, diagramScope],
   );
   return (
     <div className={compact ? "rich-text rich-text-compact" : "rich-text"}>

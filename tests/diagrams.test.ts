@@ -301,7 +301,7 @@ test("diagramas: respaldo v8 portable, v7 compatible y restauración privada", a
     const path = join(directory, "backup.json");
     await f.repo.exportBackup(path);
     const backup = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(backup.version, 8);
+    assert.equal(backup.version, 9);
     assert.equal(backup.tables.diagrams[0].publicToken, null);
     assert.equal(backup.tables.diagrams[0].scene.files.png.dataURL, png);
     const corrupted = structuredClone(backup);
@@ -316,6 +316,7 @@ test("diagramas: respaldo v8 portable, v7 compatible y restauración privada", a
     const legacy = structuredClone(backup);
     legacy.version = 7;
     delete legacy.tables.diagrams;
+    delete legacy.tables.documents;
     assert.deepEqual(validateApplicationBackup(legacy).tables.diagrams, []);
     await f.repo.execute({ type: "module.delete", id: f.moduleId }, f.owner);
     assert.equal((await f.service.get(f.owner, doc.id)).scope.kind, "feature");

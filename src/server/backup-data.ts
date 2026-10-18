@@ -8,6 +8,7 @@ import { DomainError } from "./repository";
 import { MAX_BACKUP_BYTES } from "../lib/backups";
 import divipola from "./catalogs/divipola.json";
 import { normalizeClientText } from "../lib/clients";
+import { documentInputSchema } from "../lib/documents";
 import { fileTypes } from "../lib/files";
 import { validTimeZone } from "../lib/project-time";
 import { notificationPreferencesSchema } from "../lib/notifications";
@@ -35,6 +36,7 @@ export const backupTables = {
   labels: schema.labels,
   tasks: schema.tasks,
   diagrams: schema.diagrams,
+  documents: schema.documents,
   task_clients: schema.taskClients,
   task_team_members: schema.taskTeamMembers,
   files: schema.files,
@@ -49,6 +51,7 @@ export const backupTables = {
 };
 type BackupRow = Record<string, string | number | boolean | string[] | DiagramScene | null>;
 const tableValidators: Record<string, z.ZodType> = {};
+const version8Validators: Record<string, z.ZodType> = {};
 const version7Validators: Record<string, z.ZodType> = {};
 const version6Validators: Record<string, z.ZodType> = {};
 const version5Validators: Record<string, z.ZodType> = {};
@@ -85,6 +88,8 @@ for (const [name, table] of Object.entries(backupTables)) {
     fields[key] = column.notNull ? field : field.nullable();
   }
   tableValidators[name] = z.array(z.strictObject({ ...fields }));
+  if (name === "documents") continue;
+  version8Validators[name] = z.array(z.strictObject({ ...fields }));
   if (name === "diagrams") continue;
   version7Validators[name] = z.array(z.strictObject({ ...fields }));
   if (["notification_preferences", "notifications"].includes(name)) continue;
@@ -147,8 +152,13 @@ const fileSchema = z
   .union([
     z.strictObject({
       ...backupHeader,
-      version: z.literal(8),
+      version: z.literal(9),
       tables: z.strictObject(tableValidators),
+    }),
+    z.strictObject({
+      ...backupHeader,
+      version: z.literal(8),
+      tables: z.strictObject(version8Validators),
     }),
     z.strictObject({
       ...backupHeader,
@@ -305,20 +315,26 @@ const fileSchema = z
       notification_preferences: [], notifications: [],
     } };
   })
-  .transform((input) => input.version === 8 ? input : ({
+  .transform((input) => input.version >= 8 ? input : ({
     ...input, version: 8 as const, tables: { ...input.tables, diagrams: [] },
   }))
+  .transform((input): { format: "taskode-backup"; createdAt: string; version: 9; tables: Record<string, unknown> } => {
+    const tables = input.tables as Record<string, BackupRow[]>;
+    return { ...input, version: 9, tables: { ...tables, documents: tables.documents ?? [],
+      files: tables.files.map((file) => ({ ...file, purpose: file.purpose === "document" ? "file" : file.purpose })),
+    } };
+  })
   .pipe(
     z.strictObject({
       format: z.literal("taskode-backup"),
       createdAt: z.iso.datetime(),
-      version: z.literal(8),
+      version: z.literal(9),
       tables: z.strictObject(tableValidators),
     }),
   );
 export type ApplicationBackup = {
   format: "taskode-backup";
-  version: 8;
+  version: 9;
   createdAt: string;
   tables: Record<string, BackupRow[]>;
 };
@@ -332,10 +348,13 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
   const parsed = fileSchema.safeParse(input);
   if (!parsed.success)
     invalid(
-      "El archivo no es un respaldo JSON compatible de Taskode (versiones 1–8).",
+      "El archivo no es un respaldo JSON compatible de Taskode (versiones 1–9).",
     );
   const backup = parsed.data as ApplicationBackup;
   const data = backup.tables;
+  for (const document of data.documents) {
+    if (!documentInputSchema.safeParse({ title: document.title, description: document.description, content: document.content }).success || !Number.isInteger(document.revision) || Number(document.revision) < 1) invalid("El respaldo contiene un documento inválido.");
+  }
   for (const diagram of data.diagrams) {
     const value = { title: diagram.title, description: diagram.description, scene: diagram.scene };
     if (!diagramInputSchema.safeParse(value).success || diagramBytes(value) > MAX_DIAGRAM_BYTES || !Number.isInteger(diagram.revision) || Number(diagram.revision) < 1) invalid("El respaldo contiene un diagrama inválido.");
@@ -373,6 +392,10 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
     return indexes.get(name)!.has(JSON.stringify(values));
   };
   const references = [
+    ["documents", "projectId", "projects"],
+    ["documents", "moduleId", "modules"],
+    ["documents", "featureId", "features"],
+    ["documents", "taskId", "tasks"],
     ["diagrams", "projectId", "projects"],
     ["diagrams", "moduleId", "modules"],
     ["diagrams", "featureId", "features"],
@@ -597,12 +620,12 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
     if (!isParticipant(task.projectId, c.userId) || task.leaderId === c.userId)
       invalid();
   }
-  for (const row of [...data.comments, ...data.files, ...data.diagrams]) {
+  for (const row of [...data.comments, ...data.files, ...data.diagrams, ...data.documents]) {
     const targets = [row.taskId, row.moduleId, row.featureId].filter(
       (id) => id !== null,
     );
     if (row.scopeType === null) {
-      if (data.comments.includes(row) || data.diagrams.includes(row) || targets.length) invalid();
+      if (data.comments.includes(row) || data.diagrams.includes(row) || data.documents.includes(row) || targets.length) invalid();
       continue;
     }
     const column = { task: "taskId", module: "moduleId", feature: "featureId" }[
@@ -627,7 +650,7 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
       ) ||
       f.storageKey !== f.id ||
       !["pending", "ready", "deleted"].includes(String(f.status)) ||
-      !["document", "image"].includes(String(f.purpose)) ||
+      !["file", "image"].includes(String(f.purpose)) ||
       Number(f.size) <= 0 ||
       Number(f.size) > 104857600
     )
@@ -664,7 +687,7 @@ export async function exportApplicationBackup(
   });
   const text = JSON.stringify({
     format: "taskode-backup",
-    version: 8,
+    version: 9,
     createdAt: new Date().toISOString(),
     tables,
   });

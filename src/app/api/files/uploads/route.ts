@@ -11,7 +11,7 @@ const input = z.object({
   scope: entityRefSchema.optional(),
   name: z.string().min(1).max(500),
   size: z.number().int().positive(),
-  purpose: z.enum(["image", "document"]),
+  purpose: z.enum(["image", "file", "document"]).transform((value) => value === "document" ? "file" as const : value),
 });
 export async function POST(request: Request) {
   try {

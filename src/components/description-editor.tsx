@@ -1,7 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createMarkdownParser } from "@/lib/markdown-parser";
+import {
+  EditorContent,
+  ReactNodeViewRenderer,
+  useEditor,
+  useEditorState,
+} from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "@tiptap/markdown";
 import { DescriptionImage } from "./description-image";
@@ -10,6 +16,7 @@ import { imageAlignment } from "@/lib/image-formatting";
 import { imagePasteExtension, MarkdownYoutube } from "./media-extensions";
 import { toast } from "sonner";
 import {
+  GitBranch,
   Bold,
   Check,
   Code,
@@ -26,6 +33,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MarkdownContent } from "./markdown-content";
+import type { EntityRef } from "@/lib/types";
+import { DiagramReference } from "./diagram-reference";
+import { DiagramReferenceView } from "./diagram-reference-view";
+import { DocumentDiagramPicker } from "./document-diagram-picker";
 
 export function DescriptionEditor({
   value,
@@ -35,6 +46,7 @@ export function DescriptionEditor({
   disabled,
   uploadImage,
   onUploadingChange,
+  diagramScope,
   label = "Descripción de la tarea",
 }: {
   value: string;
@@ -45,17 +57,21 @@ export function DescriptionEditor({
   uploadImage?: (file: File) => Promise<string>;
   onUploadingChange?: (count: number) => void;
   label?: string;
+  diagramScope?: EntityRef;
 }) {
   const lastValue = useRef(value);
   const uploads = useRef({ uploadImage, onUploadingChange });
   uploads.current = { uploadImage, onUploadingChange };
   const [uploading, setUploading] = useState(0);
   const root = useRef<HTMLElement>(null);
+  const [diagramPicker, setDiagramPicker] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [linkError, setLinkError] = useState("");
   const scrollTop = useRef(0);
   const pendingAction = useRef<(() => void) | null>(null);
+  const diagramInsertion = useRef<number | null>(null);
+  const markdownParser = useMemo(createMarkdownParser, []);
   const clickPosition = useRef<{ left: number; top: number } | null>(null);
   const editor = useEditor({
     extensions: [
@@ -65,7 +81,19 @@ export function DescriptionEditor({
         trailingNode: false,
         link: { openOnClick: false, autolink: true },
       }),
-      Markdown.configure({ markedOptions: { breaks: true } }),
+      Markdown.configure({
+        marked: markdownParser,
+        markedOptions: { breaks: true },
+      }),
+      ...(diagramScope
+        ? [
+            DiagramReference.extend({
+              addNodeView() {
+                return ReactNodeViewRenderer(DiagramReferenceView);
+              },
+            }).configure({ scope: diagramScope }),
+          ]
+        : []),
       DescriptionImage,
       MarkdownYoutube,
       imagePasteExtension(
@@ -100,7 +128,7 @@ export function DescriptionEditor({
           contentType: "markdown",
           emitUpdate: false,
         });
-        toast.error("La descripción admite hasta 30.000 caracteres.");
+        toast.error("El contenido admite hasta 30.000 caracteres.");
         return;
       }
       lastValue.current = next;
@@ -170,7 +198,7 @@ export function DescriptionEditor({
         event.target instanceof Node &&
         !(
           event.target instanceof Element &&
-          event.target.closest("[data-image-preview]")
+          event.target.closest("[data-image-preview], [data-document-picker]")
         ) &&
         !root.current.contains(event.target)
       )
@@ -247,7 +275,9 @@ export function DescriptionEditor({
           event.relatedTarget instanceof Node &&
           !(
             event.relatedTarget instanceof Element &&
-            event.relatedTarget.closest("[data-image-preview]")
+            event.relatedTarget.closest(
+              "[data-image-preview], [data-document-picker]",
+            )
           ) &&
           !event.currentTarget.contains(event.relatedTarget)
         )
@@ -258,6 +288,36 @@ export function DescriptionEditor({
         <span className="field-hint" role="status">
           Cargando {uploading} imagen(es)…
         </span>
+      )}
+      {diagramScope && (
+        <DocumentDiagramPicker
+          scope={diagramScope}
+          open={diagramPicker}
+          onClose={() => setDiagramPicker(false)}
+          onSelect={(diagram) => {
+            setDiagramPicker(false);
+            startEditing(() =>
+              editor
+                ?.chain()
+                .focus()
+                .insertContentAt(
+                  diagramInsertion.current ?? editor.state.selection.to,
+                  [
+                    {
+                      type: "diagramReference",
+                      attrs: {
+                        projectId: diagram.scope.projectId,
+                        diagramId: diagram.id,
+                        title: diagram.title,
+                      },
+                    },
+                    { type: "paragraph" },
+                  ],
+                )
+                .run(),
+            );
+          }}
+        />
       )}
       <div
         className="description-toolbar"
@@ -330,6 +390,23 @@ export function DescriptionEditor({
             }
           >
             <Unlink size={16} />
+          </button>
+        )}
+        {diagramScope && (
+          <button
+            type="button"
+            aria-label="Insertar diagrama"
+            title="Insertar diagrama"
+            disabled={!editor || disabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() =>
+              startEditing(() => {
+                diagramInsertion.current = editor?.state.selection.to ?? null;
+                setDiagramPicker(true);
+              })
+            }
+          >
+            <GitBranch size={16} />
           </button>
         )}
         <button
@@ -438,7 +515,11 @@ export function DescriptionEditor({
           <div
             className="description-rendered"
             role="region"
-            aria-label="Editar descripción"
+            aria-label={
+              diagramScope
+                ? "Editar contenido del documento"
+                : "Editar descripción"
+            }
             tabIndex={disabled ? -1 : 0}
             onScroll={(event) => {
               scrollTop.current = event.currentTarget.scrollTop;
@@ -467,7 +548,9 @@ export function DescriptionEditor({
             }}
           >
             {value ? (
-              <MarkdownContent>{value}</MarkdownContent>
+              <MarkdownContent diagramScope={diagramScope}>
+                {value}
+              </MarkdownContent>
             ) : (
               <span className="description-placeholder">
                 Añade contexto, notas o enlaces…

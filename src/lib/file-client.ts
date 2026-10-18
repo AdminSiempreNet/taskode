@@ -11,7 +11,7 @@ export async function uploadFile(
   file: File,
   projectId: string,
   taskId: string | EntityRef | undefined,
-  purpose: "image" | "document",
+  purpose: "image" | "file",
   progress?: (value: number) => void,
 ) {
   const target = typeof taskId === "object" ? { scope: taskId } : { taskId };
@@ -50,15 +50,15 @@ export async function uploadFile(
     await fetch(`/api/files/uploads/${upload.id}/complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(purpose === "document" ? target : {}),
+      body: JSON.stringify(purpose === "file" ? target : {}),
     }),
   );
   progress?.(100);
   return {
     ...result,
-    ...(purpose === "document" && typeof taskId === "object"
+    ...(purpose === "file" && typeof taskId === "object"
       ? entityColumns(taskId)
-      : { taskId: purpose === "document" ? (taskId ?? null) : null }),
+      : { taskId: purpose === "file" ? (taskId ?? null) : null }),
     projectId,
     purpose,
     createdAt: new Date().toISOString(),

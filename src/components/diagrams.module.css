@@ -254,6 +254,9 @@
   margin-top: 10px;
 }
 .editor {
+  --editor-inset-x: 0px;
+  --editor-inset-y: 0px;
+  position: relative;
   container-type: inline-size;
   display: flex;
   flex-direction: column;
@@ -262,14 +265,31 @@
   background: var(--background);
 }
 .editorHeader {
-  display: flex;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 9px;
+  column-gap: 9px;
+  row-gap: 0;
   flex-shrink: 0;
-  padding: 0 0 12px;
-  margin-bottom: 12px;
-  min-height: 58px;
+  padding: 2px 0 4px;
+  margin-bottom: 6px;
+  min-height: 44px;
   border-bottom: 1px solid var(--border);
+}
+.editorHeader[hidden] {
+  display: none;
+}
+.hideHeader {
+  position: absolute;
+  z-index: 5;
+  top: calc(var(--editor-inset-y) + 6px);
+  right: var(--editor-inset-x);
+}
+.showHeader {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: center;
+  font-size: 11px;
 }
 .editorMark {
   width: 32px;
@@ -288,18 +308,19 @@
   align-items: center;
   gap: 5px;
   margin-left: auto;
+  margin-right: 38px;
   flex-shrink: 0;
 }
 .editorMeta {
   padding: 0 3px;
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 10px;
   flex: 1;
   min-width: 0;
 }
 .editorMeta input,
-.editorMeta textarea {
+.editorDescription {
   border: 0;
   outline: 0;
   width: 100%;
@@ -310,23 +331,29 @@
   padding: 2px 4px;
 }
 .editorMeta input {
-  font-size: 18px;
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  line-height: 20px;
   font-weight: 600;
   letter-spacing: -0.5px;
 }
-.editorMeta textarea {
+.editorDescription {
+  grid-column: 1 / -1;
+  min-width: 0;
   font-size: 11px;
+  line-height: 16px;
   color: var(--muted-foreground);
   height: 22px;
   min-height: 22px;
   max-height: 44px;
 }
 .editorMeta input:focus,
-.editorMeta textarea:focus {
+.editorDescription:focus {
   box-shadow: 0 0 0 1px var(--ring);
 }
 .editorMeta input:disabled,
-.editorMeta textarea:disabled {
+.editorDescription:disabled {
   opacity: 1;
 }
 .canvas {
@@ -339,19 +366,29 @@
   isolation: isolate;
 }
 .editorFooter {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  flex-shrink: 0;
   gap: 12px;
   padding: 10px 3px 0;
   font-size: 10px;
   color: var(--muted-foreground);
 }
-.editorFooter span {
+.editorFooter > span {
   display: flex;
   align-items: center;
   gap: 5px;
 }
+.editorFooter > span:last-child {
+  grid-column: 3;
+  grid-row: 1;
+  justify-self: end;
+  text-align: right;
+}
 .fullscreen {
+  --editor-inset-x: 24px;
+  --editor-inset-y: 18px;
   position: fixed;
   inset: 0;
   z-index: 45;
@@ -430,19 +467,29 @@
   }
 }
 @container (max-width: 480px) {
+  .editorFooter {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .editorFooter > span:last-child {
+    grid-column: 2;
+  }
+  .showHeader {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
   .editorHeader {
-    flex-wrap: wrap;
-    gap: 8px;
+    grid-template-columns: 32px minmax(0, 1fr);
   }
   .editorHeader .editorMark {
     display: none;
   }
-  .editorMeta {
-    flex-basis: calc(100% - 44px);
-  }
   .editorActions {
-    flex-basis: 100%;
+    grid-column: 1 / -1;
+    margin-right: 0;
     justify-content: flex-end;
+  }
+  .editorMeta {
+    margin-right: 38px;
   }
 }
 @media (max-width: 700px) {
@@ -468,8 +515,7 @@
     min-height: 430px;
   }
   .editorHeader {
-    gap: 5px;
-    flex-wrap: wrap;
+    column-gap: 5px;
   }
   .editorHeader .editorMark {
     display: none;
@@ -481,16 +527,19 @@
     display: none;
   }
   .editorMeta input {
-    font-size: 18px;
+    font-size: 16px;
   }
   .editorFooter {
     font-size: 9px;
-    flex-wrap: wrap;
     gap: 6px;
   }
   .fullscreen,
   .standalone {
     padding: 12px;
+  }
+  .fullscreen {
+    --editor-inset-x: 12px;
+    --editor-inset-y: 12px;
   }
   .fullscreen,
   .standaloneEditor {

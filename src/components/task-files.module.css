@@ -1,4 +1,4 @@
-.documents {
+.files {
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -459,7 +459,7 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .documents * {
+  .files * {
     transition: none;
   }
   .spinner {

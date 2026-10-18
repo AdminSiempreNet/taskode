@@ -582,7 +582,7 @@ export const files = pgTable(
     size: integer().notNull(),
     storageKey: text().notNull(),
     status: text().notNull().default("pending"),
-    purpose: text().notNull().default("document"),
+    purpose: text().notNull().default("file"),
     createdAt: text().notNull(),
   },
   (t) => [
@@ -631,6 +631,24 @@ export const diagrams = pgTable("diagrams", {
   foreignKey({ columns: [t.featureId, t.projectId], foreignColumns: [features.id, features.projectId] }).onDelete("cascade"),
   check("diagram_revision", sql`${t.revision} > 0`),
   check("diagram_scope_target", sql`(${t.scopeType} = 'project' and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 0) or (${t.scopeType} = 'task' and ${t.taskId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'module' and ${t.moduleId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'feature' and ${t.featureId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1)`),
+]);
+
+export const documents = pgTable("documents", {
+  id: text().primaryKey(),
+  projectId: text().notNull().references(() => projects.id, { onDelete: "cascade" }),
+  scopeType: text().notNull(),
+  taskId: text(), moduleId: text(), featureId: text(),
+  title: text().notNull(), description: text().notNull().default(""),
+  content: text().notNull().default(""),
+  revision: integer().notNull().default(1),
+  createdAt: text().notNull(), updatedAt: text().notNull(),
+}, (t) => [
+  index("document_scope").on(t.projectId, t.scopeType, t.taskId, t.moduleId, t.featureId),
+  foreignKey({ columns: [t.taskId, t.projectId], foreignColumns: [tasks.id, tasks.projectId] }).onDelete("cascade"),
+  foreignKey({ columns: [t.moduleId, t.projectId], foreignColumns: [modules.id, modules.projectId] }).onDelete("cascade"),
+  foreignKey({ columns: [t.featureId, t.projectId], foreignColumns: [features.id, features.projectId] }).onDelete("cascade"),
+  check("document_revision", sql`${t.revision} > 0`),
+  check("document_scope_target", sql`(${t.scopeType} = 'project' and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 0) or (${t.scopeType} = 'task' and ${t.taskId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'module' and ${t.moduleId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'feature' and ${t.featureId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1)`),
 ]);
 
 export const commentOutbox = pgTable(

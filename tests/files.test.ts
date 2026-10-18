@@ -107,7 +107,7 @@ test("archivos privados: publicación, pegado antes de crear, referencias, lími
         projectId,
         name: "large.pdf",
         size: 10485761,
-        purpose: "document",
+        purpose: "file",
       }),
       { status: 413 },
     );
@@ -123,7 +123,7 @@ test("archivos privados: publicación, pegado antes de crear, referencias, lími
       projectId,
       name: "fake.pdf",
       size: png.length,
-      purpose: "document",
+      purpose: "file",
     });
     await manager.put(
       owner,
