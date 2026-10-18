@@ -7,7 +7,7 @@ import { SearchParamsContext } from "next/dist/shared/lib/hooks-client-context.s
 import { WorkspaceApp } from "../src/components/workspace-app";
 import type { Workspace } from "../src/lib/types";
 test("el proyecto renderiza snapshots anteriores sin los catálogos de tipos e impactos", () => {
-  const legacy: Omit<Workspace, "taskTypes" | "impacts"> = {
+  const legacy: Omit<Workspace, "taskTypes" | "impacts" | "clients"> = {
     currentUser: {
       id: "admin",
       name: "Admin",

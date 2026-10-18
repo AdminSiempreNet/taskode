@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { commandSchema } from "@/lib/validation";
 import { repository } from "@/server";
 import { DomainError, isDomainError } from "@/server/repository";
+import { deliverCommentEvents } from "@/server/comment-http";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     const result = await repository().execute(parsed.data, actor);
+    if (parsed.data.type.startsWith("comment.")) deliverCommentEvents();
     return NextResponse.json({
       workspace: await repository().getWorkspace(actor),
       ...result,

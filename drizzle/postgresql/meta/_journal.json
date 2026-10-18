@@ -8,6 +8,34 @@
       "when": 1792203452951,
       "tag": "0000_postgresql_initial",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792219066442,
+      "tag": "0001_global_clients",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792221258296,
+      "tag": "0002_task_sharing",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792292692163,
+      "tag": "0003_task_leader_and_team",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792293756894,
+      "tag": "0004_comment_realtime",
+      "breakpoints": true
     }
   ]
 }

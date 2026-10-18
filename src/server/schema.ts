@@ -134,6 +134,7 @@ export const installation = pgTable(
     adminId: text().references(() => user.id),
     onboardingStep: integer().notNull().default(0),
     firstProjectId: text(),
+    maxAttachmentBytes: integer().notNull().default(10485760),
   },
   (t) => [check("single_installation", sql`${t.id} = 1`)],
 );
@@ -200,6 +201,9 @@ export const modules = pgTable(
   "modules",
   {
     id: text().primaryKey(),
+    ownerId: text()
+      .notNull()
+      .references(() => user.id),
     projectId: text()
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
@@ -213,6 +217,9 @@ export const features = pgTable(
   "features",
   {
     id: text().primaryKey(),
+    ownerId: text()
+      .notNull()
+      .references(() => user.id),
     projectId: text()
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
@@ -309,6 +316,10 @@ export const tasks = pgTable(
   "tasks",
   {
     id: text().primaryKey(),
+    createdById: text().references(() => user.id),
+    leaderId: text()
+      .notNull()
+      .references(() => user.id),
     projectId: text()
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
@@ -387,6 +398,7 @@ export const comments = pgTable(
   "comments",
   {
     id: text().primaryKey(),
+    authorId: text().references(() => user.id),
     taskId: text()
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
@@ -424,7 +436,113 @@ export const accountRelations = relations(account, ({ one }) => ({
   user: one(user, { fields: [account.userId], references: [user.id] }),
 }));
 
+export const departments = pgTable("departments", {
+  id: text().primaryKey(),
+  name: text().notNull(),
+});
+export const cities = pgTable(
+  "cities",
+  {
+    id: text().primaryKey(),
+    departmentId: text()
+      .notNull()
+      .references(() => departments.id),
+    name: text().notNull(),
+    kind: text().notNull(),
+  },
+  (t) => [index("city_department").on(t.departmentId)],
+);
+export const clients = pgTable(
+  "clients",
+  {
+    id: text().primaryKey(),
+    name: text().notNull(),
+    normalizedName: text().notNull(),
+    cityId: text()
+      .notNull()
+      .references(() => cities.id),
+    createdAt: text().notNull(),
+    updatedAt: text().notNull(),
+  },
+  (t) => [uniqueIndex("client_name_city").on(t.normalizedName, t.cityId)],
+);
+export const taskClients = pgTable(
+  "task_clients",
+  {
+    taskId: text()
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    clientId: text()
+      .notNull()
+      .references(() => clients.id, { onDelete: "restrict" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.taskId, t.clientId] }),
+    index("task_client_client").on(t.clientId),
+  ],
+);
+
+export const taskTeamMembers = pgTable(
+  "task_team_members",
+  {
+    taskId: text()
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.taskId, t.userId] }),
+    index("team_member_user").on(t.userId),
+  ],
+);
+
+export const files = pgTable(
+  "files",
+  {
+    id: text().primaryKey(),
+    projectId: text()
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    taskId: text().references(() => tasks.id, { onDelete: "cascade" }),
+    uploadedBy: text()
+      .notNull()
+      .references(() => user.id),
+    name: text().notNull(),
+    mimeType: text().notNull(),
+    size: integer().notNull(),
+    storageKey: text().notNull(),
+    status: text().notNull().default("pending"),
+    purpose: text().notNull().default("document"),
+    createdAt: text().notNull(),
+  },
+  (t) => [
+    index("file_task").on(t.taskId),
+    index("file_pending").on(t.status, t.createdAt),
+  ],
+);
+
+// Delivery state is operational data, deliberately excluded from JSON backups.
+export const commentOutbox = pgTable(
+  "comment_outbox",
+  {
+    taskId: text().primaryKey(),
+    eventId: text().notNull().default(sql`gen_random_uuid()::text`),
+    attempts: integer().notNull().default(0),
+    availableAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    leaseUntil: timestamp({ withTimezone: true }),
+  },
+  (t) => [index("comment_outbox_available").on(t.availableAt)],
+);
+
 export const domainTables = {
+  task_team_members: taskTeamMembers,
+  files,
+  departments,
+  cities,
+  clients,
+  task_clients: taskClients,
   projects,
   modules,
   features,

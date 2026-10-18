@@ -36,6 +36,7 @@ services:
     environment:
       DATABASE_URL: postgresql://${TASKODE_DB_USER:-taskode}:${TASKODE_DB_PASSWORD:?Required}@postgres:5432/${POSTGRES_DB:-taskode}
       BACKUP_DIR: /app/backups
+      ATTACHMENT_DIR: /app/attachments
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:?Required}
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?Required}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
@@ -44,6 +45,8 @@ services:
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      ABLY_API_KEY: ${ABLY_API_KEY:-}
+      ABLY_CHANNEL_NAMESPACE: ${ABLY_CHANNEL_NAMESPACE:-taskode-development}
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,9 +54,12 @@ services:
         condition: service_completed_successfully
     volumes:
       - taskode-backups:/app/backups
+      - taskode-attachments:/app/attachments
     restart: unless-stopped
 volumes:
   taskode-postgres:
     name: ${TASKODE_POSTGRES_VOLUME:-${COMPOSE_PROJECT_NAME:-tareas}_taskode-postgres}
   taskode-backups:
     name: ${TASKODE_BACKUP_VOLUME:-${COMPOSE_PROJECT_NAME:-tareas}_taskode-backups}
+  taskode-attachments:
+    name: ${TASKODE_ATTACHMENT_VOLUME:-${COMPOSE_PROJECT_NAME:-tareas}_taskode-attachments}

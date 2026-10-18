@@ -45,7 +45,8 @@ type Section =
   | "taskTypes"
   | "impacts"
   | "labels"
-  | "appearance";
+  | "appearance"
+  | "general";
 const catalogKinds = {
   priorities: "priority",
   taskTypes: "taskType",
@@ -59,6 +60,11 @@ const catalogNouns = {
   label: { singular: "etiqueta", article: "la", fresh: "Nueva etiqueta" },
 } as const;
 const sections = {
+  general: {
+    title: "General",
+    description: "Opciones globales de la aplicación.",
+    icon: Settings2,
+  },
   statuses: {
     title: "Estados del proyecto",
     description:
@@ -187,6 +193,15 @@ export function SettingsModal({
             <Palette size={17} />
             <span>Apariencia</span>
           </button>
+          {workspace.currentUser.role === "admin" && (
+            <button
+              aria-current={section === "general" ? "page" : undefined}
+              onClick={() => setSection("general")}
+            >
+              <Settings2 size={17} />
+              <span>General</span>
+            </button>
+          )}
         </nav>
         <section className="settings-content" aria-label={current.title}>
           <header>
@@ -203,44 +218,86 @@ export function SettingsModal({
               busy={busy}
             />
           )}
-          {section !== "statuses" && section !== "appearance" && project && (
-            <div className="form-stack settings-editor" key={section}>
-              <p className="info-note">
-                {section === "labels"
-                  ? "Las etiquetas se comparten dentro de este proyecto. Al renombrar una etiqueta se actualizan sus tareas; al eliminarla se retira de ellas."
-                  : "Los cambios de nombre y color se reflejan en todas las tareas. Para eliminar una opción, cambia o quita antes su asignación en las tareas que la usan, incluidas las archivadas."}
-              </p>
-              <div
-                className="status-editor"
-                role="region"
-                aria-label={`Lista de ${sections[section].title.toLocaleLowerCase("es")}`}
-                tabIndex={0}
-              >
-                {(workspace[section] ?? [])
-                  .filter((option) => option.projectId === project.id)
-                  .map((option) => (
-                    <OptionRow
-                      key={option.id}
-                      option={option}
-                      kind={catalogKinds[section]}
-                      projectId={project.id}
-                      mutate={mutate}
-                      busy={busy}
-                      confirm={confirm}
-                    />
-                  ))}
+          {section !== "statuses" &&
+            section !== "appearance" &&
+            section !== "general" &&
+            project && (
+              <div className="form-stack settings-editor" key={section}>
+                <p className="info-note">
+                  {section === "labels"
+                    ? "Las etiquetas se comparten dentro de este proyecto. Al renombrar una etiqueta se actualizan sus tareas; al eliminarla se retira de ellas."
+                    : "Los cambios de nombre y color se reflejan en todas las tareas. Para eliminar una opción, cambia o quita antes su asignación en las tareas que la usan, incluidas las archivadas."}
+                </p>
+                <div
+                  className="status-editor"
+                  role="region"
+                  aria-label={`Lista de ${sections[section].title.toLocaleLowerCase("es")}`}
+                  tabIndex={0}
+                >
+                  {(workspace[section] ?? [])
+                    .filter((option) => option.projectId === project.id)
+                    .map((option) => (
+                      <OptionRow
+                        key={option.id}
+                        option={option}
+                        kind={catalogKinds[section]}
+                        projectId={project.id}
+                        mutate={mutate}
+                        busy={busy}
+                        confirm={confirm}
+                      />
+                    ))}
+                </div>
+                <OptionRow
+                  key={`new-${section}`}
+                  kind={catalogKinds[section]}
+                  projectId={project.id}
+                  mutate={mutate}
+                  busy={busy}
+                  confirm={confirm}
+                />
               </div>
-              <OptionRow
-                key={`new-${section}`}
-                kind={catalogKinds[section]}
-                projectId={project.id}
-                mutate={mutate}
-                busy={busy}
-                confirm={confirm}
-              />
-            </div>
-          )}
+            )}
           {section === "appearance" && <Appearance />}
+          {section === "general" && workspace.currentUser.role === "admin" && (
+            <form
+              className="form-stack"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const data = new FormData(e.currentTarget);
+                if (
+                  await mutate({
+                    type: "settings.update",
+                    maxAttachmentBytes: Number(data.get("maxMB")) * 1048576,
+                  })
+                )
+                  toast.success("Configuración guardada.");
+              }}
+            >
+              <label htmlFor="attachment-limit">
+                Tamaño máximo por archivo (MB)
+              </label>
+              <Input
+                id="attachment-limit"
+                name="maxMB"
+                type="number"
+                min={1}
+                max={100}
+                step={1}
+                defaultValue={
+                  (workspace.settings?.maxAttachmentBytes ?? 10485760) / 1048576
+                }
+                required
+              />
+              <p className="field-hint">
+                Entre 1 y 100 MB. Se aplica a documentos e imágenes pegadas. Los
+                archivos existentes se conservan.
+              </p>
+              <Button disabled={busy} type="submit">
+                Guardar configuración
+              </Button>
+            </form>
+          )}
         </section>
       </DialogContent>
     </Dialog>

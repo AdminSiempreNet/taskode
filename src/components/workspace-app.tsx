@@ -1,15 +1,18 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import {
   Archive,
   ArrowLeft,
   DatabaseBackup,
   ArrowUpRight,
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleHelp,
+  FolderKanban,
   Layers3,
   LayoutGrid,
   List,
@@ -54,12 +57,19 @@ import { ProjectCatalog } from "./project-catalog";
 import { SettingsModal } from "./settings-modal";
 import { BackupModal } from "./backup-modal";
 import { TaskDetail, type TaskDefaults } from "./task-detail";
+import { ClientsManager } from "./clients-manager";
 import { AccountMenu, ProfileModal } from "./account-menu";
 import { UsersModal } from "./invitation-manager";
 import { ProjectPeopleModal } from "./project-people";
 import { CatalogFilter, useProjectFilter } from "./status-filter";
-import { matchesTaskFilters } from "@/lib/task-filters";
+import { MINE_FILTER, matchesTaskFilters } from "@/lib/task-filters";
 import { readPreference } from "@/lib/preferences";
+import {
+  readProjectPreferences,
+  rememberProject,
+  saveProjectPreferences,
+  type ProjectPreferences,
+} from "@/lib/project-navigation";
 
 export function WorkspaceApp({
   initialWorkspace,
@@ -67,13 +77,16 @@ export function WorkspaceApp({
   taskId = "",
   taskDefaults,
   initialTaskCreation,
+  menuSection,
 }: {
   initialWorkspace: Workspace;
   projectId?: string;
   taskId?: string;
   taskDefaults?: TaskDefaults;
   initialTaskCreation?: TaskDefaults;
+  menuSection?: "dashboard" | "clients";
 }) {
+  const menuMode = !!menuSection;
   const router = useRouter();
   const searchParams = useSearchParams();
   const view = getProjectView(searchParams.get("view"));
@@ -81,6 +94,11 @@ export function WorkspaceApp({
     initialWorkspace,
   );
   const [featureId, setFeatureId] = useState("all");
+  const [projectPreferences, setProjectPreferences] =
+    useState<ProjectPreferences>({
+      favorites: [],
+      recent: [],
+    });
   const [search, setSearch] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -120,15 +138,20 @@ export function WorkspaceApp({
       if (!r.ok) throw new Error("No se pudo cargar tu espacio.");
       const w: Workspace = await r.json();
       setWorkspace(w);
-      if (!w.projects.some((project) => project.id === projectId)) {
-        const destination = w.projects[0] ? projectPath(w.projects[0].id) : "/projects";
+      if (
+        !menuMode &&
+        !w.projects.some((project) => project.id === projectId)
+      ) {
+        const destination = w.projects[0]
+          ? projectPath(w.projects[0].id)
+          : "/projects";
         if (projectId || w.projects.length)
           router.replace(destination, { scroll: false });
       }
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Error de conexión.");
     }
-  }, [projectId, router]);
+  }, [projectId, router, menuMode]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -185,9 +208,12 @@ export function WorkspaceApp({
           projectId &&
           !w.projects.some((project) => project.id === projectId)
         ) {
-          router.replace(w.projects[0] ? projectPath(w.projects[0].id) : "/projects", {
-            scroll: false,
-          });
+          router.replace(
+            w.projects[0] ? projectPath(w.projects[0].id) : "/projects",
+            {
+              scroll: false,
+            },
+          );
         }
         setFeatureId((current) =>
           current === "all" || w.features.some((f) => f.id === current)
@@ -210,6 +236,32 @@ export function WorkspaceApp({
     [projectId, router],
   );
   const project = workspace?.projects.find((p) => p.id === projectId);
+  const currentUserId = workspace?.currentUser.id;
+  const activeProjectId = project?.id;
+  useEffect(() => {
+    if (!currentUserId) return;
+    const preferences = readProjectPreferences(currentUserId);
+    if (activeProjectId) {
+      preferences.recent = [
+        activeProjectId,
+        ...preferences.recent.filter((id) => id !== activeProjectId),
+      ].slice(0, 100);
+      rememberProject(currentUserId, activeProjectId);
+      saveProjectPreferences(currentUserId, preferences);
+    }
+    setProjectPreferences(preferences);
+  }, [currentUserId, activeProjectId]);
+  function toggleProjectFavorite(id: string) {
+    if (!currentUserId) return;
+    const next = {
+      ...projectPreferences,
+      favorites: projectPreferences.favorites.includes(id)
+        ? projectPreferences.favorites.filter((favoriteId) => favoriteId !== id)
+        : [...projectPreferences.favorites, id],
+    };
+    setProjectPreferences(next);
+    saveProjectPreferences(currentUserId, next);
+  }
   const canManageProject =
     !!workspace &&
     (workspace.currentUser.role === "admin" ||
@@ -226,7 +278,8 @@ export function WorkspaceApp({
     workspace?.taskTypes?.filter((option) => option.projectId === projectId) ??
     [];
   const impacts =
-    workspace?.impacts?.filter((option) => option.projectId === projectId) ?? [];
+    workspace?.impacts?.filter((option) => option.projectId === projectId) ??
+    [];
   const [selectedStatusIds, setStatusIds] = useProjectFilter(
     projectId,
     "status",
@@ -244,7 +297,28 @@ export function WorkspaceApp({
     impacts,
     true,
   );
+  const userOptions = [
+    { id: MINE_FILTER, name: "Mías", color: "#0d9488" },
+    ...(workspace?.people ?? [])
+      .filter((p) => p.projectId === projectId)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        email: p.email,
+        image: p.image,
+        color: "#64748b",
+      })),
+  ];
+  const [selectedUserIds, setUserIds] = useProjectFilter(
+    `${currentUserId ?? ""}.${projectId}`,
+    "user",
+    userOptions,
+    false,
+    [MINE_FILTER],
+  );
   const hasCategoryFilters =
+    selectedUserIds.length !== 1 ||
+    selectedUserIds[0] !== MINE_FILTER ||
     selectedStatusIds.length > 0 ||
     selectedTypeIds.length > 0 ||
     selectedImpactIds.length > 0;
@@ -256,6 +330,8 @@ export function WorkspaceApp({
       t.archived === archived &&
       (featureId === "all" || t.featureId === featureId) &&
       matchesTaskFilters(t, {
+        userIds: selectedUserIds,
+        currentUserId,
         statusIds: selectedStatusIds,
         typeIds: selectedTypeIds,
         impactIds: selectedImpactIds,
@@ -351,53 +427,129 @@ export function WorkspaceApp({
           onMobileOpenChange={setMobileSidebarOpen}
           triggerRef={sidebarTrigger}
         >
-          <ProjectSelector
-            projects={workspace?.projects ?? []}
-            project={project}
-            loading={!workspace}
-            disabled={busy}
-            onSelect={selectProject}
-            onCreate={() => setModal({ type: "project" })}
-          />
+          <div className="sidebar-navigation">
+            <div
+              className="view-tabs sidebar-tabs"
+              role="group"
+              aria-label="Secciones del espacio"
+            >
+              <button
+                type="button"
+                className={`sidebar-menu-button ${menuMode ? "active-view" : ""}`}
+                aria-label="Menú"
+                title="Menú"
+                aria-pressed={menuMode}
+                disabled={busy}
+                onClick={() => {
+                  if (menuMode) return;
+                  setMobileSidebarOpen(false);
+                  router.push("/dashboard", { scroll: false });
+                }}
+              >
+                <Menu size={16} aria-hidden="true" />
+              </button>
+              <ProjectSelector
+                projects={workspace?.projects ?? []}
+                project={project}
+                preferences={projectPreferences}
+                loading={!workspace}
+                disabled={busy}
+                onSelect={selectProject}
+                onToggleFavorite={toggleProjectFavorite}
+                onCreate={() => setModal({ type: "project" })}
+              >
+                <button
+                  type="button"
+                  className={`sidebar-project-button ${!menuMode ? "active-view" : ""}`}
+                  aria-pressed={!menuMode}
+                  disabled={busy || !workspace}
+                  title={
+                    project
+                      ? `Cambiar proyecto. Actual: ${project.name}`
+                      : "Seleccionar proyecto"
+                  }
+                >
+                  <span className="sidebar-project-icon" aria-hidden="true">
+                    {!menuMode && project?.icon ? (
+                      project.icon
+                    ) : (
+                      <FolderKanban size={16} />
+                    )}
+                  </span>
+                  <span className="sidebar-project-label">
+                    {!menuMode && project ? project.name : "Proyectos"}
+                  </span>
+                  <ChevronDown size={13} aria-hidden="true" />
+                </button>
+              </ProjectSelector>
+            </div>
+          </div>
           <div className="sidebar-panel">
-            <FeatureSidebar
-              key={projectId}
-              projectId={project?.id}
-              features={features}
-              taskTypes={taskTypes}
-              modules={
-                workspace?.modules.filter(
-                  (module) => module.projectId === projectId,
-                ) ?? []
-              }
-              selectedId={featureId}
-              counts={Object.fromEntries(
-                features.map((feature) => [
-                  feature.id,
-                  active.filter((task) => task.featureId === feature.id).length,
-                ]),
-              )}
-              busy={busy}
-              select={(id) => {
-                setFeatureId(id);
-                setMobileSidebarOpen(false);
-                if (taskId) router.push(projectPath(projectId, view));
-              }}
-              createFeature={() => setModal({ type: "feature" })}
-              createModule={() => setModal({ type: "module" })}
-              createTask={(typeId) =>
-                setModal({
-                  type: "task",
-                  defaults: {
-                    typeId,
-                    featureId: selectedFeature?.id ?? selectedTask?.featureId,
-                  },
-                })
-              }
-              edit={(feature) => setModal({ type: "feature", feature })}
-              editModule={(module) => setModal({ type: "module", module })}
-              mutate={mutate}
-            />
+            {project ? (
+              <FeatureSidebar
+                canReorder={canManageProject}
+                key={projectId}
+                projectId={project?.id}
+                features={features}
+                taskTypes={taskTypes}
+                modules={
+                  workspace?.modules.filter(
+                    (module) => module.projectId === projectId,
+                  ) ?? []
+                }
+                selectedId={featureId}
+                counts={Object.fromEntries(
+                  features.map((feature) => [
+                    feature.id,
+                    active.filter((task) => task.featureId === feature.id)
+                      .length,
+                  ]),
+                )}
+                busy={busy}
+                select={(id) => {
+                  setFeatureId(id);
+                  setMobileSidebarOpen(false);
+                  if (taskId) router.push(projectPath(projectId, view));
+                }}
+                createFeature={() => setModal({ type: "feature" })}
+                createModule={() => setModal({ type: "module" })}
+                createTask={(typeId) =>
+                  setModal({
+                    type: "task",
+                    defaults: {
+                      typeId,
+                      featureId: selectedFeature?.id ?? selectedTask?.featureId,
+                    },
+                  })
+                }
+                edit={(feature) => setModal({ type: "feature", feature })}
+                editModule={(module) => setModal({ type: "module", module })}
+                mutate={mutate}
+              />
+            ) : menuMode ? (
+              <nav className="application-menu" aria-label="Menú principal">
+                <Link
+                  href="/dashboard"
+                  className="nav-item"
+                  aria-current={
+                    menuSection === "dashboard" ? "page" : undefined
+                  }
+                  onClick={() => setMobileSidebarOpen(false)}
+                >
+                  <LayoutGrid size={17} />
+                  Dashboard
+                </Link>
+                <Link
+                  href="/clients"
+                  className="nav-item"
+                  aria-current={menuSection === "clients" ? "page" : undefined}
+                  onClick={() => setMobileSidebarOpen(false)}
+                >
+                  <Users size={17} />
+                  Clientes
+                </Link>
+              </nav>
+            ) : null}
             <div className="sidebar-bottom">
               {workspace && (
                 <AccountMenu
@@ -436,6 +588,17 @@ export function WorkspaceApp({
                 <Loader2 className="animate-spin" />
                 <span>Preparando tu espacio…</span>
               </div>
+            ) : menuMode ? (
+              menuSection === "clients" ? (
+                <ClientsManager
+                  clients={workspace.clients ?? []}
+                  mutate={mutate}
+                  busy={busy}
+                  confirm={setConfirmation}
+                />
+              ) : (
+                <h1 className="sr-only">Dashboard</h1>
+              )
             ) : !project ? (
               <Empty
                 icon={<Code2 />}
@@ -525,26 +688,34 @@ export function WorkspaceApp({
                       ))}
                     </div>
                   </div>
+                  <div className="search-field">
+                    <Search size={15} />
+                    <Input
+                      aria-label="Buscar tareas"
+                      placeholder="Buscar tareas…"
+                      title="Buscar por título, descripción, etiquetas o número de ticket"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                    {search && (
+                      <button
+                        aria-label="Limpiar búsqueda"
+                        onClick={() => setSearch("")}
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
                   <div className="view-tools">
-                    <div className="search-field">
-                      <Search size={15} />
-                      <Input
-                        aria-label="Buscar tareas"
-                        placeholder="Buscar tareas…"
-                        title="Buscar por título, descripción, etiquetas o número de ticket"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                      />
-                      {search && (
-                        <button
-                          aria-label="Limpiar búsqueda"
-                          onClick={() => setSearch("")}
-                        >
-                          <X size={13} />
-                        </button>
-                      )}
-                    </div>
                     <div className="task-filters">
+                      <CatalogFilter
+                        category="usuarios"
+                        allLabel="Todos los usuarios"
+                        shortLabel="Usuarios"
+                        options={userOptions}
+                        selectedIds={selectedUserIds}
+                        onChange={setUserIds}
+                      />
                       <CatalogFilter
                         category="estados"
                         allLabel="Todos los estados"
@@ -679,6 +850,7 @@ export function WorkspaceApp({
                           className="clear-filters"
                           onClick={() => {
                             setSearch("");
+                            setUserIds([MINE_FILTER]);
                             setStatusIds([]);
                             setTypeIds([]);
                             setImpactIds([]);

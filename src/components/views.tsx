@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "./markdown-content";
+import { TaskPeopleSummary } from "./task-people";
 import type { Feature, Status, Task } from "@/lib/types";
 import {
   LabelChip,
@@ -94,6 +95,10 @@ function CardContent({
         )}
       </div>
       <h3>{task.title}</h3>
+      <TaskPeopleSummary
+        leader={task.leader}
+        teamMembers={task.teamMembers}
+      />
       {task.description && (
         <div className="card-description">
           <MarkdownContent compact>{task.description}</MarkdownContent>
@@ -718,6 +723,10 @@ export function ListView({
                           )}
                           {t.title}
                         </button>
+                        <TaskPeopleSummary
+                          leader={t.leader}
+                          teamMembers={t.teamMembers}
+                        />
                         {t.labels.length > 0 && (
                           <div className="table-labels">
                             {t.labels.map((l, i) => (

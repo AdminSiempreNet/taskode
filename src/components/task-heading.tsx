@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Check, ChevronDown, Plus, Search, Tags, X } from "lucide-react";
-import { Popover } from "radix-ui";
+import { Check, Plus, Search, Tags } from "lucide-react";
+import { Popover, Tooltip } from "radix-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LabelChip, colorStyle, useProjectCatalog } from "./project-catalog";
+import { colorStyle, useProjectCatalog } from "./project-catalog";
 import type { Mutate } from "./forms";
 
 export function InlineTaskTitle({
@@ -114,19 +114,34 @@ export function TaskLabelPicker({
   }, [active, open, listId, filtered]);
   return (
     <div className="task-title-labels" aria-label="Etiquetas de la tarea">
-      <div className="selected-labels">
-        {selected.map((name) => (
-          <button
-            key={name}
-            type="button"
-            onClick={() => toggle(name)}
-            aria-label={`Quitar etiqueta ${name}`}
-          >
-            <LabelChip name={name} />
-            <X size={12} />
-          </button>
-        ))}
-      </div>
+      <Tooltip.Provider delayDuration={200}>
+        <div className="selected-labels">
+          {selected.map((name) => (
+            <Tooltip.Root key={name}>
+              <Tooltip.Trigger asChild>
+                <span
+                  className="task-label-dot"
+                  style={colorStyle(
+                    labels.find((label) => label.name === name)?.color,
+                  )}
+                  role="img"
+                  aria-label={name}
+                  tabIndex={0}
+                />
+              </Tooltip.Trigger>
+              <Tooltip.Portal>
+                <Tooltip.Content
+                  className="task-label-tooltip"
+                  sideOffset={6}
+                  collisionPadding={12}
+                >
+                  {name}
+                </Tooltip.Content>
+              </Tooltip.Portal>
+            </Tooltip.Root>
+          ))}
+        </div>
+      </Tooltip.Provider>
       <Popover.Root
         open={open}
         onOpenChange={(value) => {
@@ -140,14 +155,14 @@ export function TaskLabelPicker({
         <Popover.Trigger asChild>
           <Button
             type="button"
-            variant="outline"
-            size="sm"
+            variant="ghost"
+            size="icon-sm"
             className="label-combobox-trigger"
-            aria-label="Seleccionar etiquetas"
+            aria-label="Agregar o quitar etiquetas"
+            title="Agregar o quitar etiquetas"
+            disabled={busy}
           >
-            <Tags size={15} />
-            <span>Etiquetas</span>
-            <ChevronDown size={13} />
+            <Tags size={15} aria-hidden="true" />
           </Button>
         </Popover.Trigger>
         <Popover.Portal>

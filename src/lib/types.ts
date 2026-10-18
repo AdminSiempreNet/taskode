@@ -28,6 +28,40 @@ export interface TaskComment {
   content: string;
   createdAt: string;
   updatedAt: string;
+  authorId?: string | null;
+  author?: UserSummary | null;
+  canEdit?: boolean;
+  canDelete?: boolean;
+}
+export interface TaskCommentsSnapshot {
+  comments: TaskComment[];
+  permissions: TaskPermissions;
+  realtime: { enabled: boolean; channel: string | null };
+}
+export interface UserSummary {
+  id: string;
+  name: string;
+  image: string | null;
+}
+export interface ProjectPerson extends UserSummary {
+  projectId: string;
+  email: string;
+}
+export interface TaskFile {
+  id: string;
+  projectId: string;
+  taskId: string | null;
+  name: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+  purpose: string;
+}
+export interface TaskPermissions {
+  canEdit: boolean;
+  canManageAccess: boolean;
+  canDelete: boolean;
+  canModerateComments: boolean;
 }
 export interface TaskStatusChange {
   id: number;
@@ -55,6 +89,8 @@ export interface ProjectModule {
   name: string;
   description: string;
   position: number;
+  ownerId?: string;
+  canManage?: boolean;
 }
 export interface Feature {
   id: string;
@@ -65,6 +101,8 @@ export interface Feature {
   description: string;
   position: number;
   pinned: boolean;
+  ownerId?: string;
+  canManage?: boolean;
 }
 export interface Status {
   id: string;
@@ -92,11 +130,19 @@ export interface Task {
   archived: boolean;
   position: number;
   labels: string[];
+  clientIds: string[];
   createdAt: string;
   updatedAt: string;
   checklists: Checklist[];
   comments: TaskComment[];
   statusHistory: TaskStatusChange[];
+  createdById?: string | null;
+  leaderId?: string;
+  teamMemberIds?: string[];
+  leader?: UserSummary;
+  teamMembers?: UserSummary[];
+  permissions?: TaskPermissions;
+  files?: TaskFile[];
 }
 export interface Workspace {
   currentUser: CurrentUser;
@@ -110,6 +156,33 @@ export interface Workspace {
   taskTypes: ProjectTaskType[];
   impacts: ProjectImpact[];
   labels: ProjectLabel[];
+  clients: Client[];
+  people?: ProjectPerson[];
+  settings?: { maxAttachmentBytes: number };
+}
+export interface Department {
+  id: string;
+  name: string;
+}
+export interface City {
+  id: string;
+  departmentId: string;
+  name: string;
+  kind: string;
+}
+export interface Geography {
+  departments: Department[];
+  cities: City[];
+}
+export interface Client {
+  id: string;
+  name: string;
+  cityId: string;
+  cityName: string;
+  departmentId: string;
+  departmentName: string;
+  createdAt: string;
+  updatedAt: string;
 }
 export interface Actor {
   id: string;

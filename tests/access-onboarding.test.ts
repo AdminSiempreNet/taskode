@@ -174,6 +174,9 @@ test("permisos: proyectos privados, participación, administración global y tra
       repo.execute({ type: "project.update", id: p, ...fields }, owner),
       { status: 403 },
     );
+    await assert.rejects(repo.execute({ type: "project.member.remove", projectId: p, userId: member.id }, stranger), { status: 409 });
+    await repo.execute({ type: "task.assignment.update", id: taskId!, leaderId: stranger.id, teamMemberIds: [] }, stranger);
+    await repo.execute({ type: "module.transferOwnership", id: moduleId!, userId: stranger.id }, stranger);
     await repo.execute(
       { type: "project.member.remove", projectId: p, userId: member.id },
       stranger,

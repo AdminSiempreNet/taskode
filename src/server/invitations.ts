@@ -1,7 +1,10 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { and, eq, isNull, gt } from "drizzle-orm";
+import { createElement } from "react";
+import { render, toPlainText } from "react-email";
 import { Resend } from "resend";
 import { z } from "zod";
+import InvitationEmail from "../emails/invitation";
 import type { Actor } from "../lib/types";
 import type { PostgresRepository } from "./postgres";
 import * as s from "./schema";
@@ -25,24 +28,13 @@ export async function sendInvitationEmail(data: {
     throw new Error(
       "Configura RESEND_API_KEY y RESEND_FROM_EMAIL para enviar correos.",
     );
-  const escape = (value: string) =>
-    value.replace(
-      /[&<>"']/g,
-      (c) =>
-        ({
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-          "'": "&#39;",
-        })[c]!,
-    );
+  const html = await render(createElement(InvitationEmail, data));
   const result = await new Resend(process.env.RESEND_API_KEY).emails.send({
     from: process.env.RESEND_FROM_EMAIL,
     to: data.to,
     subject: "Te han invitado a Taskode",
-    text: `${data.inviter} te invita a Taskode. Acepta con Google o GitHub usando este correo. El enlace vence en 7 días: ${data.url}`,
-    html: `<h1>Te han invitado a Taskode</h1><p>${escape(data.inviter)} te invita a colaborar.</p><p>Accede con Google o GitHub usando el correo de esta invitación.</p><p><a href="${escape(data.url)}">Aceptar invitación</a></p><p>El enlace vence en 7 días.</p>`,
+    text: toPlainText(html),
+    html,
   });
   if (result.error) throw new Error(result.error.message);
 }

@@ -21,10 +21,11 @@ CMD ["node", "dist/migrate.cjs"]
 
 FROM node:24-bookworm-slim AS runner
 WORKDIR /app
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=5010 HOSTNAME=0.0.0.0 BACKUP_DIR=/app/backups TZ=America/Bogota
-RUN mkdir -p /app/backups && chown node:node /app/backups
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=5010 HOSTNAME=0.0.0.0 BACKUP_DIR=/app/backups ATTACHMENT_DIR=/app/attachments TZ=America/Bogota
+RUN mkdir -p /app/backups /app/attachments && chown node:node /app/backups /app/attachments
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/drizzle/postgresql ./drizzle/postgresql
 USER node
 EXPOSE 5010

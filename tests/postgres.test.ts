@@ -14,6 +14,7 @@ import { repository } from "../src/server";
 import { GET as health } from "../src/app/api/health/route";
 import { InvitationService } from "../src/server/invitations";
 import { projectMembers } from "../src/server/schema";
+import migrationJournal from "../drizzle/postgresql/meta/_journal.json";
 
 test("DATABASE_URL es obligatoria y TEST_DATABASE_URL no puede usar la base de desarrollo", () => {
   const previous = process.env.DATABASE_URL;
@@ -32,7 +33,7 @@ test("DATABASE_URL es obligatoria y TEST_DATABASE_URL no puede usar la base de d
   }
 });
 
-test("la instalación vacía sólo contiene el estado inicial y repetir migraciones conserva personalizaciones", async () => {
+test("la instalación vacía no contiene usuarios y repetir migraciones conserva personalizaciones", async () => {
   const repo = await createEmptyRepository();
   try {
     assert.equal(
@@ -73,7 +74,7 @@ test("la instalación vacía sólo contiene el estado inicial y repetir migracio
           "select count(*)::int as n from __drizzle_migrations",
         )
       ).rows[0].n,
-      1,
+      migrationJournal.entries.length,
     );
   } finally {
     await repo.close();

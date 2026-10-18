@@ -4,7 +4,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getProjectView, taskPath } from "@/lib/routes";
 import { FeatureCombobox } from "./feature-combobox";
 import { CatalogCombobox } from "./catalog-combobox";
+import { ClientPicker } from "./client-picker";
 import { formatFeatureNumber } from "@/lib/features";
+import { ScopeOwner } from "./scope-owner";
+import type { UserSummary } from "@/lib/types";
+import { TaskPeopleFields } from "./task-people";
+import { uploadFile } from "@/lib/file-client";
 import { DescriptionEditor } from "./description-editor";
 import { EmojiPicker } from "./emoji-picker";
 import type { TaskDefaults } from "./task-detail";
@@ -267,6 +272,13 @@ export function WorkspaceModal({
           <FeatureForm
             feature={modal.feature}
             projectId={project.id}
+            people={(workspace.people ?? []).filter(
+              (p) => p.projectId === project.id,
+            )}
+            canReorder={
+              workspace.currentUser.role === "admin" ||
+              project.ownerId === workspace.currentUser.id
+            }
             features={workspace.features.filter(
               (feature) => feature.projectId === project.id,
             )}
@@ -283,6 +295,13 @@ export function WorkspaceModal({
           <ModuleForm
             module={modal.module}
             projectId={project.id}
+            people={(workspace.people ?? []).filter(
+              (p) => p.projectId === project.id,
+            )}
+            canReorder={
+              workspace.currentUser.role === "admin" ||
+              project.ownerId === workspace.currentUser.id
+            }
             modules={workspace.modules.filter(
               (module) => module.projectId === project.id,
             )}
@@ -337,6 +356,26 @@ function TaskCreateForm({
   busy: boolean;
   close: () => void;
 }) {
+  const [leaderId, setLeaderId] = useState(workspace.currentUser.id);
+  const [teamMemberIds, setTeamMemberIds] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(0);
+  const people = (workspace.people ?? []).filter(
+    (p) => p.projectId === project.id,
+  );
+  const mayKeepAccess = () =>
+    leaderId === workspace.currentUser.id ||
+    teamMemberIds.includes(workspace.currentUser.id) ||
+    workspace.currentUser.role === "admin" ||
+    project.ownerId === workspace.currentUser.id ||
+    features.some(
+      (f) =>
+        f.id === featureId &&
+        (f.ownerId === workspace.currentUser.id ||
+          workspace.modules.some(
+            (m) =>
+              m.id === f.moduleId && m.ownerId === workspace.currentUser.id,
+          )),
+    );
   const router = useRouter();
   const view = getProjectView(useSearchParams().get("view"));
   const features = workspace.features.filter(
@@ -367,6 +406,7 @@ function TaskCreateForm({
       : "",
   );
   const [impactId, setImpactId] = useState("");
+  const [clientIds, setClientIds] = useState<string[]>([]);
   const [startDate, setStartDate] = useState(defaults.startDate ?? "");
   const [description, setDescription] = useState("");
   const [descriptionEditing, setDescriptionEditing] = useState(false);
@@ -380,12 +420,15 @@ function TaskCreateForm({
   );
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (uploading) return;
     const afterCreate = (
       (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
     )?.value;
     const data = new FormData(event.currentTarget);
     const result = await mutate({
       type: "task.create",
+      leaderId,
+      teamMemberIds,
       projectId: project.id,
       title: data.get("title"),
       description,
@@ -400,11 +443,12 @@ function TaskCreateForm({
       dueDate: dueDate || null,
       dueTime: dueDate ? dueTime || null : null,
       labels: [],
+      clientIds,
     });
     if (!result) return;
     close();
     toast.success("Tarea creada.");
-    if (afterCreate === "edit" && result.createdId)
+    if (afterCreate === "edit" && result.createdId && mayKeepAccess())
       router.push(taskPath(project.id, result.createdId, view));
   }
   return (
@@ -428,152 +472,183 @@ function TaskCreateForm({
             editing={descriptionEditing}
             setEditing={setDescriptionEditing}
             disabled={busy}
+            uploadImage={async (file) =>
+              (await uploadFile(file, project.id, undefined, "image")).url
+            }
+            onUploadingChange={setUploading}
           />
         </div>
-        <div className="task-properties-grid">
-          <Field label="Feature" htmlFor="create-task-feature">
-            <FeatureCombobox
-              id="create-task-feature"
-              name="featureId"
-              features={features}
-              modules={workspace.modules.filter(
-                (module) => module.projectId === project.id,
-              )}
-              value={featureId}
-              onChange={setFeatureId}
-              disabled={busy}
-            />
-          </Field>
-          <Field label="Estado" htmlFor="create-task-status">
-            <CatalogCombobox
-              id="create-task-status"
-              name="statusId"
-              label="Estado"
-              options={statuses}
-              value={statusId}
-              onChange={setStatusId}
-              disabled={busy}
-            />
-          </Field>
-          <Field label="Prioridad" htmlFor="create-task-priority">
-            <CatalogCombobox
-              id="create-task-priority"
-              name="priority"
-              label="Prioridad"
-              options={priorities}
-              value={priority}
-              onChange={setPriority}
-              disabled={busy}
-            />
-          </Field>
-          {(
-            [
-              {
-                field: "typeId",
-                label: "Tipo",
-                empty: "Sin tipo",
-                options: workspace.taskTypes ?? [],
-                value: typeId,
-                setValue: setTypeId,
-              },
-              {
-                field: "impactId",
-                label: "Impacto",
-                empty: "Sin impacto",
-                options: workspace.impacts ?? [],
-                value: impactId,
-                setValue: setImpactId,
-              },
-            ] as const
-          ).map(({ field, label, empty, options, value, setValue }) => (
-            <Field
-              key={field}
-              label={`${label} (opcional)`}
-              htmlFor={`create-task-${field}`}
-            >
-              <CatalogCombobox
-                id={`create-task-${field}`}
-                name={field}
-                label={label}
-                options={options.filter(
-                  (option) => option.projectId === project.id,
+        <TaskPeopleFields
+          idPrefix="create-task"
+          people={people}
+          leaderId={leaderId}
+          teamMemberIds={teamMemberIds}
+          onLeader={setLeaderId}
+          onTeamMembers={setTeamMemberIds}
+          disabled={busy}
+        />
+        <section className="task-property-section" aria-label="Propiedades">
+          <h2>Propiedades</h2>
+          <div className="task-properties-grid">
+            <Field label="Feature" htmlFor="create-task-feature">
+              <FeatureCombobox
+                id="create-task-feature"
+                name="featureId"
+                features={features}
+                modules={workspace.modules.filter(
+                  (module) => module.projectId === project.id,
                 )}
-                emptyLabel={empty}
-                value={value}
-                onChange={setValue}
+                value={featureId}
+                onChange={setFeatureId}
                 disabled={busy}
               />
             </Field>
-          ))}
-          <Field
-            label="Ticket (opcional)"
-            htmlFor="create-task-ticket"
-          >
-            <Input
-              id="create-task-ticket"
-              name="ticketNumber"
-              placeholder="Ej. 001234"
-              maxLength={100}
-              disabled={busy}
-            />
-          </Field>
-          <div className="task-schedule-group">
-            <span>
-              Inicio <small>opcional</small>
-            </span>
-            <div>
-              <Input
-                type="date"
-                aria-label="Fecha de inicio (opcional)"
-                min="1900-01-01"
-                max={dueDate || "9999-12-31"}
-                value={startDate}
-                onChange={(e) => {
-                  setStartDate(e.target.value);
-                  if (!e.target.value) setStartTime("");
-                }}
+            <Field label="Estado" htmlFor="create-task-status">
+              <CatalogCombobox
+                id="create-task-status"
+                name="statusId"
+                label="Estado"
+                options={statuses}
+                value={statusId}
+                onChange={setStatusId}
+                disabled={busy}
               />
-              <Input
-                type="time"
-                aria-label="Hora de inicio (opcional)"
-                disabled={!startDate}
-                value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+            </Field>
+            <Field label="Prioridad" htmlFor="create-task-priority">
+              <CatalogCombobox
+                id="create-task-priority"
+                name="priority"
+                label="Prioridad"
+                options={priorities}
+                value={priority}
+                onChange={setPriority}
+                disabled={busy}
               />
+            </Field>
+            {(
+              [
+                {
+                  field: "typeId",
+                  label: "Tipo",
+                  empty: "Sin tipo",
+                  options: workspace.taskTypes ?? [],
+                  value: typeId,
+                  setValue: setTypeId,
+                },
+                {
+                  field: "impactId",
+                  label: "Impacto",
+                  empty: "Sin impacto",
+                  options: workspace.impacts ?? [],
+                  value: impactId,
+                  setValue: setImpactId,
+                },
+              ] as const
+            ).map(({ field, label, empty, options, value, setValue }) => (
+              <Field
+                key={field}
+                label={`${label} (opcional)`}
+                htmlFor={`create-task-${field}`}
+              >
+                <CatalogCombobox
+                  id={`create-task-${field}`}
+                  name={field}
+                  label={label}
+                  options={options.filter(
+                    (option) => option.projectId === project.id,
+                  )}
+                  emptyLabel={empty}
+                  value={value}
+                  onChange={setValue}
+                  disabled={busy}
+                />
+              </Field>
+            ))}
+            <Field label="Ticket (opcional)" htmlFor="create-task-ticket">
+              <Input
+                id="create-task-ticket"
+                name="ticketNumber"
+                placeholder="Ej. 001234"
+                maxLength={100}
+                disabled={busy}
+              />
+            </Field>
+            <div className="task-schedule-group">
+              <span>
+                Inicio <small>opcional</small>
+              </span>
+              <div>
+                <Input
+                  type="date"
+                  aria-label="Fecha de inicio (opcional)"
+                  min="1900-01-01"
+                  max={dueDate || "9999-12-31"}
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    if (!e.target.value) setStartTime("");
+                  }}
+                />
+                <Input
+                  type="time"
+                  aria-label="Hora de inicio (opcional)"
+                  disabled={!startDate}
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="task-schedule-group">
+              <span>
+                Entrega <small>opcional</small>
+              </span>
+              <div>
+                <Input
+                  type="date"
+                  aria-label="Fecha de entrega"
+                  min={startDate || "1900-01-01"}
+                  max="9999-12-31"
+                  value={dueDate}
+                  onChange={(e) => {
+                    setDueDate(e.target.value);
+                    if (!e.target.value) setDueTime("");
+                  }}
+                />
+                <Input
+                  type="time"
+                  aria-label="Hora de entrega (opcional)"
+                  disabled={!dueDate}
+                  value={dueTime}
+                  onChange={(e) => setDueTime(e.target.value)}
+                />
+              </div>
             </div>
           </div>
-          <div className="task-schedule-group">
-            <span>
-              Entrega <small>opcional</small>
-            </span>
-            <div>
-              <Input
-                type="date"
-                aria-label="Fecha de entrega"
-                min={startDate || "1900-01-01"}
-                max="9999-12-31"
-                value={dueDate}
-                onChange={(e) => {
-                  setDueDate(e.target.value);
-                  if (!e.target.value) setDueTime("");
-                }}
-              />
-              <Input
-                type="time"
-                aria-label="Hora de entrega (opcional)"
-                disabled={!dueDate}
-                value={dueTime}
-                onChange={(e) => setDueTime(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
+        </section>
+        <section className="task-property-section" aria-label="Clientes">
+          <h2>
+            Clientes <small>Opcional</small>
+          </h2>
+          <ClientPicker
+            id="create-task-clients"
+            clients={workspace.clients ?? []}
+            values={clientIds}
+            onChange={setClientIds}
+            mutate={mutate}
+            busy={busy}
+          />
+        </section>
       </div>
       <div className="task-create-actions">
         <Button type="button" variant="ghost" disabled={busy} onClick={close}>
           Cancelar
         </Button>
-        <Button type="submit" name="afterCreate" value="close" disabled={busy}>
+        <Button
+          type="submit"
+          name="afterCreate"
+          value="close"
+          disabled={busy || uploading > 0}
+        >
           {busy ? <Loader2 className="animate-spin" /> : <Plus size={16} />}
           Crear
         </Button>
@@ -693,6 +768,8 @@ function ProjectForm({
 function FeatureForm({
   feature,
   projectId,
+  people,
+  canReorder,
   features,
   modules,
   mutate,
@@ -702,6 +779,8 @@ function FeatureForm({
 }: {
   feature?: Feature;
   projectId: string;
+  people: UserSummary[];
+  canReorder: boolean;
   features: Feature[];
   modules: ProjectModule[];
   mutate: Mutate;
@@ -740,105 +819,129 @@ function FeatureForm({
   }
   return (
     <form onSubmit={submit} className="form-stack">
-      <Field label="Nombre de la feature" htmlFor="feature-name">
-        <Input
-          id="feature-name"
-          name="name"
-          defaultValue={feature?.name}
-          placeholder="Por ejemplo, Experiencia de compra"
-          required
-          maxLength={160}
-          autoFocus
-        />
-      </Field>
-      <Field label="Descripción" htmlFor="feature-description">
-        <Textarea
-          id="feature-description"
-          name="description"
-          defaultValue={feature?.description}
-          placeholder="El objetivo de esta parte del proyecto"
-          maxLength={30000}
-        />
-      </Field>
-      <Field label="Módulo" htmlFor="feature-module">
-        <select
-          id="feature-module"
-          name="moduleId"
-          defaultValue={feature ? (feature.moduleId ?? "general") : ""}
-          required
-          disabled={busy}
-        >
-          <option value="" disabled>
-            Selecciona un módulo
-          </option>
-          <option value="general">00 · General (sin módulo)</option>
-          {modules.map((module, index) => (
-            <option key={module.id} value={module.id}>
-              {String(index + 1).padStart(2, "0")} · {module.name}
-            </option>
-          ))}
-        </select>
-      </Field>
-      {feature && (
-        <div className="feature-order">
-          <span>
-            Número de la feature{" "}
-            <strong>{formatFeatureNumber(feature.number)}</strong>
-          </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            disabled={busy || groupIndex <= 0}
-            aria-label="Mover feature hacia arriba"
-            onClick={() => reorder(-1)}
-          >
-            <ArrowUp size={15} />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            disabled={busy || groupIndex < 0 || groupIndex >= group.length - 1}
-            aria-label="Mover feature hacia abajo"
-            onClick={() => reorder(1)}
-          >
-            <ArrowDown size={15} />
-          </Button>
-        </div>
-      )}
-      <div className="dialog-actions">
-        {feature && (
-          <Button
-            variant="ghost"
-            type="button"
-            className="danger"
+      <fieldset
+        className="scope-fields"
+        disabled={busy || feature?.canManage === false}
+      >
+        <Field label="Nombre de la feature" htmlFor="feature-name">
+          <Input
+            id="feature-name"
+            name="name"
+            defaultValue={feature?.name}
+            placeholder="Por ejemplo, Experiencia de compra"
+            required
+            maxLength={160}
+            autoFocus
+          />
+        </Field>
+        <Field label="Descripción" htmlFor="feature-description">
+          <Textarea
+            id="feature-description"
+            name="description"
+            defaultValue={feature?.description}
+            placeholder="El objetivo de esta parte del proyecto"
+            maxLength={30000}
+          />
+        </Field>
+        <Field label="Módulo" htmlFor="feature-module">
+          <select
+            id="feature-module"
+            name="moduleId"
+            defaultValue={feature ? (feature.moduleId ?? "general") : ""}
+            required
             disabled={busy}
-            onClick={() =>
-              confirm({
-                title: "¿Eliminar esta feature?",
-                description: `Se eliminarán «${feature.name}» y todas sus tareas, incluidas las archivadas. Esta acción es permanente.`,
-                action: async () => {
-                  if (await mutate({ type: "feature.delete", id: feature.id }))
-                    close();
-                },
-              })
-            }
           >
-            <Trash2 />
-            Eliminar
-          </Button>
+            <option value="" disabled>
+              Selecciona un módulo
+            </option>
+            <option value="general">00 · General (sin módulo)</option>
+            {modules.map((module, index) => (
+              <option key={module.id} value={module.id}>
+                {String(index + 1).padStart(2, "0")} · {module.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        {feature && (
+          <div className="feature-order">
+            <span>
+              Número de la feature{" "}
+              <strong>{formatFeatureNumber(feature.number)}</strong>
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              disabled={busy || !canReorder || groupIndex <= 0}
+              aria-label="Mover feature hacia arriba"
+              onClick={() => reorder(-1)}
+            >
+              <ArrowUp size={15} />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              disabled={
+                busy ||
+                !canReorder ||
+                groupIndex < 0 ||
+                groupIndex >= group.length - 1
+              }
+              aria-label="Mover feature hacia abajo"
+              onClick={() => reorder(1)}
+            >
+              <ArrowDown size={15} />
+            </Button>
+          </div>
         )}
-        <Submit busy={busy}>
-          {feature ? "Guardar cambios" : "Crear feature"}
-        </Submit>
-      </div>
+        {feature && (
+          <ScopeOwner
+            kind="feature"
+            id={feature.id}
+            ownerId={feature.ownerId}
+            people={people}
+            mutate={mutate}
+            busy={busy}
+          />
+        )}
+        <div className="dialog-actions">
+          {feature && (
+            <Button
+              variant="ghost"
+              type="button"
+              className="danger"
+              disabled={busy}
+              onClick={() =>
+                confirm({
+                  title: "¿Eliminar esta feature?",
+                  description: `Se eliminarán «${feature.name}» y todas sus tareas, incluidas las archivadas. Esta acción es permanente.`,
+                  action: async () => {
+                    if (
+                      await mutate({ type: "feature.delete", id: feature.id })
+                    )
+                      close();
+                  },
+                })
+              }
+            >
+              <Trash2 />
+              Eliminar
+            </Button>
+          )}
+          <Submit busy={busy}>
+            {feature ? "Guardar cambios" : "Crear feature"}
+          </Submit>
+        </div>
+      </fieldset>
     </form>
   );
 }
 function ModuleForm({
   module,
   projectId,
+  people,
+  canReorder,
   modules,
   mutate,
   busy,
@@ -847,6 +950,8 @@ function ModuleForm({
 }: {
   module?: ProjectModule;
   projectId: string;
+  people: UserSummary[];
+  canReorder: boolean;
   modules: ProjectModule[];
   mutate: Mutate;
   busy: boolean;
@@ -875,80 +980,95 @@ function ModuleForm({
   }
   return (
     <form onSubmit={submit} className="form-stack">
-      <Field label="Nombre del módulo" htmlFor="module-name">
-        <Input
-          id="module-name"
-          name="name"
-          defaultValue={module?.name}
-          placeholder="Por ejemplo, Administración"
-          required
-          maxLength={160}
-          autoFocus
-        />
-      </Field>
-      <Field label="Descripción" htmlFor="module-description">
-        <Textarea
-          id="module-description"
-          name="description"
-          defaultValue={module?.description}
-          placeholder="Qué reúne este módulo del proyecto"
-          maxLength={30000}
-        />
-      </Field>
-      {module && (
-        <div className="module-order">
-          <span>
-            Orden del módulo{" "}
-            <strong>{String(index + 1).padStart(2, "0")}</strong>
-          </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            disabled={busy || index <= 0}
-            aria-label="Mover módulo hacia arriba"
-            onClick={() => reorder(-1)}
-          >
-            <ArrowUp size={15} />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            disabled={busy || index >= modules.length - 1}
-            aria-label="Mover módulo hacia abajo"
-            onClick={() => reorder(1)}
-          >
-            <ArrowDown size={15} />
-          </Button>
-        </div>
-      )}
-      <div className="dialog-actions">
+      <fieldset
+        className="scope-fields"
+        disabled={busy || module?.canManage === false}
+      >
+        <Field label="Nombre del módulo" htmlFor="module-name">
+          <Input
+            id="module-name"
+            name="name"
+            defaultValue={module?.name}
+            placeholder="Por ejemplo, Administración"
+            required
+            maxLength={160}
+            autoFocus
+          />
+        </Field>
+        <Field label="Descripción" htmlFor="module-description">
+          <Textarea
+            id="module-description"
+            name="description"
+            defaultValue={module?.description}
+            placeholder="Qué reúne este módulo del proyecto"
+            maxLength={30000}
+          />
+        </Field>
         {module && (
-          <Button
-            variant="ghost"
-            type="button"
-            className="danger"
-            disabled={busy}
-            onClick={() =>
-              confirm({
-                title: "¿Eliminar este módulo?",
-                description: `Se eliminará «${module.name}». Sus features pasarán a General y conservarán sus tareas.`,
-                action: async () => {
-                  if (await mutate({ type: "module.delete", id: module.id }))
-                    close();
-                },
-              })
-            }
-          >
-            <Trash2 />
-            Eliminar
-          </Button>
+          <div className="module-order">
+            <span>
+              Orden del módulo{" "}
+              <strong>{String(index + 1).padStart(2, "0")}</strong>
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              disabled={busy || !canReorder || index <= 0}
+              aria-label="Mover módulo hacia arriba"
+              onClick={() => reorder(-1)}
+            >
+              <ArrowUp size={15} />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              disabled={busy || !canReorder || index >= modules.length - 1}
+              aria-label="Mover módulo hacia abajo"
+              onClick={() => reorder(1)}
+            >
+              <ArrowDown size={15} />
+            </Button>
+          </div>
         )}
-        <Submit busy={busy}>
-          {module ? "Guardar cambios" : "Crear módulo"}
-        </Submit>
-      </div>
+        {module && (
+          <ScopeOwner
+            kind="module"
+            id={module.id}
+            ownerId={module.ownerId}
+            people={people}
+            mutate={mutate}
+            busy={busy}
+          />
+        )}
+        <div className="dialog-actions">
+          {module && (
+            <Button
+              variant="ghost"
+              type="button"
+              className="danger"
+              disabled={busy}
+              onClick={() =>
+                confirm({
+                  title: "¿Eliminar este módulo?",
+                  description: `Se eliminará «${module.name}». Sus features pasarán a General y conservarán sus tareas.`,
+                  action: async () => {
+                    if (await mutate({ type: "module.delete", id: module.id }))
+                      close();
+                  },
+                })
+              }
+            >
+              <Trash2 />
+              Eliminar
+            </Button>
+          )}
+          <Submit busy={busy}>
+            {module ? "Guardar cambios" : "Crear módulo"}
+          </Submit>
+        </div>
+      </fieldset>
     </form>
   );
 }

@@ -106,7 +106,7 @@ Conservar los callbacks de localhost para desarrollo en credenciales separadas c
 
 **Actualizaciones futuras:** una migración aplicada no se revierte si la compilación o publicación posterior falla. Además, la aplicación comprueba la versión exacta del esquema: una migración nueva puede dejar temporalmente incompatible la versión anterior mientras termina el despliegue. Respaldar, revisar SQL y planificar una ventana de mantenimiento antes de cambios de esquema; no usar el rollback del frontend como rollback de base. La primera publicación debe partir de una base inicializada/migrada y completarse antes de abrir el acceso.
 
-## Orden y responsables al desplegar
+## Orden y roles al desplegar
 
 ### Te corresponde a ti
 

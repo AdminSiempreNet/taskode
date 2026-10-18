@@ -18,6 +18,7 @@ test("Vercel: la configuración de producción se valida sin conectarse y rechaz
     GOOGLE_CLIENT_ID: "test", GOOGLE_CLIENT_SECRET: "test", BACKUP_STORAGE: "s3",
     S3_ENDPOINT: "https://example.r2.cloudflarestorage.com", S3_REGION: "auto", S3_BUCKET: "private",
     S3_ACCESS_KEY_ID: "example", S3_SECRET_ACCESS_KEY: "example", S3_PREFIX: "tareas/test/",
+    ABLY_API_KEY: "test.key:example", ABLY_CHANNEL_NAMESPACE: "taskode-production",
   };
   const check = (overrides: Record<string, string> = {}) => spawnSync(process.execPath, ["--import", "tsx", "scripts/check-production.ts"], { env: { ...env, ...overrides }, encoding: "utf8", windowsHide: true });
   const valid = check();
@@ -28,6 +29,8 @@ test("Vercel: la configuración de producción se valida sin conectarse y rechaz
   assert.equal(check({ VERCEL_ENV: "preview" }).status, 1);
   assert.equal(check({ DATABASE_SSL: "disable" }).status, 1);
   assert.equal(check({ BACKUP_STORAGE: "filesystem" }).status, 1);
+  assert.equal(check({ ABLY_API_KEY: "" }).status, 1);
+  assert.equal(check({ ABLY_CHANNEL_NAMESPACE: "taskode-development" }).status, 1);
 });
 
 test("PostgreSQL: valida TLS, CA y tamaño del pool sin permitir que la URL reemplace TLS", () => {

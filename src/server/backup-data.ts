@@ -6,10 +6,16 @@ import * as schema from "./schema";
 import type { DatabaseStore } from "./database";
 import { DomainError } from "./repository";
 import { MAX_BACKUP_BYTES } from "../lib/backups";
+import divipola from "./catalogs/divipola.json";
+import { normalizeClientText } from "../lib/clients";
+import { fileTypes } from "../lib/files";
 
 // The order also defines insertion order. Sessions, verification and migration
 // metadata are deliberately not portable application data.
 export const backupTables = {
+  departments: schema.departments,
+  cities: schema.cities,
+  clients: schema.clients,
   user: schema.user,
   account: schema.account,
   installation: schema.installation,
@@ -23,6 +29,9 @@ export const backupTables = {
   impacts: schema.impacts,
   labels: schema.labels,
   tasks: schema.tasks,
+  task_clients: schema.taskClients,
+  task_team_members: schema.taskTeamMembers,
+  files: schema.files,
   checklists: schema.checklists,
   checklist_items: schema.checklistItems,
   comments: schema.comments,
@@ -32,6 +41,8 @@ export const backupTables = {
 };
 type BackupRow = Record<string, string | number | boolean | string[] | null>;
 const tableValidators: Record<string, z.ZodType> = {};
+const version3Validators: Record<string, z.ZodType> = {};
+const version2Validators: Record<string, z.ZodType> = {};
 for (const [name, table] of Object.entries(backupTables)) {
   const fields: Record<string, z.ZodType> = {};
   for (const [key, column] of Object.entries(getTableColumns(table))) {
@@ -62,17 +73,138 @@ for (const [name, table] of Object.entries(backupTables)) {
     fields[key] = column.notNull ? field : field.nullable();
   }
   tableValidators[name] = z.array(z.strictObject(fields));
+  const version3Fields = { ...fields };
+  if (name === "tasks") {
+    version3Fields.assigneeId = version3Fields.leaderId;
+    delete version3Fields.leaderId;
+  }
+  version3Validators[
+    name === "task_team_members" ? "task_collaborators" : name
+  ] = z.array(z.strictObject(version3Fields));
+  const legacyFields = { ...fields };
+  for (const key of (
+    {
+      installation: ["maxAttachmentBytes"],
+      modules: ["ownerId"],
+      features: ["ownerId"],
+      tasks: ["createdById", "leaderId"],
+      comments: ["authorId"],
+    } as Record<string, string[]>
+  )[name] ?? [])
+    delete legacyFields[key];
+  if (!["task_team_members", "files"].includes(name))
+    version2Validators[name] = z.array(z.strictObject(legacyFields));
 }
-const fileSchema = z.strictObject({
+const backupHeader = {
   // Existing backups remain restorable; all new exports use the Taskode format.
-  format: z.enum(["taskode-backup", "brote-backup"]).transform(() => "taskode-backup" as const),
-  version: z.literal(1),
+  format: z
+    .enum(["taskode-backup", "brote-backup"])
+    .transform(() => "taskode-backup" as const),
   createdAt: z.iso.datetime(),
-  tables: z.strictObject(tableValidators),
-});
+};
+const newTables = ["departments", "cities", "clients", "task_clients"];
+const legacyTableValidators = Object.fromEntries(
+  Object.entries(version2Validators).filter(
+    ([name]) => !newTables.includes(name),
+  ),
+);
+const fileSchema = z
+  .union([
+    z.strictObject({
+      ...backupHeader,
+      version: z.literal(4),
+      tables: z.strictObject(tableValidators),
+    }),
+    z.strictObject({
+      ...backupHeader,
+      version: z.literal(3),
+      tables: z.strictObject(version3Validators),
+    }),
+    z.strictObject({
+      ...backupHeader,
+      version: z.literal(2),
+      tables: z.strictObject(version2Validators),
+    }),
+    z
+      .strictObject({
+        ...backupHeader,
+        version: z.literal(1),
+        tables: z.strictObject(legacyTableValidators),
+      })
+      .transform((legacy) => ({
+        ...legacy,
+        version: 2 as const,
+        tables: {
+          ...legacy.tables,
+          departments: divipola.departments,
+          cities: divipola.cities,
+          clients: [],
+          task_clients: [],
+        },
+      })),
+  ])
+  .transform((input) => {
+    if (input.version === 4) return input;
+    if (input.version === 3) {
+      const { task_collaborators, ...tables } = input.tables as Record<
+        string,
+        Record<string, unknown>[]
+      >;
+      return {
+        ...input,
+        version: 4 as const,
+        tables: {
+          ...tables,
+          tasks: tables.tasks.map(({ assigneeId, ...task }) => ({
+            ...task,
+            leaderId: assigneeId,
+          })),
+          task_team_members: task_collaborators,
+        },
+      };
+    }
+    const tables = input.tables as Record<string, Record<string, unknown>[]>;
+    const owner = (projectId: unknown) =>
+      tables.projects.find((p) => p.id === projectId)?.ownerId;
+    return {
+      ...input,
+      version: 4 as const,
+      tables: {
+        ...tables,
+        installation: tables.installation.map((r) => ({
+          ...r,
+          maxAttachmentBytes: 10485760,
+        })),
+        modules: tables.modules.map((r) => ({
+          ...r,
+          ownerId: owner(r.projectId),
+        })),
+        features: tables.features.map((r) => ({
+          ...r,
+          ownerId: owner(r.projectId),
+        })),
+        tasks: tables.tasks.map((r) => ({
+          ...r,
+          createdById: null,
+          leaderId: owner(r.projectId),
+        })),
+        comments: tables.comments.map((r) => ({ ...r, authorId: null })),
+        task_team_members: [],
+        files: [],
+      },
+    };
+  })
+  .pipe(
+    z.strictObject({
+      format: z.literal("taskode-backup"),
+      createdAt: z.iso.datetime(),
+      version: z.literal(4),
+      tables: z.strictObject(tableValidators),
+    }),
+  );
 export type ApplicationBackup = {
   format: "taskode-backup";
-  version: 1;
+  version: 4;
   createdAt: string;
   tables: Record<string, BackupRow[]>;
 };
@@ -86,7 +218,7 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
   const parsed = fileSchema.safeParse(input);
   if (!parsed.success)
     invalid(
-      "El archivo no es un respaldo JSON compatible de Taskode (versión 1).",
+      "El archivo no es un respaldo JSON compatible de Taskode (versiones 1, 2, 3 y 4).",
     );
   const backup = parsed.data as ApplicationBackup;
   const data = backup.tables;
@@ -111,7 +243,21 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
     return indexes.get(name)!.has(JSON.stringify(values));
   };
   const references = [
+    ["cities", "departmentId", "departments"],
+    ["clients", "cityId", "cities"],
+    ["task_clients", "taskId", "tasks"],
+    ["task_clients", "clientId", "clients"],
     ["account", "userId", "user"],
+    ["modules", "ownerId", "user"],
+    ["features", "ownerId", "user"],
+    ["tasks", "createdById", "user"],
+    ["tasks", "leaderId", "user"],
+    ["comments", "authorId", "user"],
+    ["task_team_members", "taskId", "tasks"],
+    ["task_team_members", "userId", "user"],
+    ["files", "projectId", "projects"],
+    ["files", "taskId", "tasks"],
+    ["files", "uploadedBy", "user"],
     ["installation", "adminId", "user"],
     ["projects", "ownerId", "user"],
     ["project_members", "projectId", "projects"],
@@ -164,13 +310,17 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
   };
   for (const name of Object.keys(backupTables)) {
     const keys =
-      name === "priorities"
-        ? ["id", "projectId"]
-        : name === "project_members"
-          ? ["projectId", "userId"]
-          : name === "invitation_projects"
-            ? ["invitationId", "projectId"]
-            : ["id"];
+      name === "task_team_members"
+        ? ["taskId", "userId"]
+        : name === "task_clients"
+          ? ["taskId", "clientId"]
+          : name === "priorities"
+            ? ["id", "projectId"]
+            : name === "project_members"
+              ? ["projectId", "userId"]
+              : name === "invitation_projects"
+                ? ["invitationId", "projectId"]
+                : ["id"];
     unique(name, keys);
   }
   unique("user", ["email"]);
@@ -178,6 +328,29 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
   unique("features", ["projectId", "moduleId", "number"]);
   unique("tasks", ["projectId", "externalId"], false, true);
   unique("checklists", ["taskId"]);
+  unique("clients", ["normalizedName", "cityId"]);
+  for (const department of data.departments)
+    if (
+      !/^\d{2}$/.test(String(department.id)) ||
+      !String(department.name).trim()
+    )
+      invalid();
+  for (const city of data.cities)
+    if (
+      !/^\d{5}$/.test(String(city.id)) ||
+      !String(city.id).startsWith(String(city.departmentId)) ||
+      !String(city.name).trim() ||
+      !String(city.kind).trim()
+    )
+      invalid();
+  for (const client of data.clients)
+    if (
+      !String(client.name).trim() ||
+      String(client.name).length > 160 ||
+      !normalizeClientText(String(client.name)) ||
+      client.normalizedName !== normalizeClientText(String(client.name))
+    )
+      invalid();
   for (const name of [
     "statuses",
     "priorities",
@@ -239,6 +412,55 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
         invalid();
     }
   }
+  if (
+    Number(state.maxAttachmentBytes) < 1048576 ||
+    Number(state.maxAttachmentBytes) > 104857600
+  )
+    invalid();
+  const isParticipant = (projectId: unknown, userId: unknown) =>
+    data.user.some((u) => u.id === userId && u.role === "admin") ||
+    data.projects.some((p) => p.id === projectId && p.ownerId === userId) ||
+    data.project_members.some(
+      (m) => m.projectId === projectId && m.userId === userId,
+    );
+  for (const row of [...data.modules, ...data.features])
+    if (!isParticipant(row.projectId, row.ownerId)) invalid();
+  for (const task of data.tasks)
+    if (!isParticipant(task.projectId, task.leaderId)) invalid();
+  for (const c of data.task_team_members) {
+    const task = data.tasks.find((t) => t.id === c.taskId)!;
+    if (!isParticipant(task.projectId, c.userId) || task.leaderId === c.userId)
+      invalid();
+  }
+  for (const f of data.files) {
+    if (
+      !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(
+        String(f.id),
+      ) ||
+      f.storageKey !== f.id ||
+      !["pending", "ready", "deleted"].includes(String(f.status)) ||
+      !["document", "image"].includes(String(f.purpose)) ||
+      Number(f.size) <= 0 ||
+      Number(f.size) > 104857600
+    )
+      invalid();
+    const extension = String(f.name).split(".").at(-1)!.toLowerCase();
+    if (
+      !fileTypes[extension] ||
+      fileTypes[extension] !== f.mimeType ||
+      (f.purpose === "image" && !String(f.mimeType).startsWith("image/")) ||
+      !String(f.name).length ||
+      String(f.name).length > 180 ||
+      /[\\/\x00-\x1f\x7f]/.test(String(f.name)) ||
+      (f.status !== "ready" && f.taskId !== null)
+    )
+      invalid();
+    if (
+      f.taskId !== null &&
+      !data.tasks.some((t) => t.id === f.taskId && t.projectId === f.projectId)
+    )
+      invalid();
+  }
   return backup;
 }
 
@@ -253,7 +475,7 @@ export async function exportApplicationBackup(
   });
   const text = JSON.stringify({
     format: "taskode-backup",
-    version: 1,
+    version: 4,
     createdAt: new Date().toISOString(),
     tables,
   });
@@ -287,7 +509,7 @@ export async function restoreApplicationBackup(
   await store.restore(async () => {
     // The safety copy sees the state protected by the very same write lock.
     await beforeRestore?.();
-    const names = [...Object.keys(backupTables), "session", "verification"];
+    const names = [...Object.keys(backupTables), "session", "verification", "comment_outbox"];
     await store.db.execute(
       sql`truncate table ${sql.join(
         names.map((name) => sql.identifier(name)),

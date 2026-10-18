@@ -83,6 +83,7 @@ function task(id: string, dueTime: string | null, position = 0): Task {
     statusHistory: [],
     archived: false,
     labels: [],
+    clientIds: [],
     createdAt: "",
     updatedAt: "",
   };

@@ -4,22 +4,24 @@ import {
   useEffect,
   useRef,
   useState,
-  type CSSProperties,
   type FormEvent,
   type ReactNode,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  Archive,
+  ArchiveRestore,
   ArrowLeft,
   ArrowRight,
   Check,
   CheckSquare,
+  FileText,
   History,
-  Send,
   Layers3,
   ListChecks,
   Loader2,
   MessageSquare,
+  Paperclip,
   Pencil,
   Plus,
   Trash2,
@@ -39,17 +41,23 @@ import {
 import { Field, type Confirmation, type Mutate } from "./forms";
 import { useProjectCatalog } from "./project-catalog";
 import { CatalogCombobox } from "./catalog-combobox";
+import { ClientPicker } from "./client-picker";
 import { InlineTaskTitle, TaskLabelPicker } from "./task-heading";
 import { FeatureCombobox } from "./feature-combobox";
+import { TaskAssignments } from "./task-people";
+import { TaskDocuments } from "./task-documents";
+import { ResizableTaskPanels } from "./resizable-task-panels";
+import { TaskComments } from "./task-comments";
+import { uploadFile } from "@/lib/file-client";
 import { DescriptionEditor } from "./description-editor";
 import { useUnsavedChanges } from "./unsaved-changes";
+import { useTaskComments } from "./use-task-comments";
 import { getProjectView, projectPath, taskPath } from "@/lib/routes";
 import type {
   Checklist,
   ChecklistItem,
   Project,
   Task,
-  TaskComment,
   Workspace,
 } from "@/lib/types";
 
@@ -157,6 +165,7 @@ export function TaskDetail({
         : ""),
   );
   const [impactId, setImpactId] = useState(task?.impactId ?? "");
+  const [clientIds, setClientIds] = useState(task?.clientIds ?? []);
   const [ticketNumber, setTicketNumber] = useState(task?.ticketNumber ?? "");
   const [dueDate, setDueDate] = useState(
     task?.dueDate ?? defaults.dueDate ?? "",
@@ -170,13 +179,33 @@ export function TaskDetail({
   const [startTime, setStartTime] = useState(
     task?.startTime ?? defaults.startTime ?? "",
   );
+  const [leaderId, setLeaderId] = useState(
+    task?.leaderId ?? workspace.currentUser.id,
+  );
+  const [teamMemberIds, setTeamMemberIds] = useState(task?.teamMemberIds ?? []);
+  const assignmentSaving = useRef(false);
+  const [uploading, setUploading] = useState(0);
+  const canManage = !task || (task.permissions?.canManageAccess ?? true);
+  const people = (workspace.people ?? []).filter(
+    (p) => p.projectId === project.id,
+  );
   const [dirty, setDirty] = useState(false);
   const [descriptionEditing, setDescriptionEditing] = useState(false);
-  const [descriptionContentHeight, setDescriptionContentHeight] = useState(0);
-  const [activeTab, setActiveTab] = useState("properties");
+  const [activeTab, setActiveTab] = useState("description");
+  const [documentCount, setDocumentCount] = useState(task?.files?.length ?? 0);
+  useEffect(() => {
+    setDocumentCount(task?.files?.length ?? 0);
+  }, [task?.id, task?.files]);
   const [chatOpen, setChatOpen] = useState(false);
   const [mobileComments, setMobileComments] = useState(false);
   const [commentDraft, setCommentDraft] = useState("");
+  const conversation = useTaskComments(task, workspace.currentUser);
+  useEffect(() => {
+    if (conversation.connection === "denied") {
+      toast.error("La sesión terminó o ya no tienes acceso a esta tarea.");
+      router.replace(projectPath(project.id, view));
+    }
+  }, [conversation.connection, project.id, router, view]);
   const chatToggle = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     const media = window.matchMedia("(max-width: 900px)");
@@ -214,6 +243,56 @@ export function TaskDetail({
       previousLabels.current = task.labels;
     }
   }, [task]);
+  async function saveAssignment(
+    nextLeaderId: string,
+    nextTeamMemberIds: string[],
+  ) {
+    if (busy || assignmentSaving.current || !canManage) return false;
+    const next = nextTeamMemberIds.filter((id) => id !== nextLeaderId);
+    if (!task) {
+      setLeaderId(nextLeaderId);
+      setTeamMemberIds(next);
+      setDirty(true);
+      return true;
+    }
+    assignmentSaving.current = true;
+    try {
+      const result = await mutate({
+        type: "task.assignment.update",
+        id: task.id,
+        leaderId: nextLeaderId,
+        teamMemberIds: next,
+      });
+      if (!result) return false;
+      setLeaderId(nextLeaderId);
+      setTeamMemberIds(next);
+      return true;
+    } finally {
+      assignmentSaving.current = false;
+    }
+  }
+  async function saveClients(values: string[]) {
+    if (busy || assignmentSaving.current) return;
+    const previous = clientIds;
+    setClientIds(values);
+    if (!task) {
+      setDirty(true);
+      return;
+    }
+    assignmentSaving.current = true;
+    try {
+      if (
+        !(await mutate({
+          type: "task.clients.update",
+          id: task.id,
+          clientIds: values,
+        }))
+      )
+        setClientIds(previous);
+    } finally {
+      assignmentSaving.current = false;
+    }
+  }
   async function saveTitle(value: string) {
     const next = value.trim();
     if (!next) {
@@ -227,6 +306,7 @@ export function TaskDetail({
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (uploading) return;
     if (!title.trim()) {
       toast.error("Escribe un título para la tarea.");
       document
@@ -236,6 +316,7 @@ export function TaskDetail({
     }
     const result = await mutate({
       type: task ? "task.update" : "task.create",
+      ...(!task ? { leaderId, teamMemberIds, clientIds } : {}),
       id: task?.id,
       projectId: project.id,
       title: title.trim(),
@@ -256,20 +337,62 @@ export function TaskDetail({
       setDirty(false);
       setDescriptionEditing(false);
       toast.success(task ? "Tarea guardada." : "Tarea creada.");
-      if (!task && result.createdId)
-        router.replace(taskPath(project.id, result.createdId, view));
+      if (!task && result.createdId) {
+        const feature = features.find((f) => f.id === featureId);
+        const keepAccess =
+          leaderId === workspace.currentUser.id ||
+          teamMemberIds.includes(workspace.currentUser.id) ||
+          workspace.currentUser.role === "admin" ||
+          project.ownerId === workspace.currentUser.id ||
+          feature?.ownerId === workspace.currentUser.id ||
+          workspace.modules.some(
+            (m) =>
+              m.id === feature?.moduleId &&
+              m.ownerId === workspace.currentUser.id,
+          );
+        router.replace(
+          keepAccess
+            ? taskPath(project.id, result.createdId, view)
+            : projectPath(project.id, view),
+        );
+      }
     }
   }
   const commentContents = (
     <>
       <div className="section-heading chat-heading">
-        <MessageSquare size={18} />
-        {mobileComments ? (
-          <DialogTitle>Comentarios</DialogTitle>
-        ) : (
-          <h2>Comentarios</h2>
-        )}
-        <span className="subtle-count">{task?.comments.length ?? 0}</span>
+        <span className="chat-heading-icon">
+          <MessageSquare size={18} />
+        </span>
+        <div className="chat-heading-copy">
+          {mobileComments ? (
+            <DialogTitle>Comentarios</DialogTitle>
+          ) : (
+            <h2>Comentarios</h2>
+          )}
+          <span
+            className="chat-heading-status"
+            role="status"
+            data-state={conversation.connection}
+          >
+            <i aria-hidden="true" />
+            {!task
+              ? "Conversación de la tarea"
+              : conversation.connection === "live"
+                ? "En tiempo real"
+                : conversation.connection === "polling"
+                  ? "Conectado"
+                  : conversation.connection === "connecting"
+                    ? "Conectando…"
+                    : "Reconectando…"}
+          </span>
+        </div>
+        <span
+          className="subtle-count"
+          aria-label={`${task ? conversation.comments.length : 0} mensajes`}
+        >
+          {task ? conversation.comments.length : 0}
+        </span>
         {mobileComments && (
           <DialogClose asChild>
             <Button
@@ -284,10 +407,14 @@ export function TaskDetail({
         )}
       </div>
       {task ? (
-        <Comments
+        <TaskComments
           task={task}
-          mutate={mutate}
-          busy={busy}
+          currentUserId={workspace.currentUser.id}
+          comments={conversation.comments}
+          pending={conversation.pending}
+          error={conversation.error}
+          mutate={conversation.mutate}
+          busy={conversation.sending || conversation.connection === "denied"}
           confirm={confirm}
           content={commentDraft}
           setContent={setCommentDraft}
@@ -327,26 +454,35 @@ export function TaskDetail({
           {project.icon} {project.name}
         </span>
         <div className="task-header-actions">
+          <TaskAssignments
+            people={people}
+            leaderId={leaderId}
+            teamMemberIds={teamMemberIds}
+            onSave={saveAssignment}
+            busy={busy}
+            canManage={canManage}
+            isNew={!task}
+          />
           <Button
             type="submit"
             form="task-detail-form"
             className="task-save-button"
             onMouseDown={(event) => event.preventDefault()}
             data-pending={pending}
-            aria-label={task ? "Guardar cambios" : "Crear tarea"}
+            aria-label={task ? "Guardar" : "Crear tarea"}
             title={
               pending
                 ? "Hay cambios sin guardar"
                 : "Todos los cambios guardados"
             }
-            disabled={busy || !features.length}
+            disabled={busy || uploading > 0 || !features.length}
           >
             {busy ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
               <Check size={16} />
             )}
-            <span>{task ? "Guardar cambios" : "Crear tarea"}</span>
+            <span>{task ? "Guardar" : "Crear tarea"}</span>
             {pending && <i className="save-pending-dot" aria-hidden="true" />}
             <span className="sr-only" role="status">
               {busy
@@ -368,7 +504,9 @@ export function TaskDetail({
           >
             <MessageSquare size={16} />
             Chat
-            {!!task?.comments.length && <span>{task.comments.length}</span>}
+            {!!task && !!conversation.comments.length && (
+              <span>{conversation.comments.length}</span>
+            )}
           </Button>
           {task && (
             <>
@@ -388,6 +526,11 @@ export function TaskDetail({
                     );
                 }}
               >
+                {task.archived ? (
+                  <ArchiveRestore size={16} />
+                ) : (
+                  <Archive size={16} />
+                )}
                 {task.archived ? "Restaurar" : "Archivar"}
               </Button>
               <Button
@@ -395,7 +538,7 @@ export function TaskDetail({
                 size="icon"
                 className="danger"
                 aria-label="Eliminar tarea"
-                disabled={busy}
+                disabled={busy || !canManage}
                 onClick={() =>
                   confirm({
                     title: "¿Eliminar esta tarea?",
@@ -414,7 +557,7 @@ export function TaskDetail({
           )}
         </div>
       </header>
-      <div className="task-detail-columns">
+      <ResizableTaskPanels comments={commentContents} mobile={mobileComments}>
         <section className="task-detail-main">
           <div className="task-heading">
             <InlineTaskTitle
@@ -423,18 +566,18 @@ export function TaskDetail({
               commit={saveTitle}
               busy={busy}
             />
-          </div>
-          <div className="task-labels-row">
-            <TaskLabelPicker
-              projectId={project.id}
-              selected={labels}
-              change={(value) => {
-                setLabels(value);
-                setDirty(true);
-              }}
-              mutate={mutate}
-              busy={busy}
-            />
+            <div className="task-labels-row">
+              <TaskLabelPicker
+                projectId={project.id}
+                selected={labels}
+                change={(value) => {
+                  setLabels(value);
+                  setDirty(true);
+                }}
+                mutate={mutate}
+                busy={busy}
+              />
+            </div>
           </div>
           {task?.archived && (
             <p className="info-note">
@@ -442,66 +585,109 @@ export function TaskDetail({
             </p>
           )}
           <div className="task-edit-area">
-            <div
-              className="task-edit-panels"
-              style={
-                {
-                  "--description-content-height": `${descriptionContentHeight}px`,
-                } as CSSProperties
-              }
+            <Tabs.Root
+              value={activeTab}
+              orientation="vertical"
+              onValueChange={(value) => {
+                setActiveTab(value);
+                if (value !== "description") setDescriptionEditing(false);
+              }}
+              className="task-detail-tabs"
             >
-              <form
-                id="task-detail-form"
-                className="task-description-form"
-                onSubmit={submit}
-                onInvalidCapture={() => setActiveTab("properties")}
+              <Tabs.List
+                className="task-section-tabs"
+                aria-label="Secciones de la tarea"
               >
-                <DescriptionEditor
-                  value={description}
-                  onChange={(value) => {
-                    setDescription(value);
-                    setDirty(true);
-                  }}
-                  editing={descriptionEditing}
-                  setEditing={setDescriptionEditing}
-                  disabled={busy}
-                  onContentHeightChange={setDescriptionContentHeight}
-                />
-              </form>
-              <Tabs.Root
-                value={activeTab}
-                onValueChange={setActiveTab}
-                className="task-detail-tabs"
-              >
-                <Tabs.List
-                  className="task-section-tabs"
-                  aria-label="Secciones de la tarea"
+                <Tabs.Trigger
+                  value="description"
+                  type="button"
+                  title="Descripción"
                 >
-                  <Tabs.Trigger value="properties" type="button">
-                    <Layers3 size={16} />
-                    Propiedades
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="checklists" type="button">
-                    <ListChecks size={17} />
-                    Checklist
-                    {!!task?.checklists[0]?.items.length && (
-                      <span>{task.checklists[0].items.length}</span>
-                    )}
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="history" type="button">
-                    <History size={16} />
-                    Historial
-                    {!!task?.statusHistory?.length && (
-                      <span>{task.statusHistory.length}</span>
-                    )}
-                  </Tabs.Trigger>
-                </Tabs.List>
-                <Tabs.Content
+                  <FileText size={17} />
+                  <span className="task-tab-label">Descripción</span>
+                </Tabs.Trigger>
+                <Tabs.Trigger
                   value="properties"
-                  forceMount
-                  hidden={activeTab !== "properties"}
-                  className="task-properties task-tab-panel"
+                  type="button"
+                  title="Propiedades"
                 >
+                  <Layers3 size={16} />
+                  <span className="task-tab-label">Propiedades</span>
+                </Tabs.Trigger>
+                <Tabs.Trigger
+                  value="checklists"
+                  type="button"
+                  title="Checklist"
+                >
+                  <ListChecks size={17} />
+                  <span className="task-tab-label">Checklist</span>
+                  {!!task?.checklists[0]?.items.length && (
+                    <span className="task-tab-count">
+                      {task.checklists[0].items.length}
+                    </span>
+                  )}
+                </Tabs.Trigger>
+                <Tabs.Trigger
+                  value="documents"
+                  type="button"
+                  title="Documentos"
+                >
+                  <Paperclip size={16} />
+                  <span className="task-tab-label">Documentos</span>
+                  {documentCount ? (
+                    <span className="task-tab-count">{documentCount}</span>
+                  ) : null}
+                </Tabs.Trigger>
+                <Tabs.Trigger value="history" type="button" title="Historial">
+                  <History size={16} />
+                  <span className="task-tab-label">Historial</span>
+                  {!!task?.statusHistory?.length && (
+                    <span className="task-tab-count">
+                      {task.statusHistory.length}
+                    </span>
+                  )}
+                </Tabs.Trigger>
+              </Tabs.List>
+              <Tabs.Content
+                value="description"
+                forceMount
+                hidden={activeTab !== "description"}
+                className="task-tab-panel task-description-panel"
+              >
+                <form
+                  id="task-detail-form"
+                  className="task-description-form"
+                  onSubmit={submit}
+                  onInvalidCapture={() => setActiveTab("properties")}
+                >
+                  <DescriptionEditor
+                    value={description}
+                    onChange={(value) => {
+                      setDescription(value);
+                      setDirty(true);
+                    }}
+                    editing={descriptionEditing}
+                    setEditing={setDescriptionEditing}
+                    disabled={busy}
+                    uploadImage={async (file) =>
+                      (await uploadFile(file, project.id, task?.id, "image"))
+                        .url
+                    }
+                    onUploadingChange={setUploading}
+                  />
+                </form>
+              </Tabs.Content>
+              <Tabs.Content
+                value="properties"
+                forceMount
+                hidden={activeTab !== "properties"}
+                className="task-properties task-tab-panel"
+              >
+                <section
+                  className="task-property-section"
+                  aria-label="Propiedades"
+                >
+                  <h2>Propiedades</h2>
                   <div className="task-properties-grid">
                     <Field label="Feature" htmlFor="task-feature">
                       <FeatureCombobox
@@ -517,7 +703,7 @@ export function TaskDetail({
                           setFeatureId(value);
                           setDirty(true);
                         }}
-                        disabled={busy}
+                        disabled={busy || !canManage}
                       />
                     </Field>
                     <Field label="Estado" htmlFor="task-status">
@@ -573,7 +759,7 @@ export function TaskDetail({
                       ({ field, label, empty, options, value, setValue }) => (
                         <Field
                           key={field}
-                          label={`${label} (opcional)`}
+                          label={label}
                           htmlFor={`task-${field}`}
                         >
                           <CatalogCombobox
@@ -593,10 +779,7 @@ export function TaskDetail({
                         </Field>
                       ),
                     )}
-                    <Field
-                      label="Ticket (opcional)"
-                      htmlFor="task-ticket"
-                    >
+                    <Field label="Ticket" htmlFor="task-ticket">
                       <Input
                         id="task-ticket"
                         name="ticketNumber"
@@ -612,14 +795,12 @@ export function TaskDetail({
                       />
                     </Field>
                     <div className="task-schedule-group">
-                      <span>
-                        Inicio <small>opcional</small>
-                      </span>
+                      <span>Inicio</span>
                       <div>
                         <Input
                           type="date"
                           form="task-detail-form"
-                          aria-label="Fecha de inicio (opcional)"
+                          aria-label="Fecha de inicio"
                           min="1900-01-01"
                           max={dueDate || "9999-12-31"}
                           value={startDate}
@@ -632,7 +813,7 @@ export function TaskDetail({
                         <Input
                           type="time"
                           form="task-detail-form"
-                          aria-label="Hora de inicio (opcional)"
+                          aria-label="Hora de inicio"
                           value={startTime}
                           disabled={!startDate}
                           onChange={(e) => {
@@ -643,9 +824,7 @@ export function TaskDetail({
                       </div>
                     </div>
                     <div className="task-schedule-group">
-                      <span>
-                        Entrega <small>opcional</small>
-                      </span>
+                      <span>Entrega</span>
                       <div>
                         <Input
                           type="date"
@@ -663,7 +842,7 @@ export function TaskDetail({
                         <Input
                           type="time"
                           form="task-detail-form"
-                          aria-label="Hora de entrega (opcional)"
+                          aria-label="Hora de entrega"
                           value={dueTime}
                           disabled={!dueDate}
                           onChange={(e) => {
@@ -674,84 +853,111 @@ export function TaskDetail({
                       </div>
                     </div>
                   </div>
-                </Tabs.Content>
-                <Tabs.Content
-                  value="checklists"
-                  forceMount
-                  hidden={activeTab !== "checklists"}
-                  className="task-tab-panel checklist-tab-panel"
+                </section>
+                <section
+                  className="task-property-section"
+                  aria-label="Clientes"
                 >
+                  <h2>Clientes</h2>
+                  <ClientPicker
+                    id="task-clients"
+                    clients={workspace.clients ?? []}
+                    values={clientIds}
+                    onChange={(values) => void saveClients(values)}
+                    mutate={mutate}
+                    busy={busy}
+                  />
+                </section>
+              </Tabs.Content>
+              <Tabs.Content
+                value="documents"
+                forceMount
+                hidden={activeTab !== "documents"}
+                className="task-tab-panel"
+              >
+                <div>
                   {task ? (
-                    <TaskChecklists
+                    <TaskDocuments
                       task={task}
-                      mutate={mutate}
-                      busy={busy}
-                      confirm={confirm}
+                      onCountChange={setDocumentCount}
+                      limit={workspace.settings?.maxAttachmentBytes ?? 10485760}
                     />
                   ) : (
-                    <p className="info-note">
-                      Crea la tarea para añadir su checklist.
+                    <p className="field-hint">
+                      Guarda la tarea para adjuntar documentos.
                     </p>
                   )}
-                </Tabs.Content>
-                <Tabs.Content
-                  value="history"
-                  forceMount
-                  hidden={activeTab !== "history"}
-                  className="task-tab-panel task-history-panel"
-                >
-                  {task && (
-                    <p className="task-updated-at">
-                      Actualizada el{" "}
-                      <time dateTime={task.updatedAt}>
-                        {timestamp(task.updatedAt, true)}
-                      </time>
-                    </p>
-                  )}
-                  {task?.statusHistory?.length ? (
-                    <ol
-                      className="task-status-history"
-                      aria-label="Historial de cambios de estado"
-                    >
-                      {task.statusHistory.map((change) => (
-                        <li key={change.id}>
-                          <time dateTime={change.changedAt}>
-                            {timestamp(change.changedAt, true)}
-                          </time>
-                          <div>
-                            <span className="history-status">
-                              <i
-                                style={{ background: change.fromStatusColor }}
-                              />
-                              {change.fromStatusName}
-                            </span>
-                            <ArrowRight size={14} aria-label="cambió a" />
-                            <span className="history-status">
-                              <i style={{ background: change.toStatusColor }} />
-                              {change.toStatusName}
-                            </span>
-                          </div>
-                        </li>
-                      ))}
-                    </ol>
-                  ) : (
-                    <p className="info-note">
-                      {task
-                        ? "Todavía no hay cambios de estado registrados."
-                        : "Crea la tarea para registrar su historial de estados."}
-                    </p>
-                  )}
-                </Tabs.Content>
-              </Tabs.Root>
-            </div>
+                </div>
+              </Tabs.Content>
+              <Tabs.Content
+                value="checklists"
+                forceMount
+                hidden={activeTab !== "checklists"}
+                className="task-tab-panel checklist-tab-panel"
+              >
+                {task ? (
+                  <TaskChecklists
+                    task={task}
+                    mutate={mutate}
+                    busy={busy}
+                    confirm={confirm}
+                  />
+                ) : (
+                  <p className="info-note">
+                    Crea la tarea para añadir su checklist.
+                  </p>
+                )}
+              </Tabs.Content>
+              <Tabs.Content
+                value="history"
+                forceMount
+                hidden={activeTab !== "history"}
+                className="task-tab-panel task-history-panel"
+              >
+                {task && (
+                  <p className="task-updated-at">
+                    Actualizada el{" "}
+                    <time dateTime={task.updatedAt}>
+                      {timestamp(task.updatedAt, true)}
+                    </time>
+                  </p>
+                )}
+                {task?.statusHistory?.length ? (
+                  <ol
+                    className="task-status-history"
+                    aria-label="Historial de cambios de estado"
+                  >
+                    {task.statusHistory.map((change) => (
+                      <li key={change.id}>
+                        <time dateTime={change.changedAt}>
+                          {timestamp(change.changedAt, true)}
+                        </time>
+                        <div>
+                          <span className="history-status">
+                            <i style={{ background: change.fromStatusColor }} />
+                            {change.fromStatusName}
+                          </span>
+                          <ArrowRight size={14} aria-label="cambió a" />
+                          <span className="history-status">
+                            <i style={{ background: change.toStatusColor }} />
+                            {change.toStatusName}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="info-note">
+                    {task
+                      ? "Todavía no hay cambios de estado registrados."
+                      : "Crea la tarea para registrar su historial de estados."}
+                  </p>
+                )}
+              </Tabs.Content>
+            </Tabs.Root>
           </div>
         </section>
-        {!mobileComments && (
-          <aside className="task-comments" aria-label="Comentarios de la tarea">
-            {commentContents}
-          </aside>
-        )}
-      </div>
+      </ResizableTaskPanels>
       <Dialog open={mobileComments && chatOpen} onOpenChange={setChatOpen}>
         <DialogContent
           className="task-comments task-comments-dialog translate-x-0 translate-y-0"
@@ -1159,191 +1365,5 @@ function ChecklistItemRow({
         <Trash2 size={13} />
       </Button>
     </div>
-  );
-}
-
-function Comments({
-  task,
-  mutate,
-  busy,
-  confirm,
-  content,
-  setContent,
-}: {
-  task: Task;
-  mutate: Mutate;
-  busy: boolean;
-  confirm: (value: Confirmation) => void;
-  content: string;
-  setContent: (value: string) => void;
-}) {
-  const thread = useRef<HTMLDivElement>(null);
-  const lastId = task.comments.at(-1)?.id;
-  useEffect(() => {
-    if (thread.current) thread.current.scrollTop = thread.current.scrollHeight;
-  }, [lastId]);
-  return (
-    <>
-      <div
-        className="comment-list"
-        ref={thread}
-        role="log"
-        aria-label="Conversación de la tarea"
-        aria-live="polite"
-        aria-relevant="additions text"
-      >
-        {task.comments.map((comment) => (
-          <Comment
-            key={comment.id}
-            comment={comment}
-            mutate={mutate}
-            busy={busy}
-            confirm={confirm}
-          />
-        ))}
-        {!task.comments.length && (
-          <div className="comments-empty">
-            <MessageSquare size={30} />
-            <p>Aún no hay mensajes.</p>
-            <span>Comparte una nota o un avance de esta tarea.</span>
-          </div>
-        )}
-      </div>
-      <form
-        className="comment-composer"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!content.trim() || busy) return;
-          if (
-            await mutate({ type: "comment.create", taskId: task.id, content })
-          )
-            setContent("");
-        }}
-      >
-        <div className="comment-composer-input">
-          <AutoTextarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            aria-label="Escribir comentario"
-            placeholder="Escribe un mensaje…"
-            maxLength={10000}
-            rows={2}
-            required
-            onKeyDown={(e) => {
-              if (
-                e.key === "Enter" &&
-                !e.shiftKey &&
-                !e.nativeEvent.isComposing
-              ) {
-                e.preventDefault();
-                e.currentTarget.form?.requestSubmit();
-              }
-            }}
-          />
-          <Button
-            type="submit"
-            disabled={busy || !content.trim()}
-            size="icon"
-            aria-label="Enviar comentario"
-            title="Enviar comentario"
-          >
-            <Send size={17} />
-          </Button>
-        </div>
-        <span className="composer-hint">
-          Enter para enviar · Mayús + Enter para una nueva línea
-        </span>
-      </form>
-    </>
-  );
-}
-
-function Comment({
-  comment,
-  mutate,
-  busy,
-  confirm,
-}: {
-  comment: TaskComment;
-  mutate: Mutate;
-  busy: boolean;
-  confirm: (value: Confirmation) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [content, setContent] = useState(comment.content);
-  return (
-    <article className="comment">
-      <div className="comment-meta">
-        <span className="comment-avatar">T</span>
-        <strong>Tú</strong>
-        <time
-          dateTime={comment.createdAt}
-          title={timestamp(comment.createdAt, true)}
-        >
-          {timestamp(comment.createdAt, true)}
-        </time>
-      </div>
-      {editing ? (
-        <form
-          className="form-stack"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (
-              await mutate({ type: "comment.update", id: comment.id, content })
-            )
-              setEditing(false);
-          }}
-        >
-          <AutoTextarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            aria-label="Editar comentario"
-            maxLength={10000}
-            required
-          />
-          <div className="comment-actions">
-            <Button size="sm" type="submit" disabled={busy}>
-              Guardar
-            </Button>
-            <Button
-              size="sm"
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setContent(comment.content);
-                setEditing(false);
-              }}
-            >
-              Cancelar
-            </Button>
-          </div>
-        </form>
-      ) : (
-        <p className="comment-content">{comment.content}</p>
-      )}
-      {!editing && (
-        <div className="comment-actions">
-          {comment.updatedAt !== comment.createdAt && (
-            <span className="field-hint">Editado</span>
-          )}
-          <button disabled={busy} onClick={() => setEditing(true)}>
-            Editar
-          </button>
-          <button
-            disabled={busy}
-            onClick={() =>
-              confirm({
-                title: "¿Eliminar este comentario?",
-                description: "Esta acción es permanente.",
-                action: () =>
-                  mutate({ type: "comment.delete", id: comment.id }),
-              })
-            }
-          >
-            Eliminar
-          </button>
-        </div>
-      )}
-    </article>
   );
 }

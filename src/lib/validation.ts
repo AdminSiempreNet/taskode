@@ -23,6 +23,7 @@ const featureFields = { name, description, moduleId: id.nullish() };
 const statusFields = { name: name.max(60), color, isDone: z.boolean() };
 const taskTitle = z.string().trim().min(1, "Escribe un título.").max(300);
 const taskFields = {
+  clientIds: z.array(id).max(1000).optional(),
   title: taskTitle,
   description,
   featureId: id,
@@ -87,7 +88,10 @@ export const trelloSchema = z.object({
     .max(10000),
 });
 export type TrelloBoard = z.infer<typeof trelloSchema>;
-export const commandSchema = z.discriminatedUnion("type", [
+const currentCommandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("client.create"), name, cityId: id }),
+  z.object({ type: z.literal("client.update"), id, name, cityId: id }),
+  z.object({ type: z.literal("client.delete"), id }),
   z.object({ type: z.literal("project.transferOwnership"), id, userId: id }),
   z.object({
     type: z.literal("project.member.add"),
@@ -139,8 +143,31 @@ export const commandSchema = z.discriminatedUnion("type", [
     projectId: id,
     ids: z.array(id).min(1).max(200),
   }),
-  z.object({ type: z.literal("task.create"), projectId: id, ...taskFields }),
+  z.object({
+    type: z.literal("task.create"),
+    projectId: id,
+    ...taskFields,
+    leaderId: id.optional(),
+    teamMemberIds: z.array(id).max(1000).optional(),
+  }),
+  z.object({
+    type: z.literal("task.assignment.update"),
+    id,
+    leaderId: id,
+    teamMemberIds: z.array(id).max(1000),
+  }),
+  z.object({ type: z.literal("module.transferOwnership"), id, userId: id }),
+  z.object({ type: z.literal("feature.transferOwnership"), id, userId: id }),
+  z.object({
+    type: z.literal("settings.update"),
+    maxAttachmentBytes: z.number().int().min(1048576).max(104857600),
+  }),
   z.object({ type: z.literal("task.update"), id, ...taskFields }),
+  z.object({
+    type: z.literal("task.clients.update"),
+    id,
+    clientIds: z.array(id).max(1000),
+  }),
   z.object({ type: z.literal("task.rename"), id, title: taskTitle }),
   z.object({
     type: z.literal("task.move"),
@@ -213,6 +240,7 @@ export const commandSchema = z.discriminatedUnion("type", [
     type: z.literal("comment.create"),
     taskId: id,
     content: z.string().trim().min(1).max(10000),
+    requestId: z.uuid().optional(),
   }),
   z.object({
     type: z.literal("comment.update"),
@@ -226,4 +254,32 @@ export const commandSchema = z.discriminatedUnion("type", [
     board: trelloSchema,
   }),
 ]);
+// Normalize requests from tabs opened before the terminology change.
+export const commandSchema = z.preprocess((input) => {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  const command = input as Record<string, unknown>;
+  if (
+    ![
+      "task.create",
+      "task.assignment.update",
+      "task.participants.update",
+    ].includes(String(command.type))
+  )
+    return input;
+  return {
+    ...command,
+    type:
+      command.type === "task.participants.update"
+        ? "task.assignment.update"
+        : command.type,
+    ...(!Object.hasOwn(command, "leaderId") &&
+    Object.hasOwn(command, "assigneeId")
+      ? { leaderId: command.assigneeId }
+      : {}),
+    ...(!Object.hasOwn(command, "teamMemberIds") &&
+    Object.hasOwn(command, "collaboratorIds")
+      ? { teamMemberIds: command.collaboratorIds }
+      : {}),
+  };
+}, currentCommandSchema);
 export type Command = z.infer<typeof commandSchema>;

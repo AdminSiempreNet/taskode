@@ -3,9 +3,9 @@
 Se requiere implementar funcionalidades para uso compartido real, pues hasta el momento la aplicación no tiene realmente funcionalidades de uso compartido.
 
 
-1. Las tareas tienen un usuario responsable directo (por defecto el autor pero al crearla se puede definir el responsable) y pueden tener varios colaboradores, es decir con aquellos a los que se les comparte la tarea.  
+1. Las tareas tienen un usuario líder directo (por defecto el autor pero al crearla se puede definir el líder) y pueden tener varios miembros del equipo, es decir con aquellos a los que se les comparte la tarea.
 
-2. Un usuario que no es responsable ni colaborador no puede ver ni modificar la tarea, excepto que sea administrador o propietario de la feature, el modulo o el proyecto. En otras palabras.
+2. Un usuario que no es líder ni miembro del equipo no puede ver ni modificar la tarea, excepto que sea administrador o propietario de la feature, el modulo o el proyecto. En otras palabras.
 
 3. Todas las vistas de tareas, ahora deben incluir un filtro por usuario, similar al filtro de estados, con seleccion múltiple y con una opción "Mías" seleccionada por defecto.
 

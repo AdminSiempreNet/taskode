@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import {
   and,
+  or,
   eq,
   inArray,
   isNull,
@@ -17,7 +18,14 @@ import {
 } from "./backup-data";
 import * as schema from "./schema";
 import type { Command, TrelloBoard } from "../lib/validation";
-import type { Actor, CurrentUser, ImportReport, Workspace } from "../lib/types";
+import type {
+  Actor,
+  CurrentUser,
+  Geography,
+  ImportReport,
+  Workspace,
+} from "../lib/types";
+import { normalizeClientText } from "../lib/clients";
 import { DEFAULT_TASK_TYPES, DEFAULT_IMPACTS } from "../lib/types";
 import { DomainError, type WorkspaceRepository } from "./repository";
 
@@ -43,7 +51,7 @@ async function each<T>(
 }
 export class PostgresRepository implements WorkspaceRepository {
   // Incrementar al cambiar el contrato o las migraciones de una instancia cacheada.
-  static readonly cacheVersion = 4;
+  static readonly cacheVersion = 10;
   readonly cacheVersion = PostgresRepository.cacheVersion;
   readonly store: DatabaseStore;
   private actorContext = new AsyncLocalStorage<Actor>();
@@ -206,9 +214,269 @@ export class PostgresRepository implements WorkspaceRepository {
       );
     return project;
   }
+  private visibility(actor: Actor) {
+    return or(
+      eq(schema.tasks.leaderId, actor.id),
+      sql`exists (select 1 from ${schema.taskTeamMembers} c where c."taskId" = ${schema.tasks.id} and c."userId" = ${actor.id})`,
+      sql`exists (select 1 from ${schema.projects} p where p.id = ${schema.tasks.projectId} and p."ownerId" = ${actor.id})`,
+      sql`exists (select 1 from ${schema.features} f left join ${schema.modules} m on m.id = f."moduleId" where f.id = ${schema.tasks.featureId} and (f."ownerId" = ${actor.id} or m."ownerId" = ${actor.id}))`,
+    );
+  }
+  async requireScope(actor: Actor, kind: "modules" | "features", id: string) {
+    const row = await this.get(kind, id);
+    const project = await this.requireProject(actor, String(row.projectId));
+    const user = await this.currentUser(actor);
+    const parent =
+      kind === "features" && row.moduleId
+        ? await this.get("modules", String(row.moduleId))
+        : null;
+    if (
+      user.role !== "admin" &&
+      project.ownerId !== actor.id &&
+      row.ownerId !== actor.id &&
+      parent?.ownerId !== actor.id
+    )
+      throw new DomainError(
+        "Solo el propietario o un propietario superior puede realizar esta acción.",
+        403,
+      );
+    return row;
+  }
+  async requireParticipant(projectId: string, userId: string) {
+    await this.requireProject({ id: userId }, projectId);
+  }
+  async projectPeople(actor: Actor, projectId: string) {
+    const project = await this.requireProject(actor, projectId);
+    const members = await this.store.db
+      .select()
+      .from(schema.projectMembers)
+      .where(eq(schema.projectMembers.projectId, projectId));
+    return this.store.db
+      .select({
+        id: schema.user.id,
+        name: schema.user.name,
+        email: schema.user.email,
+        image: schema.user.image,
+      })
+      .from(schema.user)
+      .where(
+        or(
+          eq(schema.user.id, String(project.ownerId)),
+          eq(schema.user.role, "admin"),
+          inArray(
+            schema.user.id,
+            members.map((m) => m.userId),
+          ),
+        ),
+      );
+  }
+  async requireTask(actor: Actor, id: string) {
+    const task = await this.get("tasks", id);
+    const project = await this.requireProject(actor, String(task.projectId));
+    const user = await this.currentUser(actor);
+    const feature = await this.get("features", String(task.featureId));
+    const module = feature.moduleId
+      ? await this.get("modules", String(feature.moduleId))
+      : null;
+    const manager =
+      user.role === "admin" ||
+      project.ownerId === actor.id ||
+      feature.ownerId === actor.id ||
+      module?.ownerId === actor.id ||
+      task.leaderId === actor.id;
+    const teamMember =
+      manager ||
+      (await this.find("task_team_members", { taskId: id, userId: actor.id }))
+        .length > 0;
+    if (!teamMember)
+      throw new DomainError("La tarea no existe o no tienes acceso.", 404);
+    return {
+      task,
+      permissions: {
+        canEdit: true,
+        canManageAccess: manager,
+        canDelete: manager,
+        canModerateComments: manager,
+      },
+    };
+  }
+  async taskComments(actor: Actor, id: string) {
+    return this.store.snapshot(async () => {
+      const { permissions } = await this.requireTask(actor, id);
+      const comments = await this.find("comments", { taskId: id });
+      const authorIds = [...new Set(comments.map((c) => c.authorId).filter((id): id is string => typeof id === "string"))];
+      const users = authorIds.length ? await this.store.db
+        .select({
+          id: schema.user.id,
+          name: schema.user.name,
+          image: schema.user.image,
+        })
+        .from(schema.user)
+        .where(inArray(schema.user.id, authorIds)) : [];
+      return {
+        permissions,
+        comments: comments
+          .sort(
+            (a, b) =>
+              String(a.createdAt).localeCompare(String(b.createdAt)) ||
+              String(a.id).localeCompare(String(b.id)),
+          )
+          .map((c) => ({
+            ...c,
+            author: users.find((u) => u.id === c.authorId) ?? null,
+            canEdit: c.authorId === actor.id,
+            canDelete:
+              c.authorId === actor.id || permissions.canModerateComments,
+          })),
+      };
+    });
+  }
+  async executeComment(actor: Actor, taskId: string, command: Command) {
+    return this.transaction(async () => {
+      await this.requireTask(actor, taskId);
+      if (command.type === "comment.create") {
+        if (command.taskId !== taskId) throw new DomainError("La tarea no coincide.");
+      } else if (command.type === "comment.update" || command.type === "comment.delete") {
+        const comment = await this.get("comments", command.id);
+        if (comment.taskId !== taskId) throw new DomainError("El comentario no pertenece a esta tarea.", 404);
+      } else throw new DomainError("Operación de comentario inválida.");
+      const result = await this.execute(command, actor);
+      return { ...result, ...(await this.taskComments(actor, taskId)) };
+    });
+  }
+  async commentRecipients(taskId: string): Promise<string[]> {
+    return this.store.snapshot(async () => {
+      const task = (await this.find("tasks", { id: taskId }))[0];
+      if (!task) return [];
+      const project = await this.get("projects", String(task.projectId));
+      const feature = await this.get("features", String(task.featureId));
+      const module = feature.moduleId ? await this.get("modules", String(feature.moduleId)) : null;
+      const owners = [project.ownerId, feature.ownerId, module?.ownerId, task.leaderId].filter((id): id is string => typeof id === "string");
+      const users = await this.store.db.select({ id: schema.user.id }).from(schema.user).where(or(
+        eq(schema.user.role, "admin"),
+        and(
+          or(eq(schema.user.id, String(project.ownerId)), sql`exists (select 1 from ${schema.projectMembers} pm where pm."projectId" = ${task.projectId} and pm."userId" = ${schema.user.id})`),
+          or(inArray(schema.user.id, owners), sql`exists (select 1 from ${schema.taskTeamMembers} tm where tm."taskId" = ${taskId} and tm."userId" = ${schema.user.id})`),
+        ),
+      ));
+      return users.map((user) => user.id);
+    });
+  }
+  private async setTaskAssignment(
+    id: string,
+    projectId: string,
+    leaderId: string,
+    teamMembers: string[],
+  ) {
+    for (const userId of new Set([leaderId, ...teamMembers]))
+      await this.requireParticipant(projectId, userId);
+    await this.update("tasks", id, {
+      leaderId,
+      updatedAt: new Date().toISOString(),
+    });
+    await this.remove("task_team_members", { taskId: id });
+    for (const userId of new Set(teamMembers.filter((x) => x !== leaderId)))
+      await this.insert("task_team_members", { taskId: id, userId });
+  }
+  async bindContentFiles(
+    content: string,
+    actor: Actor,
+    projectId: string,
+    taskId: string,
+  ) {
+    if (/!\[[^\]]*\]\(\s*(?:data:|blob:)/i.test(content))
+      throw new DomainError(
+        "Carga la imagen al almacenamiento antes de guardar.",
+      );
+    const ids = [
+      ...content.matchAll(/\/api\/files\/([a-f0-9-]{36})\/content/g),
+    ].map((m) => m[1]);
+    for (const id of new Set(ids)) {
+      const file = await this.get("files", id);
+      if (
+        file.projectId !== projectId ||
+        file.status !== "ready" ||
+        (file.taskId === null &&
+          Date.parse(String(file.createdAt)) < Date.now() - 86400000) ||
+        (file.taskId !== taskId &&
+          (file.taskId !== null || file.uploadedBy !== actor.id))
+      )
+        throw new DomainError(
+          "La imagen no pertenece a esta tarea o no terminó de cargar.",
+          403,
+        );
+      if (file.taskId === null) await this.update("files", id, { taskId });
+    }
+  }
   private async authorize(command: Command, actor: Actor) {
     await this.currentUser(actor);
     const c = command;
+    if (c.type === "settings.update") {
+      await this.requireAdmin(actor);
+      return;
+    }
+    if (
+      (c.type.startsWith("task.") && c.type !== "task.create") ||
+      c.type.startsWith("checklist.") ||
+      c.type.startsWith("comment.")
+    ) {
+      let taskId: string;
+      if ("taskId" in c) taskId = c.taskId;
+      else if ("checklistId" in c)
+        taskId = String((await this.get("checklists", c.checklistId)).taskId);
+      else {
+        const entry = c as { id: string };
+        if (c.type.startsWith("task.")) taskId = entry.id;
+        else if (c.type.startsWith("comment."))
+          taskId = String((await this.get("comments", entry.id)).taskId);
+        else if (c.type.startsWith("checklist.item.")) {
+          const item = await this.get("checklist_items", entry.id);
+          taskId = String(
+            (await this.get("checklists", String(item.checklistId))).taskId,
+          );
+        } else taskId = String((await this.get("checklists", entry.id)).taskId);
+      }
+      const { task, permissions } = await this.requireTask(actor, taskId);
+      if (
+        (c.type === "task.delete" ||
+          c.type === "task.assignment.update" ||
+          (c.type === "task.update" && c.featureId !== task.featureId)) &&
+        !permissions.canManageAccess
+      )
+        throw new DomainError(
+          "Solo el líder o un propietario puede realizar esta acción.",
+          403,
+        );
+      if (c.type === "comment.update" || c.type === "comment.delete") {
+        const comment = await this.get("comments", c.id);
+        if (
+          comment.authorId !== actor.id &&
+          !(c.type === "comment.delete" && permissions.canModerateComments)
+        )
+          throw new DomainError(
+            "Solo puedes editar tus propios comentarios.",
+            403,
+          );
+      }
+      if (c.type === "task.move" && c.beforeId) {
+        const target = await this.requireTask(actor, c.beforeId);
+        if (target.task.projectId !== task.projectId)
+          throw new DomainError("La tarea pertenece a otro proyecto.");
+      }
+      return;
+    }
+    if (/^(module|feature)\./.test(c.type) && !c.type.endsWith(".create")) {
+      const kind = c.type.startsWith("module.") ? "modules" : "features";
+      if (c.type.endsWith(".reorder"))
+        await this.requireProject(
+          actor,
+          (c as { projectId: string }).projectId,
+          true,
+        );
+      else await this.requireScope(actor, kind, (c as { id: string }).id);
+      return;
+    }
+    if (c.type.startsWith("client.")) return;
     if (
       c.type === "project.create" ||
       (c.type === "trello.import" && c.projectId === null)
@@ -303,7 +571,44 @@ export class PostgresRepository implements WorkspaceRepository {
           .insert(schema.projectMembers)
           .values({ projectId: c.projectId, userId: c.userId })
           .onConflictDoNothing();
-      else
+      else {
+        const owned = await this.store.db
+          .select({ id: schema.tasks.id })
+          .from(schema.tasks)
+          .where(
+            and(
+              eq(schema.tasks.projectId, c.projectId),
+              eq(schema.tasks.leaderId, c.userId),
+            ),
+          )
+          .limit(1);
+        const modules = await this.find("modules", {
+          projectId: c.projectId,
+          ownerId: c.userId,
+        });
+        const features = await this.find("features", {
+          projectId: c.projectId,
+          ownerId: c.userId,
+        });
+        if (owned.length || modules.length || features.length)
+          throw new DomainError(
+            "Reasigna primero las tareas, módulos y features de este usuario.",
+            409,
+          );
+        await this.store.db
+          .delete(schema.taskTeamMembers)
+          .where(
+            and(
+              eq(schema.taskTeamMembers.userId, c.userId),
+              inArray(
+                schema.taskTeamMembers.taskId,
+                this.store.db
+                  .select({ id: schema.tasks.id })
+                  .from(schema.tasks)
+                  .where(eq(schema.tasks.projectId, c.projectId)),
+              ),
+            ),
+          );
         await this.store.db
           .delete(schema.projectMembers)
           .where(
@@ -312,12 +617,26 @@ export class PostgresRepository implements WorkspaceRepository {
               eq(schema.projectMembers.userId, c.userId),
             ),
           );
+      }
       return true;
     }
     return false;
   }
   getWorkspace(actor: Actor): Promise<Workspace> {
     return this.store.snapshot(() => this.readWorkspace(actor));
+  }
+  getGeography(actor: Actor): Promise<Geography> {
+    return this.store.snapshot(async () => {
+      await this.currentUser(actor);
+      const departments = await this.store.db.select().from(schema.departments);
+      const cities = await this.store.db.select().from(schema.cities);
+      return {
+        departments: departments.sort((a, b) =>
+          a.name.localeCompare(b.name, "es"),
+        ),
+        cities: cities.sort((a, b) => a.name.localeCompare(b.name, "es")),
+      };
+    });
   }
   private async readWorkspace(actor: Actor): Promise<Workspace> {
     const currentUser = await this.currentUser(actor);
@@ -362,9 +681,71 @@ export class PostgresRepository implements WorkspaceRepository {
       () => rows("task_types"),
       () => rows("impacts"),
       () => rows("labels"),
-      () => rows("tasks"),
+      () =>
+        this.store.db
+          .select()
+          .from(schema.tasks)
+          .where(
+            and(
+              inArray(schema.tasks.projectId, ids),
+              currentUser.role === "admin" ? undefined : this.visibility(actor),
+            ),
+          ) as unknown as Promise<Row[]>,
     ]);
     const taskIds = tasks.map((t) => String(t.id));
+    const teamMembers = await rows("task_team_members", "taskId", taskIds);
+    const files = (await rows("files", "taskId", taskIds)).filter(
+      (f) => f.status === "ready",
+    );
+    const people = (
+      await Promise.all(
+        projects.map(async (p) =>
+          (await this.projectPeople(actor, String(p.id))).map((u) => ({
+            ...u,
+            projectId: String(p.id),
+          })),
+        ),
+      )
+    ).flat();
+    const authors = await this.store.db
+      .select({
+        id: schema.user.id,
+        name: schema.user.name,
+        image: schema.user.image,
+      })
+      .from(schema.user);
+    const managesScope = (f: Row, module = false) =>
+      currentUser.role === "admin" ||
+      projects.some((p) => p.id === f.projectId && p.ownerId === actor.id) ||
+      f.ownerId === actor.id ||
+      (!module &&
+        modules.some((m) => m.id === f.moduleId && m.ownerId === actor.id));
+    const associations = await rows("task_clients", "taskId", taskIds);
+    const clientIdsByTask = new Map<string, string[]>();
+    for (const link of associations) {
+      const key = String(link.taskId);
+      clientIdsByTask.set(key, [
+        ...(clientIdsByTask.get(key) ?? []),
+        String(link.clientId),
+      ]);
+    }
+    const clients = await this.store.db
+      .select({
+        id: schema.clients.id,
+        name: schema.clients.name,
+        cityId: schema.clients.cityId,
+        cityName: schema.cities.name,
+        departmentId: schema.departments.id,
+        departmentName: schema.departments.name,
+        createdAt: schema.clients.createdAt,
+        updatedAt: schema.clients.updatedAt,
+      })
+      .from(schema.clients)
+      .innerJoin(schema.cities, eq(schema.clients.cityId, schema.cities.id))
+      .innerJoin(
+        schema.departments,
+        eq(schema.cities.departmentId, schema.departments.id),
+      );
     const [lists, comments, history] = await sequential([
       () => rows("checklists", "taskId", taskIds),
       () => rows("comments", "taskId", taskIds),
@@ -389,10 +770,16 @@ export class PostgresRepository implements WorkspaceRepository {
         firstProjectId: state.firstProjectId,
       },
       projects,
-      modules: sort(modules),
+      people,
+      settings: { maxAttachmentBytes: state.maxAttachmentBytes },
+      modules: sort(modules).map((m) => ({
+        ...m,
+        canManage: managesScope(m, true),
+      })),
       features: sort(features).map((f) => ({
         ...f,
         pinned: Boolean(f.pinned),
+        canManage: managesScope(f),
       })),
       statuses: sort(statuses).map((s) => ({
         ...s,
@@ -402,12 +789,42 @@ export class PostgresRepository implements WorkspaceRepository {
       taskTypes: sort(taskTypes),
       impacts: sort(impacts),
       labels: sort(labels),
+      clients: clients.sort(
+        (a, b) =>
+          a.name.localeCompare(b.name, "es") || a.id.localeCompare(b.id),
+      ),
       tasks: sort(tasks).map((t) => {
         const { externalId: _, ...row } = t;
         return {
           ...row,
+          teamMemberIds: teamMembers
+            .filter((c) => c.taskId === t.id)
+            .map((c) => String(c.userId)),
+          leader: authors.find((u) => u.id === t.leaderId),
+          teamMembers: authors.filter((u) =>
+            teamMembers.some((c) => c.taskId === t.id && c.userId === u.id),
+          ),
+          permissions: {
+            canEdit: true,
+            canManageAccess:
+              t.leaderId === actor.id ||
+              managesScope(features.find((f) => f.id === t.featureId)!),
+            canDelete:
+              t.leaderId === actor.id ||
+              managesScope(features.find((f) => f.id === t.featureId)!),
+            canModerateComments:
+              t.leaderId === actor.id ||
+              managesScope(features.find((f) => f.id === t.featureId)!),
+          },
+          files: files
+            .filter((f) => f.taskId === t.id)
+            .map(
+              ({ storageKey: _key, uploadedBy: _by, status: _status, ...f }) =>
+                f,
+            ),
           archived: Boolean(t.archived),
           labels: t.labels,
+          clientIds: (clientIdsByTask.get(String(t.id)) ?? []).sort(),
           checklists: sort(lists.filter((l) => l.taskId === t.id)).map((l) => ({
             ...l,
             items: sort(items.filter((i) => i.checklistId === l.id)).map(
@@ -416,6 +833,17 @@ export class PostgresRepository implements WorkspaceRepository {
           })),
           comments: comments
             .filter((c) => c.taskId === t.id)
+            .map((c) => ({
+              ...c,
+              id: c.id,
+              createdAt: c.createdAt,
+              author: authors.find((u) => u.id === c.authorId) ?? null,
+              canEdit: c.authorId === actor.id,
+              canDelete:
+                c.authorId === actor.id ||
+                t.leaderId === actor.id ||
+                managesScope(features.find((f) => f.id === t.featureId)!),
+            }))
             .sort(
               (a, b) =>
                 String(a.createdAt).localeCompare(String(b.createdAt)) ||
@@ -583,6 +1011,7 @@ export class PostgresRepository implements WorkspaceRepository {
     const id = randomUUID();
     await this.insert("features", {
       id,
+      ownerId: this.actorContext.getStore()!.id,
       projectId,
       moduleId,
       number: await this.nextFeatureNumber(projectId, moduleId),
@@ -639,9 +1068,80 @@ export class PostgresRepository implements WorkspaceRepository {
     return this.actorContext.run(actor, async () =>
       this.transaction(async () => {
         await this.authorize(command, actor);
+        if (command.type === "settings.update") {
+          await this.store.db
+            .update(schema.installation)
+            .set({ maxAttachmentBytes: command.maxAttachmentBytes })
+            .where(eq(schema.installation.id, 1));
+          return {};
+        }
+        if (
+          command.type === "module.transferOwnership" ||
+          command.type === "feature.transferOwnership"
+        ) {
+          const table = command.type.startsWith("module.")
+            ? "modules"
+            : "features";
+          const row = await this.get(table, command.id);
+          await this.requireParticipant(String(row.projectId), command.userId);
+          await this.update(table, command.id, { ownerId: command.userId });
+          return {};
+        }
+        if (command.type === "task.assignment.update") {
+          const task = await this.get("tasks", command.id);
+          await this.setTaskAssignment(
+            command.id,
+            String(task.projectId),
+            command.leaderId,
+            command.teamMemberIds,
+          );
+          return {};
+        }
         if (await this.accessCommand(command)) return {};
         const c = command;
         switch (c.type) {
+          case "client.create":
+          case "client.update": {
+            if (c.type === "client.update") await this.get("clients", c.id);
+            if (!(await this.find("cities", { id: c.cityId }))[0])
+              throw new DomainError("Selecciona una ciudad válida.");
+            const normalizedName = normalizeClientText(c.name);
+            if (!normalizedName) throw new DomainError("Escribe un nombre.");
+            const duplicate = (
+              await this.find("clients", { normalizedName, cityId: c.cityId })
+            ).some((row) => c.type === "client.create" || row.id !== c.id);
+            if (duplicate)
+              throw new DomainError(
+                "Ya existe un cliente con ese nombre en esta ciudad.",
+                409,
+              );
+            const fields = {
+              name: c.name.trim().replace(/\s+/g, " "),
+              normalizedName,
+              cityId: c.cityId,
+              updatedAt: new Date().toISOString(),
+            };
+            if (c.type === "client.create") {
+              const id = randomUUID();
+              await this.insert("clients", {
+                id,
+                ...fields,
+                createdAt: fields.updatedAt,
+              });
+              return { createdId: id };
+            }
+            await this.update("clients", c.id, fields);
+            break;
+          }
+          case "client.delete":
+            await this.get("clients", c.id);
+            if ((await this.find("task_clients", { clientId: c.id })).length)
+              throw new DomainError(
+                "El cliente tiene tareas relacionadas. Desvincúlalo antes de eliminarlo.",
+                409,
+              );
+            await this.remove("clients", { id: c.id });
+            break;
           case "project.create": {
             const id = await this.project(
               c.name,
@@ -671,6 +1171,7 @@ export class PostgresRepository implements WorkspaceRepository {
             const id = randomUUID();
             await this.insert("modules", {
               id,
+              ownerId: actor.id,
               projectId: c.projectId,
               name: c.name,
               description: c.description,
@@ -874,6 +1375,20 @@ export class PostgresRepository implements WorkspaceRepository {
           case "task.update": {
             const existing =
               c.type === "task.update" ? await this.get("tasks", c.id) : null;
+            const clientIds =
+              c.clientIds === undefined ? undefined : [...new Set(c.clientIds)];
+            if (clientIds) {
+              const valid = clientIds.length
+                ? await this.store.db
+                    .select({ id: schema.clients.id })
+                    .from(schema.clients)
+                    .where(inArray(schema.clients.id, clientIds))
+                : [];
+              if (valid.length !== clientIds.length)
+                throw new DomainError(
+                  "Uno de los clientes seleccionados ya no existe.",
+                );
+            }
             const p =
               c.type === "task.create"
                 ? c.projectId
@@ -972,9 +1487,12 @@ export class PostgresRepository implements WorkspaceRepository {
               updatedAt: new Date().toISOString(),
             };
             if (c.type === "task.create") {
+              await this.requireParticipant(p, c.leaderId ?? actor.id);
               const id = randomUUID();
               await this.insert("tasks", {
                 id,
+                createdById: actor.id,
+                leaderId: c.leaderId ?? actor.id,
                 projectId: p,
                 ...fields,
                 archived: false,
@@ -982,6 +1500,15 @@ export class PostgresRepository implements WorkspaceRepository {
                 externalId: null,
                 createdAt: fields.updatedAt,
               });
+              for (const clientId of clientIds ?? [])
+                await this.insert("task_clients", { taskId: id, clientId });
+              await this.setTaskAssignment(
+                id,
+                p,
+                c.leaderId ?? actor.id,
+                c.teamMemberIds ?? [],
+              );
+              await this.bindContentFiles(c.description, actor, p, id);
               return { createdId: id };
             }
             await this.recordStatusChange(
@@ -990,6 +1517,29 @@ export class PostgresRepository implements WorkspaceRepository {
               fields.updatedAt,
             );
             await this.update("tasks", c.id, fields);
+            await this.bindContentFiles(c.description, actor, p, c.id);
+            if (clientIds !== undefined) {
+              await this.remove("task_clients", { taskId: c.id });
+              for (const clientId of clientIds)
+                await this.insert("task_clients", { taskId: c.id, clientId });
+            }
+            break;
+          }
+          case "task.clients.update": {
+            await this.get("tasks", c.id);
+            const clientIds = [...new Set(c.clientIds)];
+            const valid = clientIds.length
+              ? await this.store.db
+                  .select({ id: schema.clients.id })
+                  .from(schema.clients)
+                  .where(inArray(schema.clients.id, clientIds))
+              : [];
+            if (valid.length !== clientIds.length)
+              throw new DomainError("Uno de los clientes seleccionados ya no existe.");
+            await this.remove("task_clients", { taskId: c.id });
+            for (const clientId of clientIds)
+              await this.insert("task_clients", { taskId: c.id, clientId });
+            await this.update("tasks", c.id, { updatedAt: new Date().toISOString() });
             break;
           }
           case "task.move": {
@@ -1225,24 +1775,48 @@ export class PostgresRepository implements WorkspaceRepository {
             await this.remove("checklist_items", { id: c.id });
             break;
           case "comment.create": {
-            await this.get("tasks", c.taskId);
-            const id = randomUUID(),
+            const task = await this.get("tasks", c.taskId);
+            if (c.requestId) {
+              const existing = (await this.find("comments", { id: c.requestId }))[0];
+              if (existing) {
+                if (existing.taskId !== c.taskId || existing.authorId !== actor.id)
+                  throw new DomainError("El identificador del mensaje ya está en uso.", 409);
+                return { createdId: c.requestId };
+              }
+            }
+            const id = c.requestId ?? randomUUID(),
               now = new Date().toISOString();
             await this.insert("comments", {
               id,
+              authorId: actor.id,
               taskId: c.taskId,
               content: c.content,
               createdAt: now,
               updatedAt: now,
             });
+            await this.bindContentFiles(
+              c.content,
+              actor,
+              String(task.projectId),
+              c.taskId,
+            );
             return { createdId: id };
           }
-          case "comment.update":
+          case "comment.update": {
+            const comment = await this.get("comments", c.id);
+            const task = await this.get("tasks", String(comment.taskId));
+            await this.bindContentFiles(
+              c.content,
+              actor,
+              String(task.projectId),
+              String(task.id),
+            );
             await this.update("comments", c.id, {
               content: c.content,
               updatedAt: new Date().toISOString(),
             });
             break;
+          }
           case "comment.delete":
             await this.get("comments", c.id);
             await this.remove("comments", { id: c.id });
@@ -1327,6 +1901,8 @@ export class PostgresRepository implements WorkspaceRepository {
       );
       await this.insert("tasks", {
         id: randomUUID(),
+        createdById: this.actorContext.getStore()!.id,
+        leaderId: this.actorContext.getStore()!.id,
         projectId,
         featureId,
         statusId: await ensureStatus(card.idList),

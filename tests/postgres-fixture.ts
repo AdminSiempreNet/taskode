@@ -6,7 +6,10 @@ import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { PostgresRepository } from "../src/server/postgres";
 import { migrationsFolder } from "../src/server/migration-info";
 
-loadEnvConfig(process.cwd());
+// Tests use local development configuration even when production overrides exist.
+loadEnvConfig(process.cwd(), true);
+// Never publish test data using a developer's real Ably application.
+process.env.ABLY_API_KEY = "";
 export function testDatabaseUrl() {
   const url = process.env.TEST_DATABASE_URL;
   if (!url)

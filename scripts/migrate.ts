@@ -7,9 +7,12 @@ import { databaseSchema, databaseUrl } from "../src/server/database";
 import { migrationsFolder } from "../src/server/migration-info";
 import { databasePoolConfig } from "../src/server/database-config";
 
-loadEnvConfig(process.cwd());
+const development = process.argv.includes("--development");
+loadEnvConfig(process.cwd(), development);
 async function main() {
   const schema = databaseSchema();
+  if (development && !["localhost", "127.0.0.1", "::1", "[::1]"].includes(new URL(databaseUrl()).hostname))
+    throw new Error("La migración --development requiere una base PostgreSQL local.");
   const pool = new Pool({
     ...databasePoolConfig(databaseUrl()),
     max: 1,

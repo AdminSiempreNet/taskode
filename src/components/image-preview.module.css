@@ -1,0 +1,97 @@
+.previewDialog[data-slot="dialog-content"] {
+  gap: 0;
+  width: min(900px, calc(100vw - 32px));
+  max-width: 900px;
+  max-height: calc(100dvh - 40px);
+  padding: 0;
+  overflow: hidden;
+  border-radius: 14px;
+}
+.previewHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 20px 50px 18px 22px;
+  border-bottom: 1px solid var(--border);
+}
+.previewHeader > svg {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+.previewHeader > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+.previewTitle[data-slot="dialog-title"] {
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.previewHeader [data-slot="dialog-description"] {
+  font-size: 11px;
+}
+.previewCanvas {
+  display: grid;
+  place-items: center;
+  min-height: 180px;
+  max-height: calc(100dvh - 210px);
+  padding: 20px;
+  overflow: auto;
+  background-color: var(--muted);
+  background-image:
+    linear-gradient(45deg, var(--border) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--border) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--border) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--border) 75%);
+  background-size: 16px 16px;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+}
+.previewCanvas img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100dvh - 250px);
+  object-fit: contain;
+  border-radius: 3px;
+  box-shadow: 0 4px 24px rgb(0 0 0 / 8%);
+}
+.previewCanvas p {
+  max-width: 300px;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--muted-foreground);
+  font-size: 13px;
+  text-align: center;
+}
+.previewFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+}
+.previewFooter > a:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.previewFooter > a:first-child:hover {
+  color: var(--foreground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .previewDialog * {
+    transition: none;
+  }
+}
