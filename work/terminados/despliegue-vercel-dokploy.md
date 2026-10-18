@@ -24,7 +24,7 @@ Vercel aloja la interfaz y las rutas API/autenticación de Next.js. Solo el serv
 
 ## PostgreSQL en Dokploy
 
-El Compose de producción contiene solo `postgres`, usa `pgvector/pgvector:0.8.7-pg18-bookworm` y conserva el volumen `taskode-postgres`. La web y el migrador ya no son servicios de Dokploy. El Compose completo `compose.yaml` sigue disponible como alternativa local.
+El Compose de producción contiene `postgres` y el programador `notifications`. PostgreSQL usa `pgvector/pgvector:0.8.7-pg18-bookworm` y conserva el volumen `taskode-postgres`. La web y el migrador permanecen en Vercel. Configura el secreto compartido del programador según la [guía de notificaciones](../../docs/notificaciones.md). El Compose completo `compose.yaml` sigue disponible como alternativa local.
 
 En instalaciones anteriores al cambio de marca, establece `TASKODE_POSTGRES_VOLUME` con el nombre físico del volumen existente y conserva el proyecto Compose, la base y el rol mediante `COMPOSE_PROJECT_NAME`, `POSTGRES_DB` y `TASKODE_DB_USER`. La variable de contraseña ahora es `TASKODE_DB_PASSWORD`. No cambies el volumen por uno vacío; el [README](../README.md#instalaciones-anteriores-al-cambio-de-marca) detalla la compatibilidad.
 
