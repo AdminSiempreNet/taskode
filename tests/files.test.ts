@@ -35,7 +35,7 @@ test("archivos privados: publicación, pegado antes de crear, referencias, lími
       )
     ).createdId!;
     await repo.execute(
-      { type: "project.member.add", projectId, userId: other.id },
+      { type: "project.team.add", projectId, userId: other.id },
       owner,
     );
     const w = await repo.getWorkspace(owner);

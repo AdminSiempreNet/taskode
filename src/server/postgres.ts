@@ -24,10 +24,15 @@ import type {
   Geography,
   ImportReport,
   Workspace,
+  EntityKind,
+  EntityRef,
+  EntityPermissions,
+  EntityDetailSnapshot,
 } from "../lib/types";
 import { normalizeClientText } from "../lib/clients";
 import { DEFAULT_TASK_TYPES, DEFAULT_IMPACTS } from "../lib/types";
 import { DomainError, type WorkspaceRepository } from "./repository";
+import { entityColumns, rowScope, sameEntity } from "../lib/entities";
 
 type Row = Record<string, string | number | boolean | string[] | null>;
 async function sequential<T>(queries: (() => Promise<T>)[]): Promise<T[]> {
@@ -51,7 +56,7 @@ async function each<T>(
 }
 export class PostgresRepository implements WorkspaceRepository {
   // Incrementar al cambiar el contrato o las migraciones de una instancia cacheada.
-  static readonly cacheVersion = 10;
+  static readonly cacheVersion = 12;
   readonly cacheVersion = PostgresRepository.cacheVersion;
   readonly store: DatabaseStore;
   private actorContext = new AsyncLocalStorage<Actor>();
@@ -193,15 +198,15 @@ export class PostgresRepository implements WorkspaceRepository {
   async requireProject(actor: Actor, projectId: string, manage = false) {
     const user = await this.currentUser(actor),
       project = await this.get("projects", projectId);
-    if (user.role === "admin" || project.ownerId === user.id) return project;
+    if (user.role === "admin" || project.leaderId === user.id) return project;
     const member = (
       await this.store.db
         .select()
-        .from(schema.projectMembers)
+        .from(schema.projectTeamMembers)
         .where(
           and(
-            eq(schema.projectMembers.projectId, projectId),
-            eq(schema.projectMembers.userId, user.id),
+            eq(schema.projectTeamMembers.projectId, projectId),
+            eq(schema.projectTeamMembers.userId, user.id),
           ),
         )
     )[0];
@@ -209,7 +214,7 @@ export class PostgresRepository implements WorkspaceRepository {
       throw new DomainError("El proyecto no existe o no tienes acceso.", 404);
     if (manage)
       throw new DomainError(
-        "Solo el propietario o el administrador puede realizar esta acción.",
+        "Solo el líder o el administrador puede realizar esta acción.",
         403,
       );
     return project;
@@ -218,8 +223,8 @@ export class PostgresRepository implements WorkspaceRepository {
     return or(
       eq(schema.tasks.leaderId, actor.id),
       sql`exists (select 1 from ${schema.taskTeamMembers} c where c."taskId" = ${schema.tasks.id} and c."userId" = ${actor.id})`,
-      sql`exists (select 1 from ${schema.projects} p where p.id = ${schema.tasks.projectId} and p."ownerId" = ${actor.id})`,
-      sql`exists (select 1 from ${schema.features} f left join ${schema.modules} m on m.id = f."moduleId" where f.id = ${schema.tasks.featureId} and (f."ownerId" = ${actor.id} or m."ownerId" = ${actor.id}))`,
+      sql`exists (select 1 from ${schema.projects} p where p.id = ${schema.tasks.projectId} and p."leaderId" = ${actor.id})`,
+      sql`exists (select 1 from ${schema.features} f left join ${schema.modules} m on m.id = f."moduleId" where f.id = ${schema.tasks.featureId} and (f."leaderId" = ${actor.id} or m."leaderId" = ${actor.id}))`,
     );
   }
   async requireScope(actor: Actor, kind: "modules" | "features", id: string) {
@@ -232,12 +237,12 @@ export class PostgresRepository implements WorkspaceRepository {
         : null;
     if (
       user.role !== "admin" &&
-      project.ownerId !== actor.id &&
-      row.ownerId !== actor.id &&
-      parent?.ownerId !== actor.id
+      project.leaderId !== actor.id &&
+      row.leaderId !== actor.id &&
+      parent?.leaderId !== actor.id
     )
       throw new DomainError(
-        "Solo el propietario o un propietario superior puede realizar esta acción.",
+        "Solo el líder o un líder superior puede realizar esta acción.",
         403,
       );
     return row;
@@ -249,8 +254,8 @@ export class PostgresRepository implements WorkspaceRepository {
     const project = await this.requireProject(actor, projectId);
     const members = await this.store.db
       .select()
-      .from(schema.projectMembers)
-      .where(eq(schema.projectMembers.projectId, projectId));
+      .from(schema.projectTeamMembers)
+      .where(eq(schema.projectTeamMembers.projectId, projectId));
     return this.store.db
       .select({
         id: schema.user.id,
@@ -261,7 +266,7 @@ export class PostgresRepository implements WorkspaceRepository {
       .from(schema.user)
       .where(
         or(
-          eq(schema.user.id, String(project.ownerId)),
+          eq(schema.user.id, String(project.leaderId)),
           eq(schema.user.role, "admin"),
           inArray(
             schema.user.id,
@@ -280,9 +285,9 @@ export class PostgresRepository implements WorkspaceRepository {
       : null;
     const manager =
       user.role === "admin" ||
-      project.ownerId === actor.id ||
-      feature.ownerId === actor.id ||
-      module?.ownerId === actor.id ||
+      project.leaderId === actor.id ||
+      feature.leaderId === actor.id ||
+      module?.leaderId === actor.id ||
       task.leaderId === actor.id;
     const teamMember =
       manager ||
@@ -300,19 +305,127 @@ export class PostgresRepository implements WorkspaceRepository {
       },
     };
   }
-  async taskComments(actor: Actor, id: string) {
-    return this.store.snapshot(async () => {
-      const { permissions } = await this.requireTask(actor, id);
-      const comments = await this.find("comments", { taskId: id });
-      const authorIds = [...new Set(comments.map((c) => c.authorId).filter((id): id is string => typeof id === "string"))];
-      const users = authorIds.length ? await this.store.db
-        .select({
-          id: schema.user.id,
-          name: schema.user.name,
-          image: schema.user.image,
+  async requireEntity(
+    actor: Actor,
+    kind: EntityKind,
+    id: string,
+    expectedProject?: string,
+  ) {
+    const table = {
+      project: "projects",
+      module: "modules",
+      feature: "features",
+      task: "tasks",
+    }[kind];
+    const entity = await this.get(table, id);
+    const projectId = String(kind === "project" ? entity.id : entity.projectId);
+    if (expectedProject && expectedProject !== projectId)
+      throw new DomainError("El elemento no pertenece a este proyecto.", 404);
+    const project = await this.requireProject(actor, projectId);
+    const user = await this.currentUser(actor);
+    const parent =
+      kind === "feature" && entity.moduleId
+        ? await this.get("modules", String(entity.moduleId))
+        : null;
+    const manager =
+      user.role === "admin" ||
+      project.leaderId === actor.id ||
+      (kind !== "project" && entity.leaderId === actor.id) ||
+      parent?.leaderId === actor.id;
+    const taskPermissions =
+      kind === "task" ? (await this.requireTask(actor, id)).permissions : null;
+    const teamMember =
+      (kind === "module" || kind === "feature") &&
+      (
+        await this.find(`${kind}_team_members`, {
+          [`${kind}Id`]: id,
+          userId: actor.id,
         })
-        .from(schema.user)
-        .where(inArray(schema.user.id, authorIds)) : [];
+      ).length > 0;
+    const permissions: EntityPermissions = {
+      canEdit: manager || teamMember,
+      canDelete: manager,
+      canManageAccess: manager,
+      canModerateComments: manager,
+      ...taskPermissions,
+      canComment: true,
+      canManageDocuments: taskPermissions?.canEdit ?? (manager || teamMember),
+    };
+    return {
+      scope: { kind, id, projectId } satisfies EntityRef,
+      entity,
+      permissions,
+    };
+  }
+  async entityDetail(
+    actor: Actor,
+    kind: EntityKind,
+    id: string,
+    projectId?: string,
+  ): Promise<EntityDetailSnapshot> {
+    return this.store.snapshot(async () => {
+      const detail = await this.requireEntity(actor, kind, id, projectId);
+      const files = (
+        await this.find("files", {
+          ...entityColumns(detail.scope),
+          status: "ready",
+        })
+      ).map(
+        ({ storageKey: _key, uploadedBy: _by, status: _status, ...file }) =>
+          file,
+      );
+      const teamMemberIds = (
+        await this.find(`${kind}_team_members`, { [`${kind}Id`]: id })
+      ).map((m) => String(m.userId));
+      return {
+        ...detail,
+        entity: { ...detail.entity, teamMemberIds },
+        files,
+      } as unknown as EntityDetailSnapshot;
+    });
+  }
+  private async commentScope(command: Command): Promise<EntityRef> {
+    if (command.type === "comment.create") {
+      if (command.scope && !command.taskId) return command.scope;
+      if (command.taskId && !command.scope) {
+        const task = await this.get("tasks", command.taskId);
+        return {
+          kind: "task",
+          id: command.taskId,
+          projectId: String(task.projectId),
+        };
+      }
+      throw new DomainError("Indica un único destino para el comentario.");
+    }
+    if (command.type === "comment.update" || command.type === "comment.delete")
+      return rowScope(
+        (await this.get("comments", command.id)) as Parameters<
+          typeof rowScope
+        >[0],
+      )!;
+    throw new DomainError("Operación de comentario inválida.");
+  }
+  async entityComments(actor: Actor, kind: EntityKind, id: string) {
+    return this.store.snapshot(async () => {
+      const { permissions, scope } = await this.requireEntity(actor, kind, id);
+      const comments = await this.find("comments", entityColumns(scope));
+      const authorIds = [
+        ...new Set(
+          comments
+            .map((c) => c.authorId)
+            .filter((id): id is string => typeof id === "string"),
+        ),
+      ];
+      const users = authorIds.length
+        ? await this.store.db
+            .select({
+              id: schema.user.id,
+              name: schema.user.name,
+              image: schema.user.image,
+            })
+            .from(schema.user)
+            .where(inArray(schema.user.id, authorIds))
+        : [];
       return {
         permissions,
         comments: comments
@@ -322,7 +435,13 @@ export class PostgresRepository implements WorkspaceRepository {
               String(a.id).localeCompare(String(b.id)),
           )
           .map((c) => ({
-            ...c,
+            id: String(c.id),
+            taskId: c.taskId === null ? null : String(c.taskId),
+            content: String(c.content),
+            createdAt: String(c.createdAt),
+            updatedAt: String(c.updatedAt),
+            authorId: c.authorId === null ? null : String(c.authorId),
+            scope,
             author: users.find((u) => u.id === c.authorId) ?? null,
             canEdit: c.authorId === actor.id,
             canDelete:
@@ -331,36 +450,99 @@ export class PostgresRepository implements WorkspaceRepository {
       };
     });
   }
-  async executeComment(actor: Actor, taskId: string, command: Command) {
+  async taskComments(actor: Actor, id: string) {
+    return this.entityComments(actor, "task", id);
+  }
+  async executeEntityComment(
+    actor: Actor,
+    kind: EntityKind,
+    id: string,
+    command: Command,
+  ) {
     return this.transaction(async () => {
-      await this.requireTask(actor, taskId);
-      if (command.type === "comment.create") {
-        if (command.taskId !== taskId) throw new DomainError("La tarea no coincide.");
-      } else if (command.type === "comment.update" || command.type === "comment.delete") {
-        const comment = await this.get("comments", command.id);
-        if (comment.taskId !== taskId) throw new DomainError("El comentario no pertenece a esta tarea.", 404);
-      } else throw new DomainError("Operación de comentario inválida.");
+      const { scope } = await this.requireEntity(actor, kind, id);
+      if (!sameEntity(scope, await this.commentScope(command)))
+        throw new DomainError(
+          "El comentario no pertenece a este elemento.",
+          404,
+        );
       const result = await this.execute(command, actor);
-      return { ...result, ...(await this.taskComments(actor, taskId)) };
+      return { ...result, ...(await this.entityComments(actor, kind, id)) };
     });
   }
-  async commentRecipients(taskId: string): Promise<string[]> {
+  async executeComment(actor: Actor, taskId: string, command: Command) {
+    return this.executeEntityComment(actor, "task", taskId, command);
+  }
+  async commentRecipients(
+    taskId: string,
+    kind: EntityKind = "task",
+  ): Promise<string[]> {
     return this.store.snapshot(async () => {
+      if (kind !== "task") {
+        const table = {
+          project: "projects",
+          module: "modules",
+          feature: "features",
+        }[kind];
+        const entity = (await this.find(table, { id: taskId }))[0];
+        if (!entity) return [];
+        const projectId = String(
+          kind === "project" ? entity.id : entity.projectId,
+        );
+        const project = await this.get("projects", projectId);
+        const members = await this.findProjectMemberIds(projectId);
+        const users = await this.store.db
+          .select({ id: schema.user.id })
+          .from(schema.user)
+          .where(
+            or(
+              eq(schema.user.role, "admin"),
+              inArray(schema.user.id, [String(project.leaderId), ...members]),
+            ),
+          );
+        return users.map((u) => u.id);
+      }
       const task = (await this.find("tasks", { id: taskId }))[0];
       if (!task) return [];
       const project = await this.get("projects", String(task.projectId));
       const feature = await this.get("features", String(task.featureId));
-      const module = feature.moduleId ? await this.get("modules", String(feature.moduleId)) : null;
-      const owners = [project.ownerId, feature.ownerId, module?.ownerId, task.leaderId].filter((id): id is string => typeof id === "string");
-      const users = await this.store.db.select({ id: schema.user.id }).from(schema.user).where(or(
-        eq(schema.user.role, "admin"),
-        and(
-          or(eq(schema.user.id, String(project.ownerId)), sql`exists (select 1 from ${schema.projectMembers} pm where pm."projectId" = ${task.projectId} and pm."userId" = ${schema.user.id})`),
-          or(inArray(schema.user.id, owners), sql`exists (select 1 from ${schema.taskTeamMembers} tm where tm."taskId" = ${taskId} and tm."userId" = ${schema.user.id})`),
-        ),
-      ));
+      const module = feature.moduleId
+        ? await this.get("modules", String(feature.moduleId))
+        : null;
+      const owners = [
+        project.leaderId,
+        feature.leaderId,
+        module?.leaderId,
+        task.leaderId,
+      ].filter((id): id is string => typeof id === "string");
+      const users = await this.store.db
+        .select({ id: schema.user.id })
+        .from(schema.user)
+        .where(
+          or(
+            eq(schema.user.role, "admin"),
+            and(
+              or(
+                eq(schema.user.id, String(project.leaderId)),
+                sql`exists (select 1 from ${schema.projectTeamMembers} pm where pm."projectId" = ${task.projectId} and pm."userId" = ${schema.user.id})`,
+              ),
+              or(
+                inArray(schema.user.id, owners),
+                sql`exists (select 1 from ${schema.taskTeamMembers} tm where tm."taskId" = ${taskId} and tm."userId" = ${schema.user.id})`,
+              ),
+            ),
+          ),
+        );
       return users.map((user) => user.id);
     });
+  }
+  private async findProjectMemberIds(projectId: string) {
+    return (
+      await this.store.db
+        .select({ id: schema.projectTeamMembers.userId })
+        .from(schema.projectTeamMembers)
+        .where(eq(schema.projectTeamMembers.projectId, projectId))
+    ).map((m) => m.id);
   }
   private async setTaskAssignment(
     id: string,
@@ -382,8 +564,12 @@ export class PostgresRepository implements WorkspaceRepository {
     content: string,
     actor: Actor,
     projectId: string,
-    taskId: string,
+    taskId: string | EntityRef,
   ) {
+    const scope: EntityRef =
+      typeof taskId === "string"
+        ? { kind: "task", id: taskId, projectId }
+        : taskId;
     if (/!\[[^\]]*\]\(\s*(?:data:|blob:)/i.test(content))
       throw new DomainError(
         "Carga la imagen al almacenamiento antes de guardar.",
@@ -396,39 +582,74 @@ export class PostgresRepository implements WorkspaceRepository {
       if (
         file.projectId !== projectId ||
         file.status !== "ready" ||
-        (file.taskId === null &&
+        (file.scopeType === null &&
           Date.parse(String(file.createdAt)) < Date.now() - 86400000) ||
-        (file.taskId !== taskId &&
-          (file.taskId !== null || file.uploadedBy !== actor.id))
+        (!sameEntity(rowScope(file as Parameters<typeof rowScope>[0]), scope) &&
+          (file.scopeType !== null || file.uploadedBy !== actor.id))
       )
         throw new DomainError(
           "La imagen no pertenece a esta tarea o no terminó de cargar.",
           403,
         );
-      if (file.taskId === null) await this.update("files", id, { taskId });
+      if (file.scopeType === null) {
+        if (
+          file.purpose === "document" &&
+          !(
+            await this.requireEntity(
+              actor,
+              scope.kind,
+              scope.id,
+              scope.projectId,
+            )
+          ).permissions.canManageDocuments
+        )
+          throw new DomainError(
+            "No puedes gestionar los documentos de este elemento.",
+            403,
+          );
+        await this.update("files", id, entityColumns(scope));
+      }
     }
   }
   private async authorize(command: Command, actor: Actor) {
     await this.currentUser(actor);
     const c = command;
+    if (c.type.startsWith("comment.")) {
+      const scope = await this.commentScope(c);
+      const { permissions } = await this.requireEntity(
+        actor,
+        scope.kind,
+        scope.id,
+        scope.projectId,
+      );
+      if (c.type === "comment.update" || c.type === "comment.delete") {
+        const comment = await this.get("comments", c.id);
+        if (
+          comment.authorId !== actor.id &&
+          !(c.type === "comment.delete" && permissions.canModerateComments)
+        )
+          throw new DomainError(
+            "Solo puedes editar tus propios comentarios.",
+            403,
+          );
+      }
+      return;
+    }
     if (c.type === "settings.update") {
       await this.requireAdmin(actor);
       return;
     }
     if (
       (c.type.startsWith("task.") && c.type !== "task.create") ||
-      c.type.startsWith("checklist.") ||
-      c.type.startsWith("comment.")
+      c.type.startsWith("checklist.")
     ) {
       let taskId: string;
-      if ("taskId" in c) taskId = c.taskId;
+      if ("taskId" in c && c.taskId) taskId = c.taskId;
       else if ("checklistId" in c)
         taskId = String((await this.get("checklists", c.checklistId)).taskId);
       else {
         const entry = c as { id: string };
         if (c.type.startsWith("task.")) taskId = entry.id;
-        else if (c.type.startsWith("comment."))
-          taskId = String((await this.get("comments", entry.id)).taskId);
         else if (c.type.startsWith("checklist.item.")) {
           const item = await this.get("checklist_items", entry.id);
           taskId = String(
@@ -444,20 +665,9 @@ export class PostgresRepository implements WorkspaceRepository {
         !permissions.canManageAccess
       )
         throw new DomainError(
-          "Solo el líder o un propietario puede realizar esta acción.",
+          "Solo el líder o un líder superior puede realizar esta acción.",
           403,
         );
-      if (c.type === "comment.update" || c.type === "comment.delete") {
-        const comment = await this.get("comments", c.id);
-        if (
-          comment.authorId !== actor.id &&
-          !(c.type === "comment.delete" && permissions.canModerateComments)
-        )
-          throw new DomainError(
-            "Solo puedes editar tus propios comentarios.",
-            403,
-          );
-      }
       if (c.type === "task.move" && c.beforeId) {
         const target = await this.requireTask(actor, c.beforeId);
         if (target.task.projectId !== task.projectId)
@@ -473,7 +683,28 @@ export class PostgresRepository implements WorkspaceRepository {
           (c as { projectId: string }).projectId,
           true,
         );
-      else await this.requireScope(actor, kind, (c as { id: string }).id);
+      else if (
+        c.type === "module.rename" ||
+        c.type === "module.update" ||
+        c.type === "feature.rename" ||
+        c.type === "feature.update"
+      ) {
+        const detail = await this.requireEntity(
+          actor,
+          kind === "modules" ? "module" : "feature",
+          c.id,
+        );
+        if (
+          !detail.permissions.canEdit ||
+          (c.type === "feature.update" &&
+            (c.moduleId ?? null) !== detail.entity.moduleId &&
+            !detail.permissions.canManageAccess)
+        )
+          throw new DomainError(
+            "Solo los líderes pueden mover elementos o gestionar su acceso.",
+            403,
+          );
+      } else await this.requireScope(actor, kind, (c as { id: string }).id);
       return;
     }
     if (c.type.startsWith("client.")) return;
@@ -482,7 +713,7 @@ export class PostgresRepository implements WorkspaceRepository {
       (c.type === "trello.import" && c.projectId === null)
     )
       return;
-    if (c.type === "project.transferOwnership") {
+    if (c.type === "project.leader.update") {
       await this.requireAdmin(actor);
       await this.requireProject(actor, c.id, true);
       return;
@@ -504,7 +735,7 @@ export class PostgresRepository implements WorkspaceRepository {
             } as Record<string, string>
           )[c.type.split(".")[0]];
       let row: Row;
-      if ("taskId" in c) {
+      if ("taskId" in c && c.taskId) {
         table = "tasks";
         row = await this.get(table, c.taskId);
       } else if ("checklistId" in c) {
@@ -525,9 +756,61 @@ export class PostgresRepository implements WorkspaceRepository {
       );
     await this.requireProject(actor, projectId, manage);
   }
+  private async setEntityAssignment(
+    actor: Actor,
+    kind: "project" | "module" | "feature",
+    id: string,
+    leaderId: string,
+    teamMemberIds: string[],
+  ) {
+    const detail = await this.requireEntity(actor, kind, id);
+    if (!detail.permissions.canManageAccess)
+      throw new DomainError("Solo los líderes pueden gestionar usuarios.", 403);
+    const next = [...new Set(teamMemberIds)].filter(
+      (userId) => userId !== leaderId,
+    );
+    if (kind === "project") {
+      if (leaderId !== detail.entity.leaderId) {
+        await this.requireAdmin(actor);
+        await this.accessCommand({
+          type: "project.leader.update",
+          id,
+          userId: leaderId,
+        });
+        if (!next.includes(String(detail.entity.leaderId)))
+          next.push(String(detail.entity.leaderId));
+      }
+      const current = await this.find("project_team_members", {
+        projectId: id,
+      });
+      // Add before removing: all changes share the command transaction.
+      for (const userId of next)
+        await this.accessCommand({
+          type: "project.team.add",
+          projectId: id,
+          userId,
+        });
+      for (const member of current)
+        if (!next.includes(String(member.userId)))
+          await this.accessCommand({
+            type: "project.team.remove",
+            projectId: id,
+            userId: String(member.userId),
+          });
+      return;
+    }
+    for (const userId of [leaderId, ...next])
+      await this.requireParticipant(detail.scope.projectId, userId);
+    await this.update(kind === "module" ? "modules" : "features", id, {
+      leaderId,
+    });
+    await this.remove(`${kind}_team_members`, { [`${kind}Id`]: id });
+    for (const userId of next)
+      await this.insert(`${kind}_team_members`, { [`${kind}Id`]: id, userId });
+  }
   private async accessCommand(command: Command): Promise<boolean> {
     const c = command;
-    if (c.type === "project.transferOwnership") {
+    if (c.type === "project.leader.update") {
       if (
         !(
           await this.store.db
@@ -539,21 +822,21 @@ export class PostgresRepository implements WorkspaceRepository {
         throw new DomainError("El usuario no existe.", 404);
       const old = await this.get("projects", c.id);
       await this.store.db
-        .insert(schema.projectMembers)
-        .values({ projectId: c.id, userId: String(old.ownerId) })
+        .insert(schema.projectTeamMembers)
+        .values({ projectId: c.id, userId: String(old.leaderId) })
         .onConflictDoNothing();
-      await this.update("projects", c.id, { ownerId: c.userId });
+      await this.update("projects", c.id, { leaderId: c.userId });
       await this.store.db
-        .delete(schema.projectMembers)
+        .delete(schema.projectTeamMembers)
         .where(
           and(
-            eq(schema.projectMembers.projectId, c.id),
-            eq(schema.projectMembers.userId, c.userId),
+            eq(schema.projectTeamMembers.projectId, c.id),
+            eq(schema.projectTeamMembers.userId, c.userId),
           ),
         );
       return true;
     }
-    if (c.type === "project.member.add" || c.type === "project.member.remove") {
+    if (c.type === "project.team.add" || c.type === "project.team.remove") {
       if (
         !(
           await this.store.db
@@ -564,11 +847,11 @@ export class PostgresRepository implements WorkspaceRepository {
       )
         throw new DomainError("El usuario no existe.", 404);
       const project = await this.get("projects", c.projectId);
-      if (project.ownerId === c.userId)
-        throw new DomainError("El propietario ya tiene acceso al proyecto.");
-      if (c.type === "project.member.add")
+      if (project.leaderId === c.userId)
+        throw new DomainError("El líder ya tiene acceso al proyecto.");
+      if (c.type === "project.team.add")
         await this.store.db
-          .insert(schema.projectMembers)
+          .insert(schema.projectTeamMembers)
           .values({ projectId: c.projectId, userId: c.userId })
           .onConflictDoNothing();
       else {
@@ -584,17 +867,28 @@ export class PostgresRepository implements WorkspaceRepository {
           .limit(1);
         const modules = await this.find("modules", {
           projectId: c.projectId,
-          ownerId: c.userId,
+          leaderId: c.userId,
         });
         const features = await this.find("features", {
           projectId: c.projectId,
-          ownerId: c.userId,
+          leaderId: c.userId,
         });
         if (owned.length || modules.length || features.length)
           throw new DomainError(
             "Reasigna primero las tareas, módulos y features de este usuario.",
             409,
           );
+        for (const kind of ["module", "feature"] as const) {
+          const elements = await this.find(
+            kind === "module" ? "modules" : "features",
+            { projectId: c.projectId },
+          );
+          for (const element of elements)
+            await this.remove(`${kind}_team_members`, {
+              [`${kind}Id`]: String(element.id),
+              userId: c.userId,
+            });
+        }
         await this.store.db
           .delete(schema.taskTeamMembers)
           .where(
@@ -610,11 +904,11 @@ export class PostgresRepository implements WorkspaceRepository {
             ),
           );
         await this.store.db
-          .delete(schema.projectMembers)
+          .delete(schema.projectTeamMembers)
           .where(
             and(
-              eq(schema.projectMembers.projectId, c.projectId),
-              eq(schema.projectMembers.userId, c.userId),
+              eq(schema.projectTeamMembers.projectId, c.projectId),
+              eq(schema.projectTeamMembers.userId, c.userId),
             ),
           );
       }
@@ -642,12 +936,12 @@ export class PostgresRepository implements WorkspaceRepository {
     const currentUser = await this.currentUser(actor);
     const memberships = await this.store.db
       .select()
-      .from(schema.projectMembers)
-      .where(eq(schema.projectMembers.userId, actor.id));
+      .from(schema.projectTeamMembers)
+      .where(eq(schema.projectTeamMembers.userId, actor.id));
     const projects = (await this.all("projects")).filter(
       (p) =>
         currentUser.role === "admin" ||
-        p.ownerId === actor.id ||
+        p.leaderId === actor.id ||
         memberships.some((m) => m.projectId === p.id),
     );
     const ids = projects.map((p) => String(p.id));
@@ -694,6 +988,18 @@ export class PostgresRepository implements WorkspaceRepository {
     ]);
     const taskIds = tasks.map((t) => String(t.id));
     const teamMembers = await rows("task_team_members", "taskId", taskIds);
+    const projectTeams = await rows("project_team_members");
+    const moduleTeams = await rows(
+      "module_team_members",
+      "moduleId",
+      modules.map((m) => String(m.id)),
+    );
+    const featureTeams = await rows(
+      "feature_team_members",
+      "featureId",
+      features.map((f) => String(f.id)),
+    );
+
     const files = (await rows("files", "taskId", taskIds)).filter(
       (f) => f.status === "ready",
     );
@@ -716,10 +1022,10 @@ export class PostgresRepository implements WorkspaceRepository {
       .from(schema.user);
     const managesScope = (f: Row, module = false) =>
       currentUser.role === "admin" ||
-      projects.some((p) => p.id === f.projectId && p.ownerId === actor.id) ||
-      f.ownerId === actor.id ||
+      projects.some((p) => p.id === f.projectId && p.leaderId === actor.id) ||
+      f.leaderId === actor.id ||
       (!module &&
-        modules.some((m) => m.id === f.moduleId && m.ownerId === actor.id));
+        modules.some((m) => m.id === f.moduleId && m.leaderId === actor.id));
     const associations = await rows("task_clients", "taskId", taskIds);
     const clientIdsByTask = new Map<string, string[]>();
     for (const link of associations) {
@@ -769,17 +1075,32 @@ export class PostgresRepository implements WorkspaceRepository {
         step: state.onboardingStep,
         firstProjectId: state.firstProjectId,
       },
-      projects,
+      projects: projects.map((p) => ({
+        ...p,
+        teamMemberIds: projectTeams
+          .filter((m) => m.projectId === p.id && m.userId !== p.leaderId)
+          .map((m) => String(m.userId)),
+      })),
       people,
       settings: { maxAttachmentBytes: state.maxAttachmentBytes },
       modules: sort(modules).map((m) => ({
         ...m,
         canManage: managesScope(m, true),
+        teamMemberIds: moduleTeams
+          .filter(
+            (link) => link.moduleId === m.id && link.userId !== m.leaderId,
+          )
+          .map((link) => String(link.userId)),
       })),
       features: sort(features).map((f) => ({
         ...f,
         pinned: Boolean(f.pinned),
         canManage: managesScope(f),
+        teamMemberIds: featureTeams
+          .filter(
+            (link) => link.featureId === f.id && link.userId !== f.leaderId,
+          )
+          .map((link) => String(link.userId)),
       })),
       statuses: sort(statuses).map((s) => ({
         ...s,
@@ -970,8 +1291,14 @@ export class PostgresRepository implements WorkspaceRepository {
       icon,
       color,
       createdAt: new Date().toISOString(),
-      ownerId: this.actorContext.getStore()!.id,
+      leaderId: this.actorContext.getStore()!.id,
     });
+    await this.bindContentFiles(
+      description,
+      this.actorContext.getStore()!,
+      id,
+      { kind: "project", id, projectId: id },
+    );
     await this.defaultPriorities(id);
     for (const [table, options] of [
       ["task_types", DEFAULT_TASK_TYPES],
@@ -1011,7 +1338,7 @@ export class PostgresRepository implements WorkspaceRepository {
     const id = randomUUID();
     await this.insert("features", {
       id,
-      ownerId: this.actorContext.getStore()!.id,
+      leaderId: this.actorContext.getStore()!.id,
       projectId,
       moduleId,
       number: await this.nextFeatureNumber(projectId, moduleId),
@@ -1019,6 +1346,12 @@ export class PostgresRepository implements WorkspaceRepository {
       description,
       position: await this.nextPosition("features", projectId),
     });
+    await this.bindContentFiles(
+      description,
+      this.actorContext.getStore()!,
+      projectId,
+      { kind: "feature", id, projectId },
+    );
     return id;
   }
   private async nextFeatureNumber(projectId: string, moduleId: string | null) {
@@ -1068,6 +1401,20 @@ export class PostgresRepository implements WorkspaceRepository {
     return this.actorContext.run(actor, async () =>
       this.transaction(async () => {
         await this.authorize(command, actor);
+        if (
+          command.type === "project.assignment.update" ||
+          command.type === "module.assignment.update" ||
+          command.type === "feature.assignment.update"
+        ) {
+          await this.setEntityAssignment(
+            actor,
+            command.type.split(".")[0] as "project" | "module" | "feature",
+            command.id,
+            command.leaderId,
+            command.teamMemberIds,
+          );
+          return {};
+        }
         if (command.type === "settings.update") {
           await this.store.db
             .update(schema.installation)
@@ -1076,15 +1423,20 @@ export class PostgresRepository implements WorkspaceRepository {
           return {};
         }
         if (
-          command.type === "module.transferOwnership" ||
-          command.type === "feature.transferOwnership"
+          command.type === "module.leader.update" ||
+          command.type === "feature.leader.update"
         ) {
           const table = command.type.startsWith("module.")
             ? "modules"
             : "features";
           const row = await this.get(table, command.id);
           await this.requireParticipant(String(row.projectId), command.userId);
-          await this.update(table, command.id, { ownerId: command.userId });
+          await this.update(table, command.id, { leaderId: command.userId });
+          const kind = table === "modules" ? "module" : "feature";
+          await this.remove(`${kind}_team_members`, {
+            [`${kind}Id`]: command.id,
+            userId: command.userId,
+          });
           return {};
         }
         if (command.type === "task.assignment.update") {
@@ -1153,12 +1505,28 @@ export class PostgresRepository implements WorkspaceRepository {
             return { createdId: id };
           }
           case "project.update":
+            await this.bindContentFiles(c.description, actor, c.id, {
+              kind: "project",
+              id: c.id,
+              projectId: c.id,
+            });
             await this.update("projects", c.id, {
               name: c.name,
               description: c.description,
               icon: c.icon,
               color: c.color,
             });
+            break;
+          case "project.rename":
+          case "module.rename":
+          case "feature.rename":
+            await this.update(
+              { project: "projects", module: "modules", feature: "features" }[
+                c.type.split(".")[0] as "project" | "module" | "feature"
+              ],
+              c.id,
+              { name: c.name },
+            );
             break;
           case "project.delete":
             await this.get("projects", c.id);
@@ -1171,20 +1539,33 @@ export class PostgresRepository implements WorkspaceRepository {
             const id = randomUUID();
             await this.insert("modules", {
               id,
-              ownerId: actor.id,
+              leaderId: actor.id,
               projectId: c.projectId,
               name: c.name,
               description: c.description,
               position: await this.nextPosition("modules", c.projectId),
             });
+            await this.bindContentFiles(c.description, actor, c.projectId, {
+              kind: "module",
+              id,
+              projectId: c.projectId,
+            });
             return { createdId: id };
           }
-          case "module.update":
+          case "module.update": {
+            const module = await this.get("modules", c.id);
+            const projectId = String(module.projectId);
+            await this.bindContentFiles(c.description, actor, projectId, {
+              kind: "module",
+              id: c.id,
+              projectId,
+            });
             await this.update("modules", c.id, {
               name: c.name,
               description: c.description,
             });
             break;
+          }
           case "module.delete": {
             const module = await this.get("modules", c.id);
             for (const feature of (await this.all("features")).filter(
@@ -1231,6 +1612,16 @@ export class PostgresRepository implements WorkspaceRepository {
             };
           case "feature.update": {
             const feature = await this.get("features", c.id);
+            await this.bindContentFiles(
+              c.description,
+              actor,
+              String(feature.projectId),
+              {
+                kind: "feature",
+                id: c.id,
+                projectId: String(feature.projectId),
+              },
+            );
             const moduleId =
               c.moduleId === undefined
                 ? (feature.moduleId as string | null)
@@ -1535,11 +1926,15 @@ export class PostgresRepository implements WorkspaceRepository {
                   .where(inArray(schema.clients.id, clientIds))
               : [];
             if (valid.length !== clientIds.length)
-              throw new DomainError("Uno de los clientes seleccionados ya no existe.");
+              throw new DomainError(
+                "Uno de los clientes seleccionados ya no existe.",
+              );
             await this.remove("task_clients", { taskId: c.id });
             for (const clientId of clientIds)
               await this.insert("task_clients", { taskId: c.id, clientId });
-            await this.update("tasks", c.id, { updatedAt: new Date().toISOString() });
+            await this.update("tasks", c.id, {
+              updatedAt: new Date().toISOString(),
+            });
             break;
           }
           case "task.move": {
@@ -1775,12 +2170,23 @@ export class PostgresRepository implements WorkspaceRepository {
             await this.remove("checklist_items", { id: c.id });
             break;
           case "comment.create": {
-            const task = await this.get("tasks", c.taskId);
+            const scope = await this.commentScope(c);
             if (c.requestId) {
-              const existing = (await this.find("comments", { id: c.requestId }))[0];
+              const existing = (
+                await this.find("comments", { id: c.requestId })
+              )[0];
               if (existing) {
-                if (existing.taskId !== c.taskId || existing.authorId !== actor.id)
-                  throw new DomainError("El identificador del mensaje ya está en uso.", 409);
+                if (
+                  !sameEntity(
+                    rowScope(existing as Parameters<typeof rowScope>[0]),
+                    scope,
+                  ) ||
+                  existing.authorId !== actor.id
+                )
+                  throw new DomainError(
+                    "El identificador del mensaje ya está en uso.",
+                    409,
+                  );
                 return { createdId: c.requestId };
               }
             }
@@ -1789,7 +2195,7 @@ export class PostgresRepository implements WorkspaceRepository {
             await this.insert("comments", {
               id,
               authorId: actor.id,
-              taskId: c.taskId,
+              ...entityColumns(scope),
               content: c.content,
               createdAt: now,
               updatedAt: now,
@@ -1797,19 +2203,19 @@ export class PostgresRepository implements WorkspaceRepository {
             await this.bindContentFiles(
               c.content,
               actor,
-              String(task.projectId),
-              c.taskId,
+              scope.projectId,
+              scope,
             );
             return { createdId: id };
           }
           case "comment.update": {
             const comment = await this.get("comments", c.id);
-            const task = await this.get("tasks", String(comment.taskId));
+            const scope = rowScope(comment as Parameters<typeof rowScope>[0])!;
             await this.bindContentFiles(
               c.content,
               actor,
-              String(task.projectId),
-              String(task.id),
+              scope.projectId,
+              scope,
             );
             await this.update("comments", c.id, {
               content: c.content,

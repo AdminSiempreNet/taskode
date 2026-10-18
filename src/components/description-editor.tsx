@@ -35,6 +35,7 @@ export function DescriptionEditor({
   disabled,
   uploadImage,
   onUploadingChange,
+  label = "Descripción de la tarea",
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -43,6 +44,7 @@ export function DescriptionEditor({
   disabled: boolean;
   uploadImage?: (file: File) => Promise<string>;
   onUploadingChange?: (count: number) => void;
+  label?: string;
 }) {
   const lastValue = useRef(value);
   const uploads = useRef({ uploadImage, onUploadingChange });
@@ -86,7 +88,7 @@ export function DescriptionEditor({
     editorProps: {
       attributes: {
         role: "textbox",
-        "aria-label": "Descripción de la tarea",
+        "aria-label": label,
         "aria-multiline": "true",
         class: "rich-text description-writing",
       },
@@ -239,7 +241,7 @@ export function DescriptionEditor({
       ref={root}
       className="description-editor"
       data-editing={editing}
-      aria-label="Descripción de la tarea"
+      aria-label={label}
       onBlurCapture={(event) => {
         if (
           event.relatedTarget instanceof Node &&

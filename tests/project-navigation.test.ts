@@ -14,7 +14,7 @@ import type { Project } from "../src/lib/types";
 
 const projects: Project[] = Array.from({ length: 8 }, (_, index) => ({
   id: `project-${index}`,
-  ownerId: "user-a",
+  leaderId: "user-a",
   name: index === 0 ? "Administración" : `Proyecto ${index}`,
   description: "",
   icon: "📋",

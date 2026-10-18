@@ -1,30 +1,44 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Task, UserSummary } from "@/lib/types";
+import type { Task, UserSummary, EntityRef, TaskComment } from "@/lib/types";
 import { TaskCommentsClient, type ChatState } from "@/lib/task-comments-client";
 
 export function useTaskComments(task: Task | undefined, user: UserSummary) {
+  return useEntityComments(
+    task ? { kind: "task", id: task.id, projectId: task.projectId } : undefined,
+    user,
+    task?.comments ?? [],
+    true,
+  );
+}
+export function useEntityComments(
+  scope: EntityRef | undefined,
+  user: UserSummary,
+  comments: TaskComment[] = [],
+  legacy = false,
+) {
   const client = useRef<TaskCommentsClient | null>(null);
-  const initial = useRef({ task, user });
-  initial.current = { task, user };
+  const initial = useRef({ scope, user, comments });
+  initial.current = { scope, user, comments };
   const [state, setState] = useState<ChatState>({
-    comments: task?.comments ?? [],
+    comments,
     connection: "connecting",
     sending: false,
     pending: null,
     error: "",
   });
   useEffect(() => {
-    const { task, user } = initial.current;
-    if (!task) {
+    const { scope, user, comments } = initial.current;
+    if (!scope) {
       client.current = null;
       return;
     }
     const conversation = new TaskCommentsClient(
-      task.id,
-      task.comments,
+      scope.id,
+      comments,
       user,
       setState,
+      legacy ? {} : { scope },
     );
     client.current = conversation;
     setState(conversation.state);
@@ -42,7 +56,7 @@ export function useTaskComments(task: Task | undefined, user: UserSummary) {
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", refresh);
     };
-  }, [task?.id, user.id]);
+  }, [scope?.kind, scope?.id, scope?.projectId, user.id, legacy]);
   const mutate = useCallback(
     (command: unknown) =>
       client.current?.mutate(command) ?? Promise.resolve(null),

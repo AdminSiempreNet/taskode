@@ -126,7 +126,7 @@ for (const [kind, catalog, field] of [
       const other = await project(repo, "Otro proyecto");
       const member = await addUser(repo, `member-${kind}`);
       await repo.execute(
-        { type: "project.member.add", projectId, userId: member.id },
+        { type: "project.team.add", projectId, userId: member.id },
         actor,
       );
       const create = {
@@ -149,7 +149,7 @@ for (const [kind, catalog, field] of [
           commandSchema.parse({ ...create, name: "Prohibida" }),
           member,
         ),
-        /propietario/,
+        /líder/,
       );
       await assert.rejects(
         repo.execute(
@@ -228,7 +228,7 @@ for (const [kind, catalog, field] of [
           commandSchema.parse({ type: `${kind}.delete`, projectId, id }),
           member,
         ),
-        /propietario/,
+        /líder/,
       );
       await assert.rejects(
         repo.execute(

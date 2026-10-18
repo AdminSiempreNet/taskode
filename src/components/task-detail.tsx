@@ -47,12 +47,18 @@ import { FeatureCombobox } from "./feature-combobox";
 import { TaskAssignments } from "./task-people";
 import { TaskDocuments } from "./task-documents";
 import { ResizableTaskPanels } from "./resizable-task-panels";
+import { DetailTabs } from "./detail-tabs";
 import { TaskComments } from "./task-comments";
 import { uploadFile } from "@/lib/file-client";
 import { DescriptionEditor } from "./description-editor";
 import { useUnsavedChanges } from "./unsaved-changes";
 import { useTaskComments } from "./use-task-comments";
-import { getProjectView, projectPath, taskPath } from "@/lib/routes";
+import {
+  getProjectView,
+  projectPath,
+  taskPath,
+  safeReturnTo,
+} from "@/lib/routes";
 import type {
   Checklist,
   ChecklistItem,
@@ -129,7 +135,9 @@ export function TaskDetail({
   sidebarControls: ReactNode;
 }) {
   const router = useRouter();
-  const view = getProjectView(useSearchParams().get("view"));
+  const searchParams = useSearchParams();
+  const view = getProjectView(searchParams.get("view"));
+  const returnTo = safeReturnTo(project.id, searchParams.get("returnTo"));
   const { priorities, taskTypes, impacts } = useProjectCatalog();
   const features = workspace.features.filter(
     (feature) => feature.projectId === project.id,
@@ -232,7 +240,10 @@ export function TaskDetail({
       dueTime !== (task.dueTime ?? "") ||
       JSON.stringify(labels) !== JSON.stringify(task.labels)
     : dirty || !!title.trim() || !!description;
-  const { requestNavigation, leaveDialog } = useUnsavedChanges(pending, busy);
+  const { requestNavigation, leaveDialog } = useUnsavedChanges(
+    pending || !!commentDraft.trim(),
+    busy,
+  );
   const previousLabels = useRef(task?.labels);
   useEffect(() => {
     if (
@@ -343,12 +354,12 @@ export function TaskDetail({
           leaderId === workspace.currentUser.id ||
           teamMemberIds.includes(workspace.currentUser.id) ||
           workspace.currentUser.role === "admin" ||
-          project.ownerId === workspace.currentUser.id ||
-          feature?.ownerId === workspace.currentUser.id ||
+          project.leaderId === workspace.currentUser.id ||
+          feature?.leaderId === workspace.currentUser.id ||
           workspace.modules.some(
             (m) =>
               m.id === feature?.moduleId &&
-              m.ownerId === workspace.currentUser.id,
+              m.leaderId === workspace.currentUser.id,
           );
         router.replace(
           keepAccess
@@ -438,16 +449,18 @@ export function TaskDetail({
             disabled={busy}
             onClick={() =>
               requestNavigation(() =>
-                router.push(projectPath(project.id, view)),
+                router.push(returnTo ?? projectPath(project.id, view)),
               )
             }
           >
             <ArrowLeft size={17} />
-            {view === "list"
-              ? "Volver a la lista"
-              : view === "calendar"
-                ? "Volver al calendario"
-                : "Volver al tablero"}
+            {returnTo
+              ? "Volver"
+              : view === "list"
+                ? "Volver a la lista"
+                : view === "calendar"
+                  ? "Volver al calendario"
+                  : "Volver al tablero"}
           </Button>
         </div>
         <span title={project.name}>
@@ -585,69 +598,44 @@ export function TaskDetail({
             </p>
           )}
           <div className="task-edit-area">
-            <Tabs.Root
+            <DetailTabs
               value={activeTab}
-              orientation="vertical"
-              onValueChange={(value) => {
+              change={(value) => {
                 setActiveTab(value);
                 if (value !== "description") setDescriptionEditing(false);
               }}
-              className="task-detail-tabs"
+              label="Secciones de la tarea"
+              sections={[
+                {
+                  id: "description",
+                  label: "Descripción",
+                  icon: <FileText size={17} />,
+                },
+                {
+                  id: "properties",
+                  label: "Propiedades",
+                  icon: <Layers3 size={16} />,
+                },
+                {
+                  id: "checklists",
+                  label: "Checklist",
+                  icon: <ListChecks size={17} />,
+                  count: task?.checklists[0]?.items.length,
+                },
+                {
+                  id: "documents",
+                  label: "Documentos",
+                  icon: <Paperclip size={16} />,
+                  count: documentCount,
+                },
+                {
+                  id: "history",
+                  label: "Historial",
+                  icon: <History size={16} />,
+                  count: task?.statusHistory?.length,
+                },
+              ]}
             >
-              <Tabs.List
-                className="task-section-tabs"
-                aria-label="Secciones de la tarea"
-              >
-                <Tabs.Trigger
-                  value="description"
-                  type="button"
-                  title="Descripción"
-                >
-                  <FileText size={17} />
-                  <span className="task-tab-label">Descripción</span>
-                </Tabs.Trigger>
-                <Tabs.Trigger
-                  value="properties"
-                  type="button"
-                  title="Propiedades"
-                >
-                  <Layers3 size={16} />
-                  <span className="task-tab-label">Propiedades</span>
-                </Tabs.Trigger>
-                <Tabs.Trigger
-                  value="checklists"
-                  type="button"
-                  title="Checklist"
-                >
-                  <ListChecks size={17} />
-                  <span className="task-tab-label">Checklist</span>
-                  {!!task?.checklists[0]?.items.length && (
-                    <span className="task-tab-count">
-                      {task.checklists[0].items.length}
-                    </span>
-                  )}
-                </Tabs.Trigger>
-                <Tabs.Trigger
-                  value="documents"
-                  type="button"
-                  title="Documentos"
-                >
-                  <Paperclip size={16} />
-                  <span className="task-tab-label">Documentos</span>
-                  {documentCount ? (
-                    <span className="task-tab-count">{documentCount}</span>
-                  ) : null}
-                </Tabs.Trigger>
-                <Tabs.Trigger value="history" type="button" title="Historial">
-                  <History size={16} />
-                  <span className="task-tab-label">Historial</span>
-                  {!!task?.statusHistory?.length && (
-                    <span className="task-tab-count">
-                      {task.statusHistory.length}
-                    </span>
-                  )}
-                </Tabs.Trigger>
-              </Tabs.List>
               <Tabs.Content
                 value="description"
                 forceMount
@@ -954,7 +942,7 @@ export function TaskDetail({
                   </p>
                 )}
               </Tabs.Content>
-            </Tabs.Root>
+            </DetailTabs>
           </div>
         </section>
       </ResizableTaskPanels>

@@ -21,10 +21,12 @@ export function ResizableTaskPanels({
   children,
   comments,
   mobile,
+  label = "Comentarios de la tarea",
 }: {
   children: ReactNode;
   comments: ReactNode;
   mobile: boolean;
+  label?: string;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const commentsId = useId();
@@ -151,11 +153,7 @@ export function ResizableTaskPanels({
               remember(null);
             }}
           />
-          <aside
-            id={commentsId}
-            className="task-comments"
-            aria-label="Comentarios de la tarea"
-          >
+          <aside id={commentsId} className="task-comments" aria-label={label}>
             {comments}
           </aside>
         </>

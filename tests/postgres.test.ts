@@ -13,7 +13,7 @@ import {
 import { repository } from "../src/server";
 import { GET as health } from "../src/app/api/health/route";
 import { InvitationService } from "../src/server/invitations";
-import { projectMembers } from "../src/server/schema";
+import { projectTeamMembers } from "../src/server/schema";
 import migrationJournal from "../drizzle/postgresql/meta/_journal.json";
 
 test("DATABASE_URL es obligatoria y TEST_DATABASE_URL no puede usar la base de desarrollo", () => {
@@ -251,7 +251,7 @@ test("dos instancias consumen una invitación una sola vez y otorgan participaci
       results.filter((result) => result.status === "fulfilled").length,
       1,
     );
-    assert.equal((await repo.store.db.select().from(projectMembers)).length, 1);
+    assert.equal((await repo.store.db.select().from(projectTeamMembers)).length, 1);
   } finally {
     await peer.close();
     await repo.close();

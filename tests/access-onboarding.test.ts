@@ -5,7 +5,7 @@ import { actor, createRepository, addUser, authConfig } from "./helpers";
 import {
   installation,
   invitations,
-  projectMembers,
+  projectTeamMembers,
 } from "../src/server/schema";
 import { InvitationService } from "../src/server/invitations";
 import { createFirstProject, finishOnboarding } from "../src/server/onboarding";
@@ -31,11 +31,11 @@ test("permisos: proyectos privados, participación, administración global y tra
       w = await repo.getWorkspace(owner),
       featureId = w.features[0].id,
       statusId = w.statuses[0].id;
-    assert.equal(w.projects[0].ownerId, owner.id);
+    assert.equal(w.projects[0].leaderId, owner.id);
     assert.equal((await repo.getWorkspace(member)).projects.length, 0);
     assert.equal((await repo.getWorkspace(actor)).projects.length, 1);
     await repo.execute(
-      { type: "project.member.add", projectId: p, userId: member.id },
+      { type: "project.team.add", projectId: p, userId: member.id },
       owner,
     );
     const { createdId: taskId } = await repo.execute(
@@ -145,7 +145,7 @@ test("permisos: proyectos privados, participación, administración global y tra
       );
     await assert.rejects(
       repo.execute(
-        { type: "project.member.add", projectId: p, userId: stranger.id },
+        { type: "project.team.add", projectId: p, userId: stranger.id },
         member,
       ),
       { status: 403 },
@@ -156,17 +156,17 @@ test("permisos: proyectos privados, participación, administración global y tra
     );
     await assert.rejects(
       repo.execute(
-        { type: "project.transferOwnership", id: p, userId: member.id },
+        { type: "project.leader.update", id: p, userId: member.id },
         owner,
       ),
       { status: 403 },
     );
     await repo.execute(
-      { type: "project.transferOwnership", id: p, userId: stranger.id },
+      { type: "project.leader.update", id: p, userId: stranger.id },
       actor,
     );
     assert.equal(
-      (await repo.getWorkspace(stranger)).projects[0].ownerId,
+      (await repo.getWorkspace(stranger)).projects[0].leaderId,
       stranger.id,
     );
     assert.equal((await repo.getWorkspace(owner)).projects.length, 1);
@@ -174,11 +174,11 @@ test("permisos: proyectos privados, participación, administración global y tra
       repo.execute({ type: "project.update", id: p, ...fields }, owner),
       { status: 403 },
     );
-    await assert.rejects(repo.execute({ type: "project.member.remove", projectId: p, userId: member.id }, stranger), { status: 409 });
+    await assert.rejects(repo.execute({ type: "project.team.remove", projectId: p, userId: member.id }, stranger), { status: 409 });
     await repo.execute({ type: "task.assignment.update", id: taskId!, leaderId: stranger.id, teamMemberIds: [] }, stranger);
-    await repo.execute({ type: "module.transferOwnership", id: moduleId!, userId: stranger.id }, stranger);
+    await repo.execute({ type: "module.leader.update", id: moduleId!, userId: stranger.id }, stranger);
     await repo.execute(
-      { type: "project.member.remove", projectId: p, userId: member.id },
+      { type: "project.team.remove", projectId: p, userId: member.id },
       stranger,
     );
     assert.equal((await repo.getWorkspace(member)).tasks.length, 0);
@@ -232,7 +232,7 @@ test("invitaciones: envío fallido conserva enlace, correo verificado, caducidad
     );
     assert.equal((await repo.getWorkspace(member)).projects.length, 1);
     await assert.rejects(service.verify(token));
-    assert.equal((await repo.store.db.select().from(projectMembers)).length, 1);
+    assert.equal((await repo.store.db.select().from(projectTeamMembers)).length, 1);
     const next = await service.create({ email: "other@example.com" }, actor),
       nextToken = new URL(next.invitation.url).pathname.split("/").pop()!;
     await service.revoke(next.invitation.id, actor);

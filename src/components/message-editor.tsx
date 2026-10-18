@@ -7,11 +7,13 @@ import Image from "@tiptap/extension-image";
 import { toast } from "sonner";
 import { MarkdownYoutube, imagePasteExtension } from "./media-extensions";
 import { uploadFile } from "@/lib/file-client";
+import type { EntityRef } from "@/lib/types";
 export function MessageEditor(props: {
   value: string;
   onChange: (value: string) => void;
   projectId: string;
-  taskId: string;
+  taskId?: string;
+  scope?: EntityRef;
   disabled: boolean;
   onSend?: () => void;
   onUploading?: (count: number) => void;
@@ -39,7 +41,7 @@ export function MessageEditor(props: {
             await uploadFile(
               file,
               latest.current.projectId,
-              latest.current.taskId,
+              latest.current.scope ?? latest.current.taskId,
               "image",
             )
           ).url,

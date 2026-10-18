@@ -3,10 +3,12 @@ import { repository } from "@/server";
 import { FileManager } from "@/server/files";
 import { assertOrigin, requireActor, httpError } from "@/server/access";
 import { DomainError } from "@/server/repository";
+import { entityRefSchema } from "@/lib/validation";
 export const runtime = "nodejs";
 const input = z.object({
   projectId: z.string().min(1).max(200),
   taskId: z.string().min(1).max(200).optional(),
+  scope: entityRefSchema.optional(),
   name: z.string().min(1).max(500),
   size: z.number().int().positive(),
   purpose: z.enum(["image", "document"]),

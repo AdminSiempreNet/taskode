@@ -63,7 +63,7 @@ test(
         color: "#059669",
       });
       await send({
-        type: "project.member.add",
+        type: "project.team.add",
         projectId: project.createdId,
         userId: member.id,
       });

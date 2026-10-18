@@ -1,12 +1,18 @@
 "use client";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { getProjectView, taskPath } from "@/lib/routes";
+import { useSearchParams } from "next/navigation";
+import {
+  entityPath,
+  getProjectView,
+  taskPath,
+  safeReturnTo,
+} from "@/lib/routes";
+import { useWorkspaceRouter } from "./unsaved-changes";
 import { FeatureCombobox } from "./feature-combobox";
 import { CatalogCombobox } from "./catalog-combobox";
 import { ClientPicker } from "./client-picker";
 import { formatFeatureNumber } from "@/lib/features";
-import { ScopeOwner } from "./scope-owner";
+import { EntityAssignments } from "./task-people";
 import type { UserSummary } from "@/lib/types";
 import { TaskPeopleFields } from "./task-people";
 import { uploadFile } from "@/lib/file-client";
@@ -60,7 +66,7 @@ export type MutationResult = { createdId?: string; report?: ImportReport };
 export type Mutate = (command: unknown) => Promise<MutationResult | null>;
 export type Modal =
   | { type: "project"; project?: Project }
-  | { type: "feature"; feature?: Feature }
+  | { type: "feature"; feature?: Feature; moduleId?: string | null }
   | { type: "module"; module?: ProjectModule }
   | { type: "task"; defaults?: TaskDefaults }
   | { type: "import" };
@@ -138,7 +144,7 @@ function Submit({
     </Button>
   );
 }
-function Colors({
+export function Colors({
   value,
   onChange,
   disabled = false,
@@ -271,13 +277,14 @@ export function WorkspaceModal({
         {modal.type === "feature" && project && (
           <FeatureForm
             feature={modal.feature}
+            defaultModuleId={modal.moduleId}
             projectId={project.id}
             people={(workspace.people ?? []).filter(
               (p) => p.projectId === project.id,
             )}
             canReorder={
               workspace.currentUser.role === "admin" ||
-              project.ownerId === workspace.currentUser.id
+              project.leaderId === workspace.currentUser.id
             }
             features={workspace.features.filter(
               (feature) => feature.projectId === project.id,
@@ -300,7 +307,7 @@ export function WorkspaceModal({
             )}
             canReorder={
               workspace.currentUser.role === "admin" ||
-              project.ownerId === workspace.currentUser.id
+              project.leaderId === workspace.currentUser.id
             }
             modules={workspace.modules.filter(
               (module) => module.projectId === project.id,
@@ -316,7 +323,7 @@ export function WorkspaceModal({
             project={
               project &&
               (workspace.currentUser.role === "admin" ||
-                project.ownerId === workspace.currentUser.id)
+                project.leaderId === workspace.currentUser.id)
                 ? project
                 : undefined
             }
@@ -366,17 +373,17 @@ function TaskCreateForm({
     leaderId === workspace.currentUser.id ||
     teamMemberIds.includes(workspace.currentUser.id) ||
     workspace.currentUser.role === "admin" ||
-    project.ownerId === workspace.currentUser.id ||
+    project.leaderId === workspace.currentUser.id ||
     features.some(
       (f) =>
         f.id === featureId &&
-        (f.ownerId === workspace.currentUser.id ||
+        (f.leaderId === workspace.currentUser.id ||
           workspace.modules.some(
             (m) =>
-              m.id === f.moduleId && m.ownerId === workspace.currentUser.id,
+              m.id === f.moduleId && m.leaderId === workspace.currentUser.id,
           )),
     );
-  const router = useRouter();
+  const router = useWorkspaceRouter();
   const view = getProjectView(useSearchParams().get("view"));
   const features = workspace.features.filter(
     (feature) => feature.projectId === project.id,
@@ -448,8 +455,28 @@ function TaskCreateForm({
     if (!result) return;
     close();
     toast.success("Tarea creada.");
-    if (afterCreate === "edit" && result.createdId && mayKeepAccess())
-      router.push(taskPath(project.id, result.createdId, view));
+    if (afterCreate === "edit" && result.createdId && mayKeepAccess()) {
+      const source = /\/(?:details|modules\/[^/]+|features\/[^/]+)$/.test(
+        window.location.pathname,
+      )
+        ? safeReturnTo(
+            project.id,
+            `${window.location.pathname}${window.location.search}`,
+          )
+        : null;
+      router.push(
+        source
+          ? entityPath(
+              project.id,
+              "task",
+              result.createdId,
+              view,
+              undefined,
+              source,
+            )
+          : taskPath(project.id, result.createdId, view),
+      );
+    }
   }
   return (
     <form className="task-create-form" onSubmit={submit}>
@@ -767,6 +794,7 @@ function ProjectForm({
 }
 function FeatureForm({
   feature,
+  defaultModuleId,
   projectId,
   people,
   canReorder,
@@ -778,6 +806,7 @@ function FeatureForm({
   confirm,
 }: {
   feature?: Feature;
+  defaultModuleId?: string | null;
   projectId: string;
   people: UserSummary[];
   canReorder: boolean;
@@ -847,7 +876,13 @@ function FeatureForm({
           <select
             id="feature-module"
             name="moduleId"
-            defaultValue={feature ? (feature.moduleId ?? "general") : ""}
+            defaultValue={
+              feature
+                ? (feature.moduleId ?? "general")
+                : defaultModuleId === undefined
+                  ? ""
+                  : (defaultModuleId ?? "general")
+            }
             required
             disabled={busy}
           >
@@ -896,13 +931,24 @@ function FeatureForm({
           </div>
         )}
         {feature && (
-          <ScopeOwner
-            kind="feature"
-            id={feature.id}
-            ownerId={feature.ownerId}
-            people={people}
-            mutate={mutate}
+          <EntityAssignments
+            leaderId={feature.leaderId ?? ""}
+            teamMemberIds={feature.teamMemberIds ?? []}
+            people={people.map((person) => ({
+              ...person,
+              projectId,
+              email: "",
+            }))}
+            canManage={feature.canManage !== false}
             busy={busy}
+            onSave={async (leaderId, teamMemberIds) =>
+              !!(await mutate({
+                type: "feature.assignment.update",
+                id: feature.id,
+                leaderId,
+                teamMemberIds,
+              }))
+            }
           />
         )}
         <div className="dialog-actions">
@@ -1033,13 +1079,24 @@ function ModuleForm({
           </div>
         )}
         {module && (
-          <ScopeOwner
-            kind="module"
-            id={module.id}
-            ownerId={module.ownerId}
-            people={people}
-            mutate={mutate}
+          <EntityAssignments
+            leaderId={module.leaderId ?? ""}
+            teamMemberIds={module.teamMemberIds ?? []}
+            people={people.map((person) => ({
+              ...person,
+              projectId,
+              email: "",
+            }))}
+            canManage={module.canManage !== false}
             busy={busy}
+            onSave={async (leaderId, teamMemberIds) =>
+              !!(await mutate({
+                type: "module.assignment.update",
+                id: module.id,
+                leaderId,
+                teamMemberIds,
+              }))
+            }
           />
         )}
         <div className="dialog-actions">

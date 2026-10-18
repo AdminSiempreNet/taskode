@@ -7,17 +7,27 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { colorStyle, useProjectCatalog } from "./project-catalog";
 import type { Mutate } from "./forms";
+import { EntityTypeIcon } from "./entity-type-icon";
+import type { EntityKind } from "@/lib/types";
 
-export function InlineTaskTitle({
+export function InlineTitle({
   value,
   change,
   commit,
   busy,
+  label = "Título de la tarea",
+  maxLength = 300,
+  readOnly = false,
+  kind = "task",
 }: {
   value: string;
   change: (value: string) => void;
   commit: (value: string) => void;
   busy: boolean;
+  label?: string;
+  maxLength?: number;
+  readOnly?: boolean;
+  kind?: EntityKind;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   const initialValue = useRef(value);
@@ -29,29 +39,35 @@ export function InlineTaskTitle({
   }, [value]);
   return (
     <h1 className="inline-task-title">
+      <EntityTypeIcon kind={kind} />
       <span
         ref={ref}
         role="textbox"
-        aria-label="Título de la tarea"
+        aria-label={label}
         aria-multiline="false"
-        contentEditable={!busy ? "plaintext-only" : false}
+        aria-readonly={readOnly}
+        contentEditable={!busy && !readOnly ? "plaintext-only" : false}
         suppressContentEditableWarning
         tabIndex={0}
-        data-placeholder="Escribe el título de la tarea…"
-        title="Clic para editar · Enter para guardar · Escape para cancelar"
+        data-placeholder={`Escribe ${label.toLocaleLowerCase("es")}…`}
+        title={
+          readOnly
+            ? label
+            : "Clic para editar · Enter para guardar · Escape para cancelar"
+        }
         onFocus={() => {
           beforeEdit.current = value;
           cancelled.current = false;
         }}
         onInput={(event) => {
           const text = event.currentTarget.textContent ?? "";
-          if (text.length > 300) {
-            event.currentTarget.textContent = text.slice(0, 300);
+          if (text.length > maxLength) {
+            event.currentTarget.textContent = text.slice(0, maxLength);
             const selection = window.getSelection();
             selection?.selectAllChildren(event.currentTarget);
             selection?.collapseToEnd();
           }
-          change(text.slice(0, 300));
+          change(text.slice(0, maxLength));
         }}
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing) return;
@@ -68,7 +84,8 @@ export function InlineTaskTitle({
           }
         }}
         onBlur={(event) => {
-          if (!cancelled.current) commit(event.currentTarget.textContent ?? "");
+          if (!readOnly && !cancelled.current)
+            commit(event.currentTarget.textContent ?? "");
         }}
       >
         {initialValue.current}
@@ -309,3 +326,5 @@ export function TaskLabelPicker({
     </div>
   );
 }
+
+export { InlineTitle as InlineTaskTitle };

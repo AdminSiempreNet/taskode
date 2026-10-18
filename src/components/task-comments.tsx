@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ComponentProps,
 } from "react";
 import type { Editor } from "@tiptap/react";
 import {
@@ -33,7 +34,7 @@ import { MessageEditor } from "./message-editor";
 import { MarkdownContent } from "./markdown-content";
 import { UserAvatar } from "./user-avatar";
 import type { Confirmation, Mutate } from "./forms";
-import type { Task, TaskComment } from "@/lib/types";
+import type { Task, TaskComment, EntityRef } from "@/lib/types";
 import { uploadFile } from "@/lib/file-client";
 import styles from "./task-comments.module.css";
 
@@ -92,6 +93,18 @@ function sameGroup(previous: TaskComment | undefined, current: TaskComment) {
 
 export function TaskComments({
   task,
+  ...props
+}: Omit<ComponentProps<typeof EntityComments>, "scope"> & { task: Task }) {
+  return (
+    <EntityComments
+      {...props}
+      scope={{ kind: "task", id: task.id, projectId: task.projectId }}
+    />
+  );
+}
+
+export function EntityComments({
+  scope,
   comments,
   pending,
   error,
@@ -102,7 +115,7 @@ export function TaskComments({
   setContent,
   currentUserId,
 }: {
-  task: Task;
+  scope: EntityRef;
   comments: TaskComment[];
   pending: TaskComment | null;
   error: string;
@@ -157,7 +170,7 @@ export function TaskComments({
     if (!target || blocked) return;
     setAttaching(true);
     try {
-      const image = await uploadFile(file, task.projectId, task.id, "image");
+      const image = await uploadFile(file, scope.projectId, scope, "image");
       if (editor.current === target && !target.isDestroyed)
         target
           .chain()
@@ -182,7 +195,7 @@ export function TaskComments({
           className={styles.thread}
           ref={thread}
           role="log"
-          aria-label="Conversación de la tarea"
+          aria-label="Conversación"
           aria-live="polite"
           aria-relevant="additions text"
           onScroll={() => {
@@ -220,7 +233,7 @@ export function TaskComments({
                     )}
                     <ChatMessage
                       comment={comment}
-                      task={task}
+                      scope={scope}
                       currentUserId={currentUserId}
                       grouped={sameGroup(previous, comment)}
                       pending={pending?.id === comment.id}
@@ -258,9 +271,7 @@ export function TaskComments({
           event.preventDefault();
           if (!content.trim() || blocked) return;
           nearBottom.current = true;
-          if (
-            await mutate({ type: "comment.create", taskId: task.id, content })
-          ) {
+          if (await mutate({ type: "comment.create", scope, content })) {
             setContent("");
             editor.current?.commands.focus();
           }
@@ -317,8 +328,8 @@ export function TaskComments({
               <MessageEditor
                 value={content}
                 onChange={setContent}
-                projectId={task.projectId}
-                taskId={task.id}
+                projectId={scope.projectId}
+                scope={scope}
                 disabled={busy || attaching}
                 onSend={() => form.current?.requestSubmit()}
                 onUploading={setUploading}
@@ -352,7 +363,7 @@ export function TaskComments({
 
 function ChatMessage({
   comment,
-  task,
+  scope,
   currentUserId,
   grouped,
   pending,
@@ -361,7 +372,7 @@ function ChatMessage({
   confirm,
 }: {
   comment: TaskComment;
-  task: Task;
+  scope: EntityRef;
   currentUserId: string;
   grouped: boolean;
   pending: boolean;
@@ -471,8 +482,8 @@ function ChatMessage({
             <MessageEditor
               value={content}
               onChange={setContent}
-              projectId={task.projectId}
-              taskId={task.id}
+              projectId={scope.projectId}
+              scope={scope}
               disabled={busy}
               onUploading={setUploading}
               onSend={() => editForm.current?.requestSubmit()}

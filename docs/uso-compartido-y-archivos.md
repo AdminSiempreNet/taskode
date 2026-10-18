@@ -1,6 +1,6 @@
 # Tareas compartidas y archivos
 
-Cada tarea tiene un **Líder** y un **Equipo** formado por otros usuarios del proyecto. El autor queda registrado, pero conservar acceso requiere ser líder, miembro del equipo, propietario de la feature, módulo o proyecto, o administrador. Los miembros del equipo editan contenido, propiedades ordinarias, estado, checklist y documentos y pueden archivar; el líder y los propietarios administran el acceso, el traslado de feature y la eliminación. Cada autor edita sus comentarios; el líder y los propietarios pueden eliminar mensajes ajenos.
+Cada tarea tiene un **Líder** y un **Equipo** formado por otros usuarios del proyecto. El autor queda registrado, pero conservar acceso requiere ser líder, miembro del equipo, líder de la feature, módulo o proyecto, o administrador. Los miembros del equipo editan contenido, propiedades ordinarias, estado, checklist y documentos y pueden archivar; el líder y los líderes superiores administran el acceso, el traslado de feature y la eliminación. Cada autor edita sus comentarios; el líder y los líderes superiores pueden eliminar mensajes ajenos.
 
 El filtro **Usuarios** comienza en **Mías**: tareas que lideras o en cuyo equipo participas. Sin selección muestra todas las tareas autorizadas. La preferencia se conserva por cuenta y proyecto. El chat se sincroniza con Ably y conserva el borrador y la posición de lectura. Se desplaza al final solo si ya estabas leyendo los mensajes más recientes; en caso contrario muestra «Mensajes nuevos».
 
@@ -51,6 +51,14 @@ Referencias: [tokens JWT](https://ably.com/docs/auth/token/jwt), [capacidades po
 
 ## Migración y despliegue
 
+La migración `0005_entity_details` amplía comentarios y archivos a proyectos, módulos y features, conserva las asociaciones de tareas existentes y actualiza el trigger y el outbox de comentarios. Debe aplicarse antes de arrancar la nueva versión. En desarrollo utiliza `npm run db:migrate -- --development`; en otros entornos utiliza la conexión y el procedimiento de despliegue correspondiente.
+
+Los detalles nuevos se abren desde Editar. Incluyen Descripción, Propiedades, Documentos y la lista de módulos, features o tareas. General es una vista virtual de features sin módulo. Los participantes pueden comentar y leer documentos; los líderes del elemento, sus superiores y el administrador pueden editar y gestionar documentos. El equipo propio del módulo o feature también puede editar su nombre, descripción y documentos; gestionar usuarios, mover y eliminar sigue reservado a los líderes. Las imágenes de los comentarios se autorizan como parte de comentar y se vinculan únicamente a esa conversación. Los permisos de tareas siguen siendo específicos de cada tarea.
+
+Los endpoints `/api/entities/{kind}/{id}`, `/comments` y `/comments/token` comparten la autorización y la lógica de comentarios con los endpoints de tareas existentes. Los canales de tareas mantienen sus nombres; los otros niveles tienen canales separados por tipo, identificador y usuario. Los avisos nuevos contienen tipo e identificador de entidad y evento, sin texto. La cola agrupa cambios por entidad.
+
+Los archivos con `scopeType = null` son temporales; un documento de proyecto tiene `scopeType = project` aunque no tenga `taskId`. La limpieza respeta esa distinción. Borrar un módulo elimina su conversación y documentos propios, y traslada sus features a General conservando los archivos y comentarios de esas features. Al eliminar una entidad se retira el acceso a sus archivos; los objetos privados sin referencia conservan la política de retención descrita abajo.
+
 La migración `0002_task_sharing` es aditiva. Asigna tareas, módulos y features existentes al propietario del proyecto, deja desconocida la autoría histórica y no agrega miembros del equipo automáticamente. El líder de las nuevas tareas es su creador por defecto. Las importaciones Trello registran como autor y líder a quien importa.
 
 La migración `0003_task_leader_and_team` renombra `tasks.assigneeId` a `tasks.leaderId` y la tabla `task_collaborators` a `task_team_members`, junto con sus índices y restricciones. Conserva las filas, las relaciones y los permisos. El código utiliza `leaderId`, `teamMemberIds` y `task.assignment.update`. Las solicitudes con los nombres anteriores se normalizan en la entrada para conservar las selecciones de pestañas abiertas antes del cambio.
@@ -74,8 +82,12 @@ Las cargas sin asociar caducan a las 24 horas. Al gestionar cargas se limpian ha
 
 ## Respaldos y restauración
 
-Los nuevos JSON usan la versión 4 e incluyen líder, equipo, propietarios, autores, límite global y metadatos de archivos. Los JSON anteriores de Taskode y Brote, versiones 1, 2 y 3, siguen admitidos. La versión 3 convierte los nombres anteriores conservando las asignaciones; las versiones 1 y 2 reciben los mismos valores iniciales que la migración.
+Los nuevos JSON usan la versión 6 e incluyen líderes y equipos de proyectos, módulos, features y tareas, autores, límite global, metadatos de archivos y las asociaciones de comentarios y documentos con su proyecto, módulo, feature o tarea. Los JSON anteriores de Taskode y Brote, versiones 1, 2, 3, 4 y 5, siguen admitidos con validadores históricos. La versión 5 renombra los líderes y el equipo del proyecto y deja vacíos los equipos nuevos de módulos y features. La versión 4 recibe las asociaciones de tarea; la versión 3 también convierte los nombres anteriores conservando las asignaciones; las versiones 1 y 2 reciben los mismos valores iniciales que la migración. Las asociaciones inválidas o entre proyectos distintos se rechazan antes de modificar los datos.
 
 Los JSON no contienen los archivos físicos. Copia por separado el directorio completo `ATTACHMENT_DIR` o el prefijo `<S3_PREFIX>attachments/`, conservando los nombres de objeto. Mantén copias con fechas compatibles con los JSON y retención suficiente para recuperar documentos eliminados. Los respaldos del bucket de JSON, por sí solos, no incluyen los documentos.
 
 Para restaurar, recupera el JSON mediante el flujo habitual y restaura los objetos en el directorio o prefijo configurado, sin cambiar sus identificadores. Si falta un objeto, la descarga informa que se requiere restaurar también el almacenamiento. Las sesiones se invalidan como en las restauraciones existentes.
+
+La migración `0006_entity_leaders_and_teams` renombra `ownerId` a `leaderId` en proyectos, módulos y features, y `project_members` a `project_team_members`. Conserva sus asignaciones y crea `module_team_members` y `feature_team_members` vacíos. Se aplica después de `0005_entity_details`, antes de arrancar la aplicación. Solo el administrador transfiere el liderazgo del proyecto; el líder anterior conserva acceso como miembro del equipo. Al quitar a alguien del proyecto se eliminan sus asignaciones de equipo en módulos, features y tareas, pero primero deben reasignarse los elementos que lidera.
+
+La cabecera **Usuarios** permite consultar líder y equipo en los cuatro niveles. Los cambios se guardan al aceptar, independientemente del borrador de descripción o propiedades. Los equipos de módulo y feature no heredan asignaciones de su padre ni acceso a tareas privadas. El sidebar recuerda los grupos abiertos en la sesión del usuario y los reinicia cuando cambia de proyecto.

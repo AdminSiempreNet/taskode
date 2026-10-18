@@ -16,7 +16,7 @@ import {
   DialogTrigger,
 } from "./ui/dialog";
 
-export function TaskAssignments({
+export function EntityAssignments({
   people,
   leaderId,
   teamMemberIds,
@@ -24,6 +24,11 @@ export function TaskAssignments({
   busy,
   canManage,
   isNew = false,
+  canChangeLeader = canManage,
+  initialOpen = false,
+  hideTrigger = false,
+  onClose,
+  error,
 }: {
   people: ProjectPerson[];
   leaderId: string;
@@ -32,8 +37,13 @@ export function TaskAssignments({
   busy: boolean;
   canManage: boolean;
   isNew?: boolean;
+  canChangeLeader?: boolean;
+  initialOpen?: boolean;
+  hideTrigger?: boolean;
+  onClose?: () => void;
+  error?: string;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen);
   const [draftLeader, setDraftLeader] = useState(leaderId);
   const [draftTeamMembers, setDraftTeamMembers] = useState(teamMemberIds);
   const [saving, setSaving] = useState(false);
@@ -52,67 +62,70 @@ export function TaskAssignments({
       setDraftTeamMembers(teamMembers);
     }
     setOpen(next);
+    if (!next) onClose?.();
   }
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
-      <div className="task-assignment-control">
-        <div className="task-assignment-avatars">
-          <span
-            className="task-assignment-leader"
-            role="img"
-            aria-label={`Líder: ${leader?.name ?? "sin asignar"}`}
-            title={`Líder: ${personTitle(leader)}`}
-          >
-            <UserAvatar
-              name={leader?.name ?? "Usuario"}
-              image={leader?.image}
-            />
-          </span>
-          {teamMembers.length > 0 && (
-            <div
-              className="task-assignment-team"
-              role="group"
-              aria-label={`Equipo: ${teamMembers.length}`}
-              title={teamMembers
-                .map((id) =>
-                  personTitle(people.find((person) => person.id === id)),
-                )
-                .join("\n")}
+      {!hideTrigger && (
+        <div className="task-assignment-control">
+          <div className="task-assignment-avatars">
+            <span
+              className="task-assignment-leader"
+              role="img"
+              aria-label={`Líder: ${leader?.name ?? "sin asignar"}`}
+              title={`Líder: ${personTitle(leader)}`}
             >
-              {teamMembers.slice(0, 3).map((id) => {
-                const person = people.find((person) => person.id === id);
-                return (
-                  <span
-                    key={id}
-                    role="img"
-                    aria-label={`Miembro del equipo: ${person?.name ?? "no disponible"}`}
-                    title={personTitle(person)}
-                  >
-                    <UserAvatar
-                      name={person?.name ?? "Usuario"}
-                      image={person?.image}
-                    />
-                  </span>
-                );
-              })}
-            </div>
-          )}
+              <UserAvatar
+                name={leader?.name ?? "Usuario"}
+                image={leader?.image}
+              />
+            </span>
+            {teamMembers.length > 0 && (
+              <div
+                className="task-assignment-team"
+                role="group"
+                aria-label={`Equipo: ${teamMembers.length}`}
+                title={teamMembers
+                  .map((id) =>
+                    personTitle(people.find((person) => person.id === id)),
+                  )
+                  .join("\n")}
+              >
+                {teamMembers.slice(0, 3).map((id) => {
+                  const person = people.find((person) => person.id === id);
+                  return (
+                    <span
+                      key={id}
+                      role="img"
+                      aria-label={`Miembro del equipo: ${person?.name ?? "no disponible"}`}
+                      title={personTitle(person)}
+                    >
+                      <UserAvatar
+                        name={person?.name ?? "Usuario"}
+                        image={person?.image}
+                      />
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <DialogTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="task-assignment-trigger"
+              aria-label="Ver asignación de usuarios"
+              title={`Ver asignación: ${teamMembers.length} miembros del equipo`}
+              disabled={waiting}
+            >
+              <Users size={16} />
+              Usuarios
+            </Button>
+          </DialogTrigger>
         </div>
-        <DialogTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            className="task-assignment-trigger"
-            aria-label="Ver asignación de usuarios"
-            title={`Ver asignación: ${teamMembers.length} miembros del equipo`}
-            disabled={waiting}
-          >
-            <Users size={16} />
-            Usuarios
-          </Button>
-        </DialogTrigger>
-      </div>
+      )}
       <DialogContent
         className="task-assignment-dialog"
         onEscapeKeyDown={(event) => {
@@ -129,24 +142,28 @@ export function TaskAssignments({
               ? isNew
                 ? "Elige el líder y los miembros del equipo para la nueva tarea."
                 : "Los cambios se guardan al aceptar."
-              : "Consulta el líder y los miembros del equipo de esta tarea."}
+              : "Consulta el líder y los miembros del equipo de este elemento."}
           </DialogDescription>
         </DialogHeader>
         <form
           onSubmit={async (event) => {
             event.preventDefault();
+            event.stopPropagation();
             if (waiting || !canManage) return;
             const changed =
               draftLeader !== leaderId ||
               JSON.stringify([...draftTeamMembers].sort()) !==
                 JSON.stringify([...teamMembers].sort());
             if (!changed) {
-              setOpen(false);
+              changeOpen(false);
               return;
             }
             setSaving(true);
             try {
-              if (await onSave(draftLeader, draftTeamMembers)) setOpen(false);
+              if (await onSave(draftLeader, draftTeamMembers)) {
+                setOpen(false);
+                onClose?.();
+              }
             } finally {
               setSaving(false);
             }
@@ -162,9 +179,15 @@ export function TaskAssignments({
             }}
             onTeamMembers={setDraftTeamMembers}
             disabled={waiting || !canManage}
+            leaderDisabled={!canChangeLeader}
             idPrefix="task-assignment"
             framed={false}
           />
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
           <DialogFooter>
             <DialogClose asChild>
               <Button type="button" variant="outline" disabled={waiting}>
@@ -191,6 +214,7 @@ export function TaskPeopleFields({
   onLeader,
   onTeamMembers,
   disabled,
+  leaderDisabled = false,
   idPrefix = "task",
   framed = true,
 }: {
@@ -200,6 +224,7 @@ export function TaskPeopleFields({
   onLeader: (id: string) => void;
   onTeamMembers: (ids: string[]) => void;
   disabled?: boolean;
+  leaderDisabled?: boolean;
   idPrefix?: string;
   framed?: boolean;
 }) {
@@ -223,7 +248,7 @@ export function TaskPeopleFields({
             options={options}
             values={[leaderId]}
             onChange={(ids) => onLeader(ids[0])}
-            disabled={disabled}
+            disabled={disabled || leaderDisabled}
           />
         </div>
         <div className="field">
@@ -300,3 +325,5 @@ export function TaskPeopleSummary({
     </div>
   );
 }
+
+export const TaskAssignments = EntityAssignments;

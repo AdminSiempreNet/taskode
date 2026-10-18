@@ -1,3 +1,4 @@
+import { removeEntitySchema, stripEntityColumns } from "./entity-fixtures";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { actor, addUser, createRepository } from "./helpers";
@@ -42,7 +43,7 @@ async function fixture() {
     other,
   ])
     await repo.execute(
-      { type: "project.member.add", projectId, userId: user.id },
+      { type: "project.team.add", projectId, userId: user.id },
       owner,
     );
   const moduleId = (
@@ -272,7 +273,7 @@ test("colaboración limitada, autoría de mensajes, transferencias y retirada de
       await assert.rejects(
         repo.execute(
           {
-            type: "project.member.remove",
+            type: "project.team.remove",
             projectId: f.projectId,
             userId: user.id,
           },
@@ -282,7 +283,7 @@ test("colaboración limitada, autoría de mensajes, transferencias y retirada de
       );
     await repo.execute(
       {
-        type: "project.member.remove",
+        type: "project.team.remove",
         projectId: f.projectId,
         userId: f.teamMember.id,
       },
@@ -296,7 +297,7 @@ test("colaboración limitada, autoría de mensajes, transferencias y retirada de
       [],
     );
     await repo.execute(
-      { type: "module.transferOwnership", id: f.moduleId, userId: f.other.id },
+      { type: "module.leader.update", id: f.moduleId, userId: f.other.id },
       f.moduleOwner,
     );
     assert.equal((await repo.getWorkspace(f.moduleOwner)).tasks.length, 0);
@@ -337,7 +338,7 @@ test("solo administrador configura el límite; respaldos v4 y v3 conservan líde
     const path = join(directory, "v4.json");
     await f.repo.exportBackup(path);
     const backup = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(backup.version, 4);
+    assert.equal(backup.version, 6);
     assert.equal(backup.tables.tasks[0].leaderId, f.leader.id);
     assert.equal(backup.tables.tasks[0].assigneeId, undefined);
     assert.deepEqual(backup.tables.task_team_members, [
@@ -356,6 +357,7 @@ test("solo administrador configura el límite; respaldos v4 y v3 conservan líde
     const before = await f.repo.getWorkspace(f.leader);
     for (const format of ["taskode-backup", "brote-backup"]) {
       const version3 = structuredClone(backup);
+      stripEntityColumns(version3.tables);
       version3.format = format;
       version3.version = 3;
       version3.tables.tasks = version3.tables.tasks.map(
@@ -367,7 +369,7 @@ test("solo administrador configura el límite; respaldos v4 y v3 conservan líde
       version3.tables.task_collaborators = version3.tables.task_team_members;
       delete version3.tables.task_team_members;
       const normalized = validateApplicationBackup(version3);
-      assert.equal(normalized.version, 4);
+      assert.equal(normalized.version, 6);
       assert.deepEqual(normalized.tables, backup.tables);
       const path = join(directory, `${format}-v3.json`);
       await writeFile(path, JSON.stringify(version3));
@@ -380,6 +382,7 @@ test("solo administrador configura el límite; respaldos v4 y v3 conservan líde
       invalidLeader.tables.tasks[0].assigneeId = "unknown";
       assert.throws(() => validateApplicationBackup(invalidLeader));
     }
+    stripEntityColumns(backup.tables);
     backup.version = 2;
     delete backup.tables.task_team_members;
     delete backup.tables.files;
@@ -418,7 +421,10 @@ test("migración de líder y equipo renombra tablas, columnas y restricciones si
       users.map((user) => repo.getWorkspace(user)),
     );
     // Recreate migration 0002's names inside this fixture's disposable schema.
-    await repo.store.pool.query("drop trigger taskode_comment_changed on comments; drop function taskode_queue_comment_change(); drop table comment_outbox");
+    await repo.store.pool.query(
+      "drop trigger taskode_comment_changed on comments; drop function taskode_queue_comment_change(); drop table comment_outbox",
+    );
+    await removeEntitySchema(repo);
     await repo.store.pool.query(`
       alter table tasks rename column "leaderId" to "assigneeId";
       alter table tasks rename constraint "tasks_leaderId_user_id_fk" to "tasks_assigneeId_user_id_fk";
@@ -441,7 +447,11 @@ test("migración de líder y equipo renombra tablas, columnas y restricciones si
     `);
     await repo.store.pool.query(
       "delete from __drizzle_migrations where created_at >= $1",
-      [migrationJournal.entries.find((entry) => entry.tag === "0003_task_leader_and_team")!.when],
+      [
+        migrationJournal.entries.find(
+          (entry) => entry.tag === "0003_task_leader_and_team",
+        )!.when,
+      ],
     );
     const options = {
       migrationsFolder: migrationsFolder(),

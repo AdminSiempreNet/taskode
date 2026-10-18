@@ -1,4 +1,9 @@
-import type { TaskComment, TaskCommentsSnapshot, UserSummary } from "./types";
+import type {
+  TaskComment,
+  TaskCommentsSnapshot,
+  UserSummary,
+  EntityRef,
+} from "./types";
 
 export type ChatConnection =
   "connecting" | "live" | "polling" | "offline" | "denied";
@@ -15,10 +20,26 @@ type Connect = (
   status: (state: ChatConnection) => void,
 ) => Promise<() => void>;
 type Dependencies = {
+  scope?: EntityRef;
   fetch?: typeof fetch;
   connect?: Connect;
   visible?: () => boolean;
 };
+
+// getRandomValues is also available on development HTTP origins where randomUUID is absent.
+export function commentRequestId(
+  source: Pick<Crypto, "getRandomValues"> &
+    Partial<Pick<Crypto, "randomUUID">> = globalThis.crypto,
+) {
+  if (source.randomUUID) return source.randomUUID();
+  const bytes = source.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 15) | 64;
+  bytes[8] = (bytes[8] & 63) | 128;
+  const hex = Array.from(bytes, (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  ).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
 
 // The controller owns the conversation independently of workspace responses.
 // GETs are coalesced; a response started before a write can never replace it.
@@ -38,6 +59,7 @@ export class TaskCommentsClient {
   private timer?: ReturnType<typeof setInterval>;
   private retry?: { content: string; requestId: string };
   private endpoint: string;
+  private scope?: EntityRef;
   constructor(
     readonly taskId: string,
     initial: TaskComment[],
@@ -45,7 +67,10 @@ export class TaskCommentsClient {
     private changed: (state: ChatState) => void,
     dependencies: Dependencies = {},
   ) {
-    this.endpoint = `/api/tasks/${encodeURIComponent(taskId)}/comments`;
+    this.scope = dependencies.scope;
+    this.endpoint = this.scope
+      ? `/api/entities/${this.scope.kind}/${encodeURIComponent(this.scope.id)}/comments`
+      : `/api/tasks/${encodeURIComponent(taskId)}/comments`;
     // Native browser fetch needs its global receiver, not this controller.
     this.fetcher = dependencies.fetch ?? globalThis.fetch.bind(globalThis);
     this.visible =
@@ -199,12 +224,20 @@ export class TaskCommentsClient {
     if (command.type === "comment.create") {
       const content = command.content ?? "";
       if (this.retry?.content !== content)
-        this.retry = { content, requestId: crypto.randomUUID() };
-      body = { ...body, taskId: this.taskId, requestId: this.retry!.requestId };
+        this.retry = { content, requestId: commentRequestId() };
+      body = { ...body, requestId: this.retry!.requestId };
+      if (this.scope) {
+        delete body.taskId;
+        body.scope = this.scope;
+      } else {
+        delete body.scope;
+        body.taskId = this.taskId;
+      }
       const now = new Date().toISOString();
       pending = {
         id: this.retry!.requestId,
-        taskId: this.taskId,
+        taskId: !this.scope || this.scope.kind === "task" ? this.taskId : null,
+        ...(this.scope ? { scope: this.scope } : {}),
         content,
         authorId: this.user.id,
         author: this.user,

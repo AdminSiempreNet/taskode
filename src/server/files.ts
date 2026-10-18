@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull, lt, or } from "drizzle-orm";
 import { fileTypeFromBuffer } from "file-type";
-import type { Actor } from "../lib/types";
+import type { Actor, EntityRef } from "../lib/types";
+import { entityColumns, rowScope, sameEntity } from "../lib/entities";
 import { fileTypes } from "../lib/files";
-import { files, tasks, comments } from "./schema";
+import { files, comments } from "./schema";
 import type { PostgresRepository } from "./postgres";
 import { DomainError } from "./repository";
 import {
@@ -27,7 +28,14 @@ export class FileManager {
   }
   private async access(actor: Actor, file: typeof files.$inferSelect) {
     await this.repo.requireProject(actor, file.projectId);
-    if (file.taskId) await this.repo.requireTask(actor, file.taskId);
+    const scope = rowScope(file);
+    if (scope)
+      await this.repo.requireEntity(
+        actor,
+        scope.kind,
+        scope.id,
+        scope.projectId,
+      );
     else if (
       file.uploadedBy !== actor.id ||
       Date.parse(file.createdAt) < Date.now() - 86400000
@@ -42,7 +50,7 @@ export class FileManager {
         or(
           eq(files.status, "deleted"),
           and(
-            isNull(files.taskId),
+            isNull(files.scopeType),
             lt(files.createdAt, new Date(Date.now() - 86400000).toISOString()),
           ),
         ),
@@ -53,7 +61,7 @@ export class FileManager {
       await this.storage.remove(file.id);
       await this.repo.store.db
         .delete(files)
-        .where(and(eq(files.id, file.id), isNull(files.taskId)));
+        .where(and(eq(files.id, file.id), isNull(files.scopeType)));
     }
   }
   async begin(
@@ -61,6 +69,7 @@ export class FileManager {
     input: {
       projectId: string;
       taskId?: string;
+      scope?: EntityRef;
       name: string;
       size: number;
       purpose: "image" | "document";
@@ -68,10 +77,31 @@ export class FileManager {
   ) {
     return this.repo.store.transaction(async () => {
       await this.repo.requireProject(actor, input.projectId);
-      if (input.taskId) {
-        const { task } = await this.repo.requireTask(actor, input.taskId);
-        if (task.projectId !== input.projectId)
-          throw new DomainError("La tarea pertenece a otro proyecto.");
+      if (input.taskId && input.scope)
+        throw new DomainError("Indica un único destino.");
+      const scope =
+        input.scope ??
+        (input.taskId
+          ? {
+              kind: "task" as const,
+              id: input.taskId,
+              projectId: input.projectId,
+            }
+          : null);
+      if (scope) {
+        if (scope.projectId !== input.projectId)
+          throw new DomainError("El archivo pertenece a otro proyecto.");
+        const { permissions } = await this.repo.requireEntity(
+          actor,
+          scope.kind,
+          scope.id,
+          input.projectId,
+        );
+        if (input.purpose === "document" && !permissions.canManageDocuments)
+          throw new DomainError(
+            "No puedes gestionar los documentos de este elemento.",
+            403,
+          );
       }
       const limit = (await this.repo.store.state()).maxAttachmentBytes;
       if (
@@ -93,20 +123,18 @@ export class FileManager {
         throw new DomainError("El tipo de archivo no está permitido.");
       await this.cleanup();
       const id = randomUUID();
-      await this.repo.store.db
-        .insert(files)
-        .values({
-          id,
-          projectId: input.projectId,
-          taskId: null,
-          uploadedBy: actor.id,
-          name,
-          mimeType,
-          size: input.size,
-          storageKey: id,
-          purpose: input.purpose,
-          createdAt: new Date().toISOString(),
-        });
+      await this.repo.store.db.insert(files).values({
+        id,
+        projectId: input.projectId,
+        taskId: null,
+        uploadedBy: actor.id,
+        name,
+        mimeType,
+        size: input.size,
+        storageKey: id,
+        purpose: input.purpose,
+        createdAt: new Date().toISOString(),
+      });
       return {
         id,
         url: await this.storage.createUpload(id, mimeType, input.size),
@@ -144,17 +172,33 @@ export class FileManager {
       await this.storage.putPending(id, Buffer.concat(chunks));
     });
   }
-  async complete(actor: Actor, id: string, taskId?: string) {
+  async complete(actor: Actor, id: string, target?: string | EntityRef) {
     const result = await this.repo.store.transaction(async () => {
       const file = await this.get(id);
       await this.access(actor, file);
       if (file.uploadedBy !== actor.id)
         throw new DomainError("No puedes finalizar esta carga.", 403);
-      if (taskId) {
-        const { task } = await this.repo.requireTask(actor, taskId);
-        if (task.projectId !== file.projectId)
+      const scope =
+        typeof target === "string"
+          ? { kind: "task" as const, id: target, projectId: file.projectId }
+          : target;
+      if (scope) {
+        const { permissions } = await this.repo.requireEntity(
+          actor,
+          scope.kind,
+          scope.id,
+          file.projectId,
+        );
+        if (scope.projectId !== file.projectId)
           throw new DomainError("El archivo pertenece a otro proyecto.");
+        if (file.purpose === "document" && !permissions.canManageDocuments)
+          throw new DomainError(
+            "No puedes gestionar los documentos de este elemento.",
+            403,
+          );
       }
+      if (file.scopeType && !sameEntity(rowScope(file), scope ?? null))
+        throw new DomainError("El archivo ya pertenece a otro elemento.", 409);
       if (file.status === "ready")
         return {
           id: file.id,
@@ -197,7 +241,17 @@ export class FileManager {
       }
       await this.repo.store.db
         .update(files)
-        .set({ status: "ready", taskId: taskId ?? null })
+        .set({
+          status: "ready",
+          ...(scope
+            ? entityColumns(scope)
+            : {
+                taskId: null,
+                scopeType: null,
+                moduleId: null,
+                featureId: null,
+              }),
+        })
         .where(eq(files.id, id));
       return { id, name: file.name, mimeType: file.mimeType, size: file.size };
     });
@@ -241,20 +295,38 @@ export class FileManager {
     await this.repo.store.transaction(async () => {
       const file = await this.get(id);
       await this.access(actor, file);
-      if (file.taskId) {
-        const task = (
-          await this.repo.store.db
-            .select()
-            .from(tasks)
-            .where(eq(tasks.id, file.taskId))
-        )[0];
+      const scope = rowScope(file);
+      if (scope) {
+        const { entity, permissions } = await this.repo.requireEntity(
+          actor,
+          scope.kind,
+          scope.id,
+          scope.projectId,
+        );
+        if (!permissions.canManageDocuments)
+          throw new DomainError(
+            "No puedes gestionar los documentos de este elemento.",
+            403,
+          );
         const notes = await this.repo.store.db
           .select()
           .from(comments)
-          .where(eq(comments.taskId, file.taskId));
+          .where(
+            and(
+              eq(comments.projectId, scope.projectId),
+              eq(comments.scopeType, scope.kind),
+              scope.kind === "task"
+                ? eq(comments.taskId, scope.id)
+                : scope.kind === "module"
+                  ? eq(comments.moduleId, scope.id)
+                  : scope.kind === "feature"
+                    ? eq(comments.featureId, scope.id)
+                    : undefined,
+            ),
+          );
         if (
-          [task.description, ...notes.map((c) => c.content)].some((c) =>
-            c.includes(`/api/files/${id}/content`),
+          [String(entity.description), ...notes.map((c) => c.content)].some(
+            (c) => c.includes(`/api/files/${id}/content`),
           )
         )
           throw new DomainError(
@@ -264,7 +336,13 @@ export class FileManager {
       }
       await this.repo.store.db
         .update(files)
-        .set({ status: "deleted", taskId: null })
+        .set({
+          status: "deleted",
+          taskId: null,
+          scopeType: null,
+          moduleId: null,
+          featureId: null,
+        })
         .where(eq(files.id, id));
     });
     // Revoke access transactionally before touching storage; failed physical cleanup is retried later.

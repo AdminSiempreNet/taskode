@@ -1,3 +1,4 @@
+import { removeEntitySchema, stripEntityColumns } from "./entity-fixtures";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -158,13 +159,22 @@ test("la migración aditiva actualiza el esquema anterior conservando proyectos 
     const before = await repo.getWorkspace(actor);
     // All operations stay inside this fixture's disposable schema. Removing only
     // the additive tables reproduces the schema of migration 0000 with live data.
-    await repo.store.pool.query("drop trigger taskode_comment_changed on comments; drop function taskode_queue_comment_change(); drop table comment_outbox");
+    await repo.store.pool.query(
+      "drop trigger taskode_comment_changed on comments; drop function taskode_queue_comment_change(); drop table comment_outbox",
+    );
+    await removeEntitySchema(repo);
     await repo.store.pool.query(
       "drop table files, task_team_members, task_clients, clients, cities, departments",
     );
-    await repo.store.pool.query('alter table modules drop column "ownerId"; alter table features drop column "ownerId"; alter table tasks drop column "createdById", drop column "leaderId"; alter table comments drop column "authorId"; alter table installation drop column "maxAttachmentBytes"');
-    await repo.store.pool.query("delete from __drizzle_migrations where created_at > (select min(created_at) from __drizzle_migrations)");
-    before.tasks.forEach(t => { t.createdById = null; });
+    await repo.store.pool.query(
+      'alter table modules drop column "ownerId"; alter table features drop column "ownerId"; alter table tasks drop column "createdById", drop column "leaderId"; alter table comments drop column "authorId"; alter table installation drop column "maxAttachmentBytes"',
+    );
+    await repo.store.pool.query(
+      "delete from __drizzle_migrations where created_at > (select min(created_at) from __drizzle_migrations)",
+    );
+    before.tasks.forEach((t) => {
+      t.createdById = null;
+    });
     await migrate(drizzle(repo.store.pool), {
       migrationsFolder: migrationsFolder(),
       migrationsSchema: repo.store.schemaName,
@@ -316,7 +326,7 @@ test("respaldos v2 conservan clientes y relaciones; v1 Taskode y Brote restauran
     const path = join(directory, "backup.json");
     await repo.exportBackup(path);
     const file = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(file.version, 4);
+    assert.equal(file.version, 6);
     validateApplicationBackup(file);
     for (const mutate of [
       (copy: typeof file) => {
@@ -357,13 +367,25 @@ test("respaldos v2 conservan clientes y relaciones; v1 Taskode y Brote restauran
     assert.deepEqual(await repo.getWorkspace(actor), snapshot);
     for (const format of ["taskode-backup", "brote-backup"]) {
       const legacy = structuredClone(file);
+      stripEntityColumns(legacy.tables);
       legacy.format = format;
       legacy.version = 1;
-      delete legacy.tables.files; delete legacy.tables.task_team_members;
-      legacy.tables.installation.forEach((r: Record<string, unknown>) => { delete r.maxAttachmentBytes; });
-      for (const table of ["modules", "features"]) legacy.tables[table].forEach((r: Record<string, unknown>) => { delete r.ownerId; });
-      legacy.tables.tasks.forEach((r: Record<string, unknown>) => { delete r.createdById; delete r.leaderId; });
-      legacy.tables.comments.forEach((r: Record<string, unknown>) => { delete r.authorId; });
+      delete legacy.tables.files;
+      delete legacy.tables.task_team_members;
+      legacy.tables.installation.forEach((r: Record<string, unknown>) => {
+        delete r.maxAttachmentBytes;
+      });
+      for (const table of ["modules", "features"])
+        legacy.tables[table].forEach((r: Record<string, unknown>) => {
+          delete r.ownerId;
+        });
+      legacy.tables.tasks.forEach((r: Record<string, unknown>) => {
+        delete r.createdById;
+        delete r.leaderId;
+      });
+      legacy.tables.comments.forEach((r: Record<string, unknown>) => {
+        delete r.authorId;
+      });
       for (const name of ["departments", "cities", "clients", "task_clients"])
         delete legacy.tables[name];
       const legacyPath = join(directory, `${format}.json`);

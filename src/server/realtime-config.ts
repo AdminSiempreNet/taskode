@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type { EntityKind } from "../lib/types";
 
 export function ablyConfig(
   env: {
@@ -27,17 +28,24 @@ export function commentsChannel(
   namespace: string,
   taskId: string,
   userId: string,
+  kind: EntityKind = "task",
 ) {
   // Hash both IDs to keep channel names bounded and prevent wildcard injection.
   const hash = (value: string) =>
     createHash("sha256").update(value).digest("hex");
-  return `${namespace}:task:${hash(taskId)}:user:${hash(userId)}`;
+  return `${namespace}:${kind}:${hash(taskId)}:user:${hash(userId)}`;
 }
 
-export function commentsRealtime(taskId: string, userId: string) {
+export function commentsRealtime(
+  taskId: string,
+  userId: string,
+  kind: EntityKind = "task",
+) {
   const config = ablyConfig();
   return {
     enabled: !!config,
-    channel: config ? commentsChannel(config.namespace, taskId, userId) : null,
+    channel: config
+      ? commentsChannel(config.namespace, taskId, userId, kind)
+      : null,
   };
 }

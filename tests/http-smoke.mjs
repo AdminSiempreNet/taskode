@@ -3,6 +3,9 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { lastProjectCookieName } from "../src/lib/project-navigation.ts";
+import { serializeSignedCookie } from "better-call";
+import { session } from "../src/server/schema.ts";
+import { authConfig } from "./helpers.ts";
 import { addUser } from "./helpers.ts";
 
 let base, fixture;
@@ -552,7 +555,7 @@ test("HTTP: clientes globales, geografía y relación opcional con tareas", asyn
     const edited = await send({ type: "client.update", id: clientId, name: "Cliente editado HTTP", cityId: "11001" });
     assert.equal(edited.workspace.clients.find((client) => client.id === clientId).departmentId, "11");
     const backup = await (await fetch(base + "/api/backup")).json();
-    assert.equal(backup.version, 4);
+    assert.equal(backup.version, 6);
     assert.ok(backup.tables.task_clients.some((link) => link.clientId === clientId && link.taskId === taskId));
     await send({ type: "task.clients.update", id: taskId, clientIds: [] });
   } finally {
@@ -658,7 +661,7 @@ test("HTTP: líder y equipo usan el contrato nuevo y aceptan solicitudes anterio
   try {
     const project = await send({ type: "project.create", name: "Líder y equipo", description: "", icon: "👥", color: "#059669" });
     projectId = project.createdId;
-    await send({ type: "project.member.add", projectId, userId: member.id });
+    await send({ type: "project.team.add", projectId, userId: member.id });
     const created = await send({
       type: "task.create", projectId,
       featureId: project.workspace.features.find((feature) => feature.projectId === projectId).id,
@@ -684,6 +687,168 @@ test("HTTP: líder y equipo usan el contrato nuevo y aceptan solicitudes anterio
   } finally {
     if (projectId) await send({ type: "project.delete", id: projectId });
   }
+});
+
+test("HTTP: detalles jerárquicos, General, comentarios compartidos y pertenencia al proyecto", async () => {
+  let projectId, otherId;
+  try {
+    projectId = (
+      await send({
+        type: "project.create",
+        name: "Detalle jerárquico HTTP",
+        description: "Descripción",
+        color: "#059669",
+        icon: "P",
+      })
+    ).createdId;
+    otherId = (
+      await send({
+        type: "project.create",
+        name: "Ajeno HTTP",
+        description: "",
+        color: "#059669",
+        icon: "P",
+      })
+    ).createdId;
+    const moduleId = (
+      await send({
+        type: "module.create",
+        projectId,
+        name: "Módulo HTTP",
+        description: "Contenido",
+      })
+    ).createdId;
+    const featureId = (
+      await send({
+        type: "feature.create",
+        projectId,
+        moduleId,
+        name: "Feature HTTP",
+        description: "Contenido",
+      })
+    ).createdId;
+    const cases = [
+      ["project", projectId, `/projects/${projectId}/details`],
+      ["module", moduleId, `/projects/${projectId}/modules/${moduleId}`],
+      ["feature", featureId, `/projects/${projectId}/features/${featureId}`],
+    ];
+    for (const [kind, id, path] of cases) {
+      const page = await fetch(base + path + "?tab=properties&view=list");
+      assert.equal(page.status, 200);
+      const html = await page.text();
+      assert.match(html, /Secciones del detalle/);
+      assert.match(html, /Propiedades/);
+      const detail = await fetch(base + `/api/entities/${kind}/${id}`);
+      assert.equal(detail.status, 200);
+      assert.match(detail.headers.get("cache-control"), /no-store/);
+      assert.deepEqual((await detail.json()).scope, { kind, id, projectId });
+      const endpoint = base + `/api/entities/${kind}/${id}/comments`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "comment.create",
+          scope: { kind, id, projectId },
+          content: "Mensaje HTTP",
+        }),
+      });
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).comments.length, 1);
+      assert.equal(
+        (await (await fetch(endpoint)).json()).comments[0].content,
+        "Mensaje HTTP",
+      );
+      assert.equal((await globalThis.fetch(endpoint)).status, 401);
+      assert.equal(
+        (await fetch(endpoint + "/token", { method: "POST" })).status,
+        503,
+      );
+      const foreign = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Origin: "https://evil.example",
+          "Content-Type": "application/json",
+        },
+        body: "{}",
+      });
+      assert.equal(foreign.status, 403);
+    }
+    const general = await fetch(
+      base + `/projects/${projectId}/modules/general?tab=features`,
+    );
+    assert.equal(general.status, 200);
+    assert.match(await general.text(), /General/);
+    assert.equal(
+      (await fetch(base + `/projects/${otherId}/modules/${moduleId}`)).status,
+      404,
+    );
+    assert.equal(
+      (await fetch(base + `/projects/${otherId}/features/${featureId}`)).status,
+      404,
+    );
+    assert.equal(
+      (await fetch(base + `/api/entities/unknown/${featureId}`)).status,
+      404,
+    );
+    const mismatch = await fetch(
+      base + `/api/entities/feature/${featureId}/comments`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "comment.create",
+          scope: { kind: "module", id: moduleId, projectId },
+          content: "Destino ajeno",
+        }),
+      },
+    );
+    assert.equal(mismatch.status, 404);
+  } finally {
+    if (projectId) await send({ type: "project.delete", id: projectId });
+    if (otherId) await send({ type: "project.delete", id: otherId });
+  }
+});
+
+
+test("HTTP: equipos propios, contratos de liderazgo y documentos con permisos de contenido", async () => {
+  const member = await addUser(fixture.repo, `scope-team-${randomUUID()}`);
+  const token = randomUUID(), now = new Date();
+  await fixture.repo.store.db.insert(session).values({ id: randomUUID(), userId: member.id, token, createdAt: now, updatedAt: now, expiresAt: new Date(Date.now() + 86400000) });
+  const cookie = (await serializeSignedCookie("better-auth.session_token", token, authConfig.BETTER_AUTH_SECRET, { path: "/" })).split(";")[0];
+  const asMember = (path, body) => globalThis.fetch(base + path, { headers: { Cookie: cookie, "Content-Type": "application/json" }, ...(body ? { method: "POST", body: JSON.stringify(body) } : {}) });
+  let projectId;
+  try {
+    const project = await send({ type: "project.create", name: "Equipos HTTP", description: "", color: "#059669", icon: "P" });
+    projectId = project.createdId;
+    const assigned = await send({ type: "project.assignment.update", id: projectId, leaderId: "test-admin", teamMemberIds: [member.id] });
+    const root = assigned.workspace.projects.find((p) => p.id === projectId);
+    assert.deepEqual(root.teamMemberIds, [member.id]);
+    assert.equal(root.leaderId, "test-admin");
+    assert.equal(root.ownerId, undefined);
+    const moduleId = (await send({ type: "module.create", projectId, name: "Módulo", description: "" })).createdId;
+    const featureId = (await send({ type: "feature.create", projectId, moduleId, name: "Feature", description: "" })).createdId;
+    for (const [kind, id] of [["module", moduleId], ["feature", featureId]]) {
+      await send({ type: `${kind}.assignment.update`, id, leaderId: "test-admin", teamMemberIds: [member.id] });
+      const response = await asMember(`/api/entities/${kind}/${id}`);
+      assert.equal(response.status, 200);
+      const detail = await response.json();
+      assert.deepEqual(detail.entity.teamMemberIds, [member.id]);
+      assert.equal(detail.permissions.canEdit, true);
+      assert.equal(detail.permissions.canManageDocuments, true);
+      assert.equal(detail.permissions.canManageAccess, false);
+      assert.equal((await asMember("/api/workspace", { type: `${kind}.rename`, id, name: "Edición de equipo" })).status, 200);
+      assert.equal((await asMember("/api/workspace", { type: `${kind}.assignment.update`, id, leaderId: member.id, teamMemberIds: [] })).status, 403);
+      assert.equal((await asMember("/api/workspace", { type: `${kind}.delete`, id })).status, 403);
+      const upload = { projectId, scope: { kind, id, projectId }, name: "documento.pdf", size: 10, purpose: "document" };
+      assert.equal((await asMember("/api/files/uploads", upload)).status, 200);
+      await send({ type: `${kind}.assignment.update`, id, leaderId: "test-admin", teamMemberIds: [] });
+      assert.equal((await asMember("/api/files/uploads", upload)).status, 403);
+    }
+    assert.equal((await asMember("/api/workspace", { type: "project.assignment.update", id: projectId, leaderId: member.id, teamMemberIds: [] })).status, 403);
+    // Tabs opened with the previous project membership contract still work.
+    await send({ type: "project.member.remove", projectId, userId: member.id });
+    assert.equal((await asMember(`/api/entities/module/${moduleId}/comments/token`, {})).status, 404);
+  } finally { if (projectId) await send({ type: "project.delete", id: projectId }); }
 });
 
 test("HTTP: cerrar sesión revoca la sesión almacenada", async () => {

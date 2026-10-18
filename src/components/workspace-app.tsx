@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useWorkspaceRouter } from "./unsaved-changes";
 import Link from "next/link";
 import {
   Archive,
@@ -51,11 +52,22 @@ import {
   type Modal,
   type MutationResult,
 } from "./forms";
-import type { Workspace, Task } from "@/lib/types";
-import { getProjectView, projectPath, taskPath } from "@/lib/routes";
+import type {
+  Workspace,
+  Task,
+  EntityDetailSnapshot,
+  EntityKind,
+} from "@/lib/types";
+import {
+  entityPath,
+  getProjectView,
+  projectPath,
+  taskPath,
+} from "@/lib/routes";
 import { ProjectCatalog } from "./project-catalog";
 import { SettingsModal } from "./settings-modal";
 import { BackupModal } from "./backup-modal";
+import { EntityDetail } from "./entity-detail";
 import { TaskDetail, type TaskDefaults } from "./task-detail";
 import { ClientsManager } from "./clients-manager";
 import { AccountMenu, ProfileModal } from "./account-menu";
@@ -78,6 +90,8 @@ export function WorkspaceApp({
   taskDefaults,
   initialTaskCreation,
   menuSection,
+  entityRoute,
+  initialEntityDetail,
 }: {
   initialWorkspace: Workspace;
   projectId?: string;
@@ -85,15 +99,19 @@ export function WorkspaceApp({
   taskDefaults?: TaskDefaults;
   initialTaskCreation?: TaskDefaults;
   menuSection?: "dashboard" | "clients";
+  entityRoute?: { kind: Exclude<EntityKind, "task">; id: string };
+  initialEntityDetail?: EntityDetailSnapshot;
 }) {
   const menuMode = !!menuSection;
-  const router = useRouter();
+  const router = useWorkspaceRouter();
   const searchParams = useSearchParams();
   const view = getProjectView(searchParams.get("view"));
   const [workspace, setWorkspace] = useState<Workspace | null>(
     initialWorkspace,
   );
-  const [featureId, setFeatureId] = useState("all");
+  const [featureId, setFeatureId] = useState(
+    searchParams.get("featureId") ?? "all",
+  );
   const [projectPreferences, setProjectPreferences] =
     useState<ProjectPreferences>({
       favorites: [],
@@ -265,7 +283,7 @@ export function WorkspaceApp({
   const canManageProject =
     !!workspace &&
     (workspace.currentUser.role === "admin" ||
-      project?.ownerId === workspace.currentUser.id);
+      project?.leaderId === workspace.currentUser.id);
   const selectedTask = workspace?.tasks.find(
     (task) => task.id === taskId && task.projectId === projectId,
   );
@@ -343,10 +361,6 @@ export function WorkspaceApp({
   );
   const selectedFeature = features.find((f) => f.id === featureId);
   const openTask = (t: Task) => router.push(taskPath(projectId, t.id, view));
-  const openMenuDialog = (nextModal: Modal) => {
-    openingMenuDialog.current = true;
-    setModal(nextModal);
-  };
   const addTask = (
     statusId?: string,
     startDate?: string,
@@ -487,6 +501,7 @@ export function WorkspaceApp({
           <div className="sidebar-panel">
             {project ? (
               <FeatureSidebar
+                userId={workspace!.currentUser.id}
                 canReorder={canManageProject}
                 key={projectId}
                 projectId={project?.id}
@@ -509,21 +524,47 @@ export function WorkspaceApp({
                 select={(id) => {
                   setFeatureId(id);
                   setMobileSidebarOpen(false);
-                  if (taskId) router.push(projectPath(projectId, view));
+                  if (taskId || entityRoute) {
+                    const path = projectPath(projectId, view);
+                    router.push(
+                      `${path}${path.includes("?") ? "&" : "?"}featureId=${encodeURIComponent(id)}`,
+                    );
+                  }
                 }}
-                createFeature={() => setModal({ type: "feature" })}
+                createFeature={() =>
+                  setModal({
+                    type: "feature",
+                    ...(entityRoute?.kind === "module"
+                      ? {
+                          moduleId:
+                            entityRoute.id === "general"
+                              ? null
+                              : entityRoute.id,
+                        }
+                      : {}),
+                  })
+                }
                 createModule={() => setModal({ type: "module" })}
                 createTask={(typeId) =>
                   setModal({
                     type: "task",
                     defaults: {
                       typeId,
-                      featureId: selectedFeature?.id ?? selectedTask?.featureId,
+                      featureId:
+                        entityRoute?.kind === "feature"
+                          ? entityRoute.id
+                          : (selectedFeature?.id ?? selectedTask?.featureId),
                     },
                   })
                 }
-                edit={(feature) => setModal({ type: "feature", feature })}
-                editModule={(module) => setModal({ type: "module", module })}
+                edit={(feature) =>
+                  router.push(
+                    entityPath(projectId, "feature", feature.id, view),
+                  )
+                }
+                editModule={(module) =>
+                  router.push(entityPath(projectId, "module", module.id, view))
+                }
                 mutate={mutate}
               />
             ) : menuMode ? (
@@ -619,6 +660,18 @@ export function WorkspaceApp({
                     </Button>
                   </>
                 }
+              />
+            ) : entityRoute ? (
+              <EntityDetail
+                scope={{ ...entityRoute, projectId }}
+                initialDetail={initialEntityDetail}
+                project={project}
+                workspace={workspace}
+                mutate={mutate}
+                busy={busy}
+                confirm={setConfirmation}
+                create={setModal}
+                sidebarControls={sidebarControls}
               />
             ) : taskId ? (
               showTaskDetail ? (
@@ -775,13 +828,16 @@ export function WorkspaceApp({
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          disabled={!canManageProject}
                           onSelect={() =>
-                            openMenuDialog({ type: "project", project })
+                            router.push(
+                              entityPath(projectId, "project", projectId, view),
+                            )
                           }
                         >
                           <Pencil />
-                          Editar proyecto
+                          {canManageProject
+                            ? "Editar proyecto"
+                            : "Ver proyecto"}
                         </DropdownMenuItem>
                         {canManageProject && (
                           <DropdownMenuItem
@@ -791,7 +847,7 @@ export function WorkspaceApp({
                             }}
                           >
                             <Users />
-                            Participantes y propietario
+                            Líder y equipo
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem
@@ -813,10 +869,14 @@ export function WorkspaceApp({
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onSelect={() =>
-                                openMenuDialog({
-                                  type: "feature",
-                                  feature: selectedFeature,
-                                })
+                                router.push(
+                                  entityPath(
+                                    projectId,
+                                    "feature",
+                                    selectedFeature.id,
+                                    view,
+                                  ),
+                                )
                               }
                             >
                               <Pencil />
@@ -866,10 +926,14 @@ export function WorkspaceApp({
                         <button
                           className="context-button"
                           onClick={() =>
-                            setModal({
-                              type: "feature",
-                              feature: selectedFeature,
-                            })
+                            router.push(
+                              entityPath(
+                                projectId,
+                                "feature",
+                                selectedFeature.id,
+                                view,
+                              ),
+                            )
                           }
                         >
                           <MoreHorizontal size={14} />

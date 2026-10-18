@@ -1,9 +1,22 @@
 import type { Command } from "../lib/validation";
-import type { Actor, Geography, ImportReport, Workspace } from "../lib/types";
+import type {
+  Actor,
+  Geography,
+  ImportReport,
+  Workspace,
+  EntityKind,
+  EntityDetailSnapshot,
+} from "../lib/types";
 
 // UI and HTTP contracts remain independent of the database implementation.
 export interface WorkspaceRepository {
   getWorkspace(actor: Actor): Promise<Workspace>;
+  entityDetail(
+    actor: Actor,
+    kind: EntityKind,
+    id: string,
+    projectId?: string,
+  ): Promise<EntityDetailSnapshot>;
   getGeography(actor: Actor): Promise<Geography>;
   execute(
     command: Command,

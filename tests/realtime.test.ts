@@ -35,7 +35,7 @@ async function fixture() {
   ).createdId!;
   for (const person of [leader, member, other])
     await repo.execute(
-      { type: "project.member.add", projectId, userId: person.id },
+      { type: "project.team.add", projectId, userId: person.id },
       owner,
     );
   const workspace = await repo.getWorkspace(owner);

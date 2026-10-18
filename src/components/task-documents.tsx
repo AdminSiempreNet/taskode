@@ -16,9 +16,10 @@ import {
 import { toast } from "sonner";
 import { uploadFile } from "@/lib/file-client";
 import { FILE_ACCEPT, fileUrl } from "@/lib/files";
-import type { Task, TaskFile } from "@/lib/types";
+import type { Task, TaskFile, EntityRef } from "@/lib/types";
 import { Button } from "./ui/button";
 import { useImagePreview } from "./image-preview";
+import { entityNames } from "@/lib/entities";
 import styles from "./task-documents.module.css";
 
 function formatSize(bytes: number) {
@@ -72,16 +73,40 @@ function FileThumbnail({ file }: { file: TaskFile }) {
   );
 }
 
+const noFiles: TaskFile[] = [];
 export function TaskDocuments({
   task,
-  limit,
-  onCountChange,
+  ...props
 }: {
   task: Task;
   limit: number;
   onCountChange?: (count: number) => void;
 }) {
-  const [files, setFiles] = useState(task.files ?? []);
+  return (
+    <EntityDocuments
+      {...props}
+      scope={{ kind: "task", id: task.id, projectId: task.projectId }}
+      files={task.files}
+      canEdit={task.permissions?.canEdit ?? true}
+    />
+  );
+}
+
+export function EntityDocuments({
+  scope,
+  files: sourceFiles,
+  canEdit,
+  limit,
+  onCountChange,
+}: {
+  scope: EntityRef;
+  files?: TaskFile[];
+  canEdit: boolean;
+  limit: number;
+  onCountChange?: (count: number) => void;
+}) {
+  const initialFiles = sourceFiles ?? noFiles;
+  const [files, setFiles] = useState(initialFiles);
   const [upload, setUpload] = useState<{
     name: string;
     progress: number;
@@ -96,11 +121,10 @@ export function TaskDocuments({
   const dragDepth = useRef(0);
   const inputId = useId();
   const headingId = useId();
-  const canEdit = task.permissions?.canEdit ?? true;
   const totalSize = files.reduce((total, file) => total + file.size, 0);
   useEffect(() => {
-    setFiles(task.files ?? []);
-  }, [task.id, task.files]);
+    setFiles(initialFiles);
+  }, [scope.kind, scope.id, initialFiles]);
   useEffect(() => {
     onCountChange?.(files.length);
   }, [files.length, onCountChange]);
@@ -128,8 +152,8 @@ export function TaskDocuments({
         try {
           const uploaded = await uploadFile(
             file,
-            task.projectId,
-            task.id,
+            scope.projectId,
+            scope,
             "document",
             (progress) =>
               setUpload((current) => current && { ...current, progress }),
@@ -194,7 +218,13 @@ export function TaskDocuments({
     >
       <header className={styles.header}>
         <div className={styles.heading}>
-          <h3 id={headingId}>Archivos de la tarea</h3>
+          <h3 id={headingId}>
+            Archivos{" "}
+            {scope.kind === "task" || scope.kind === "feature"
+              ? "de la"
+              : "del"}{" "}
+            {entityNames[scope.kind]}
+          </h3>
           <p>
             {files.length
               ? `${files.length} ${files.length === 1 ? "archivo adjunto" : "archivos adjuntos"} · ${formatSize(totalSize)}`
@@ -380,8 +410,14 @@ export function TaskDocuments({
           </span>
           <strong>Aún no hay archivos adjuntos</strong>
           <p>
-            Añade documentos, referencias o imágenes para dar contexto a esta
-            tarea.
+            {canEdit
+              ? "Añade documentos, referencias o imágenes"
+              : "Aquí encontrarás los documentos compartidos"}{" "}
+            para dar contexto a{" "}
+            {scope.kind === "task" || scope.kind === "feature"
+              ? "esta"
+              : "este"}{" "}
+            {entityNames[scope.kind]}.
           </p>
         </div>
       )}

@@ -1,6 +1,10 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import {
+  readSidebarExpansion,
+  saveSidebarExpansion,
+} from "@/lib/sidebar-expansion";
 import {
   DndContext,
   DragOverlay,
@@ -55,6 +59,7 @@ function normalize(value: string) {
 
 export function FeatureSidebar({
   projectId,
+  userId = "anonymous",
   features,
   modules,
   taskTypes,
@@ -71,6 +76,7 @@ export function FeatureSidebar({
   mutate,
 }: {
   projectId?: string;
+  userId?: string;
   features: Feature[];
   modules: ProjectModule[];
   taskTypes: ProjectTaskType[];
@@ -91,8 +97,18 @@ export function FeatureSidebar({
   const [expandedModules, setExpandedModules] = useState<Set<string>>(
     () => new Set(),
   );
-  const [collapsedSearchModules, setCollapsedSearchModules] =
-    useState<Set<string>>(() => new Set());
+  const [collapsedSearchModules, setCollapsedSearchModules] = useState<
+    Set<string>
+  >(() => new Set());
+  useEffect(() => {
+    let storage: Storage | undefined;
+    try {
+      storage = window.sessionStorage;
+    } catch {
+      /* Optional browser storage. */
+    }
+    setExpandedModules(readSidebarExpansion(userId, projectId ?? "", storage));
+  }, [userId, projectId]);
   const openingCreateDialog = useRef(false);
   function openCreateDialog(create: () => void) {
     openingCreateDialog.current = true;
@@ -119,7 +135,9 @@ export function FeatureSidebar({
   const matchingGroupIds = new Set(
     groups
       .filter((group) =>
-        normalize(`${group.name} ${group.description}`).includes(normalizedQuery),
+        normalize(`${group.name} ${group.description}`).includes(
+          normalizedQuery,
+        ),
       )
       .map((group) => group.id),
   );
@@ -251,10 +269,10 @@ export function FeatureSidebar({
                 <DropdownMenuItem
                   key={type.id}
                   disabled={!features.length}
-                  title={!features.length ? "Crea una feature primero" : undefined}
-                  onSelect={() =>
-                    openCreateDialog(() => createTask(type.id))
+                  title={
+                    !features.length ? "Crea una feature primero" : undefined
                   }
+                  onSelect={() => openCreateDialog(() => createTask(type.id))}
                 >
                   <span
                     className="sidebar-task-type-color"
@@ -267,7 +285,9 @@ export function FeatureSidebar({
             ) : (
               <DropdownMenuItem
                 disabled={!features.length}
-                title={!features.length ? "Crea una feature primero" : undefined}
+                title={
+                  !features.length ? "Crea una feature primero" : undefined
+                }
                 onSelect={() => openCreateDialog(() => createTask())}
               >
                 <ListTodo />
@@ -382,6 +402,20 @@ export function FeatureSidebar({
                         const next = new Set(current);
                         if (next.has(group.id)) next.delete(group.id);
                         else next.add(group.id);
+                        if (!normalizedQuery) {
+                          let storage: Storage | undefined;
+                          try {
+                            storage = window.sessionStorage;
+                          } catch {
+                            /* Optional browser storage. */
+                          }
+                          saveSidebarExpansion(
+                            userId,
+                            projectId ?? "",
+                            next,
+                            storage,
+                          );
+                        }
                         return next;
                       });
                     }}
@@ -426,13 +460,11 @@ export function FeatureSidebar({
               </section>
             );
           })}
-          {!visible.length &&
-            normalizedQuery &&
-            !matchingGroupIds.size && (
-              <p className="feature-search-empty">
-                No se encontraron módulos ni features.
-              </p>
-            )}
+          {!visible.length && normalizedQuery && !matchingGroupIds.size && (
+            <p className="feature-search-empty">
+              No se encontraron módulos ni features.
+            </p>
+          )}
         </div>
         <DragOverlay>
           {dragged && (

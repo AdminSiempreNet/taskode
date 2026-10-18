@@ -1,5 +1,16 @@
 import { z } from "zod";
 const id = z.string().min(1).max(200);
+export const entityKindSchema = z.enum([
+  "project",
+  "module",
+  "feature",
+  "task",
+]);
+export const entityRefSchema = z.object({
+  kind: entityKindSchema,
+  id,
+  projectId: id,
+});
 const name = z.string().trim().min(1, "Escribe un nombre.").max(160);
 const description = z.string().max(30000).default("");
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -88,23 +99,41 @@ export const trelloSchema = z.object({
     .max(10000),
 });
 export type TrelloBoard = z.infer<typeof trelloSchema>;
+const assignmentFields = {
+  id,
+  leaderId: id,
+  teamMemberIds: z.array(id).max(1000),
+};
 const currentCommandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("client.create"), name, cityId: id }),
   z.object({ type: z.literal("client.update"), id, name, cityId: id }),
   z.object({ type: z.literal("client.delete"), id }),
-  z.object({ type: z.literal("project.transferOwnership"), id, userId: id }),
   z.object({
-    type: z.literal("project.member.add"),
+    type: z.literal("project.assignment.update"),
+    ...assignmentFields,
+  }),
+  z.object({
+    type: z.literal("module.assignment.update"),
+    ...assignmentFields,
+  }),
+  z.object({
+    type: z.literal("feature.assignment.update"),
+    ...assignmentFields,
+  }),
+  z.object({ type: z.literal("project.leader.update"), id, userId: id }),
+  z.object({
+    type: z.literal("project.team.add"),
     projectId: id,
     userId: id,
   }),
   z.object({
-    type: z.literal("project.member.remove"),
+    type: z.literal("project.team.remove"),
     projectId: id,
     userId: id,
   }),
   z.object({ type: z.literal("project.create"), ...projectFields }),
   z.object({ type: z.literal("project.update"), id, ...projectFields }),
+  z.object({ type: z.literal("project.rename"), id, name }),
   z.object({ type: z.literal("project.delete"), id }),
   z.object({
     type: z.literal("module.create"),
@@ -112,6 +141,7 @@ const currentCommandSchema = z.discriminatedUnion("type", [
     ...moduleFields,
   }),
   z.object({ type: z.literal("module.update"), id, ...moduleFields }),
+  z.object({ type: z.literal("module.rename"), id, name }),
   z.object({ type: z.literal("module.delete"), id }),
   z.object({
     type: z.literal("module.reorder"),
@@ -124,6 +154,7 @@ const currentCommandSchema = z.discriminatedUnion("type", [
     ...featureFields,
   }),
   z.object({ type: z.literal("feature.update"), id, ...featureFields }),
+  z.object({ type: z.literal("feature.rename"), id, name }),
   z.object({ type: z.literal("feature.delete"), id }),
   z.object({ type: z.literal("feature.pin"), id, pinned: z.boolean() }),
   z.object({
@@ -156,8 +187,8 @@ const currentCommandSchema = z.discriminatedUnion("type", [
     leaderId: id,
     teamMemberIds: z.array(id).max(1000),
   }),
-  z.object({ type: z.literal("module.transferOwnership"), id, userId: id }),
-  z.object({ type: z.literal("feature.transferOwnership"), id, userId: id }),
+  z.object({ type: z.literal("module.leader.update"), id, userId: id }),
+  z.object({ type: z.literal("feature.leader.update"), id, userId: id }),
   z.object({
     type: z.literal("settings.update"),
     maxAttachmentBytes: z.number().int().min(1048576).max(104857600),
@@ -238,7 +269,8 @@ const currentCommandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("checklist.item.delete"), id }),
   z.object({
     type: z.literal("comment.create"),
-    taskId: id,
+    taskId: id.optional(),
+    scope: entityRefSchema.optional(),
     content: z.string().trim().min(1).max(10000),
     requestId: z.uuid().optional(),
   }),
@@ -255,31 +287,47 @@ const currentCommandSchema = z.discriminatedUnion("type", [
   }),
 ]);
 // Normalize requests from tabs opened before the terminology change.
-export const commandSchema = z.preprocess((input) => {
-  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
-  const command = input as Record<string, unknown>;
-  if (
-    ![
-      "task.create",
-      "task.assignment.update",
-      "task.participants.update",
-    ].includes(String(command.type))
-  )
-    return input;
-  return {
-    ...command,
-    type:
-      command.type === "task.participants.update"
-        ? "task.assignment.update"
-        : command.type,
-    ...(!Object.hasOwn(command, "leaderId") &&
-    Object.hasOwn(command, "assigneeId")
-      ? { leaderId: command.assigneeId }
-      : {}),
-    ...(!Object.hasOwn(command, "teamMemberIds") &&
-    Object.hasOwn(command, "collaboratorIds")
-      ? { teamMemberIds: command.collaboratorIds }
-      : {}),
-  };
-}, currentCommandSchema);
+export const commandSchema = z.preprocess(
+  (input) => {
+    if (!input || typeof input !== "object" || Array.isArray(input))
+      return input;
+    const command = input as Record<string, unknown>;
+    const legacyType = String(command.type);
+    if (/^(project|module|feature)\.transferOwnership$/.test(legacyType))
+      return {
+        ...command,
+        type: legacyType.replace(".transferOwnership", ".leader.update"),
+      };
+    if (/^project\.member\.(add|remove)$/.test(legacyType))
+      return { ...command, type: legacyType.replace(".member.", ".team.") };
+
+    if (
+      ![
+        "task.create",
+        "task.assignment.update",
+        "task.participants.update",
+      ].includes(String(command.type))
+    )
+      return input;
+    return {
+      ...command,
+      type:
+        command.type === "task.participants.update"
+          ? "task.assignment.update"
+          : command.type,
+      ...(!Object.hasOwn(command, "leaderId") &&
+      Object.hasOwn(command, "assigneeId")
+        ? { leaderId: command.assigneeId }
+        : {}),
+      ...(!Object.hasOwn(command, "teamMemberIds") &&
+      Object.hasOwn(command, "collaboratorIds")
+        ? { teamMemberIds: command.collaboratorIds }
+        : {}),
+    };
+  },
+  currentCommandSchema.refine(
+    (c) => c.type !== "comment.create" || !!c.taskId !== !!c.scope,
+    "Indica un único destino para el comentario.",
+  ),
+);
 export type Command = z.infer<typeof commandSchema>;

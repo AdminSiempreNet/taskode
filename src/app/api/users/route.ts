@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { repository } from "@/server";
 import { httpError, requireActor } from "@/server/access";
-import { user, projectMembers } from "@/server/schema";
+import { user, projectTeamMembers } from "@/server/schema";
 export const runtime = "nodejs";
 export async function GET(request: Request) {
   try {
@@ -22,11 +22,15 @@ export async function GET(request: Request) {
     const members = projectId
       ? await repo.store.db
           .select()
-          .from(projectMembers)
-          .where(eq(projectMembers.projectId, projectId))
+          .from(projectTeamMembers)
+          .where(eq(projectTeamMembers.projectId, projectId))
       : [];
     return Response.json(
-      { users, members: members.map((m) => m.userId) },
+      {
+        users,
+        teamMemberIds: members.map((m) => m.userId),
+        members: members.map((m) => m.userId),
+      },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

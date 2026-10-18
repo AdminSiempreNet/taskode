@@ -142,7 +142,7 @@ export const projects = pgTable(
   "projects",
   {
     id: text().primaryKey(),
-    ownerId: text()
+    leaderId: text()
       .notNull()
       .references(() => user.id),
     name: text().notNull(),
@@ -151,10 +151,10 @@ export const projects = pgTable(
     color: text().notNull(),
     createdAt: text().notNull(),
   },
-  (t) => [index("project_owner").on(t.ownerId)],
+  (t) => [index("project_leader").on(t.leaderId)],
 );
-export const projectMembers = pgTable(
-  "project_members",
+export const projectTeamMembers = pgTable(
+  "project_team_members",
   {
     projectId: text()
       .notNull()
@@ -165,7 +165,7 @@ export const projectMembers = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.projectId, t.userId] }),
-    index("membership_user").on(t.userId),
+    index("project_team_user").on(t.userId),
   ],
 );
 export const invitations = pgTable(
@@ -201,7 +201,7 @@ export const modules = pgTable(
   "modules",
   {
     id: text().primaryKey(),
-    ownerId: text()
+    leaderId: text()
       .notNull()
       .references(() => user.id),
     projectId: text()
@@ -211,13 +211,16 @@ export const modules = pgTable(
     description: text().notNull(),
     position: doublePrecision().notNull(),
   },
-  (t) => [index("module_project").on(t.projectId, t.position)],
+  (t) => [
+    index("module_project").on(t.projectId, t.position),
+    uniqueIndex("module_identity").on(t.id, t.projectId),
+  ],
 );
 export const features = pgTable(
   "features",
   {
     id: text().primaryKey(),
-    ownerId: text()
+    leaderId: text()
       .notNull()
       .references(() => user.id),
     projectId: text()
@@ -238,6 +241,36 @@ export const features = pgTable(
       .where(sql`${t.moduleId} is null`),
     index("feature_module").on(t.moduleId),
     check("positive_feature_number", sql`${t.number} >= 1`),
+  ],
+);
+export const moduleTeamMembers = pgTable(
+  "module_team_members",
+  {
+    moduleId: text()
+      .notNull()
+      .references(() => modules.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.moduleId, t.userId] }),
+    index("module_team_user").on(t.userId),
+  ],
+);
+export const featureTeamMembers = pgTable(
+  "feature_team_members",
+  {
+    featureId: text()
+      .notNull()
+      .references(() => features.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.featureId, t.userId] }),
+    index("feature_team_user").on(t.userId),
   ],
 );
 export const statuses = pgTable(
@@ -356,6 +389,7 @@ export const tasks = pgTable(
       foreignColumns: [priorities.id, priorities.projectId],
     }),
     uniqueIndex("task_external").on(t.projectId, t.externalId),
+    uniqueIndex("task_identity").on(t.id, t.projectId),
     index("task_project").on(t.projectId, t.archived),
     index("task_feature").on(t.featureId),
     index("task_status").on(t.statusId),
@@ -399,14 +433,43 @@ export const comments = pgTable(
   {
     id: text().primaryKey(),
     authorId: text().references(() => user.id),
-    taskId: text()
+    projectId: text()
       .notNull()
-      .references(() => tasks.id, { onDelete: "cascade" }),
+      .references(() => projects.id, { onDelete: "cascade" }),
+    scopeType: text().notNull().default("task"),
+    taskId: text(),
+    moduleId: text(),
+    featureId: text(),
     content: text().notNull(),
     createdAt: text().notNull(),
     updatedAt: text().notNull(),
   },
-  (t) => [index("comment_task").on(t.taskId, t.createdAt)],
+  (t) => [
+    index("comment_task").on(t.taskId, t.createdAt),
+    index("comment_scope").on(
+      t.projectId,
+      t.scopeType,
+      t.moduleId,
+      t.featureId,
+      t.createdAt,
+    ),
+    foreignKey({
+      columns: [t.taskId, t.projectId],
+      foreignColumns: [tasks.id, tasks.projectId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.moduleId, t.projectId],
+      foreignColumns: [modules.id, modules.projectId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.featureId, t.projectId],
+      foreignColumns: [features.id, features.projectId],
+    }).onDelete("cascade"),
+    check(
+      "comment_scope_target",
+      sql`(${t.scopeType} = 'project' and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 0) or (${t.scopeType} = 'task' and ${t.taskId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'module' and ${t.moduleId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'feature' and ${t.featureId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1)`,
+    ),
+  ],
 );
 export const taskStatusHistory = pgTable(
   "task_status_history",
@@ -506,6 +569,9 @@ export const files = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     taskId: text().references(() => tasks.id, { onDelete: "cascade" }),
+    scopeType: text(),
+    moduleId: text(),
+    featureId: text(),
     uploadedBy: text()
       .notNull()
       .references(() => user.id),
@@ -520,6 +586,27 @@ export const files = pgTable(
   (t) => [
     index("file_task").on(t.taskId),
     index("file_pending").on(t.status, t.createdAt),
+    index("file_scope").on(t.projectId, t.scopeType, t.moduleId, t.featureId),
+    foreignKey({
+      columns: [t.taskId, t.projectId],
+      foreignColumns: [tasks.id, tasks.projectId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.moduleId, t.projectId],
+      foreignColumns: [modules.id, modules.projectId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.featureId, t.projectId],
+      foreignColumns: [features.id, features.projectId],
+    }).onDelete("cascade"),
+    check(
+      "file_scope_target",
+      sql`coalesce(((${t.scopeType} is null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 0) or (${t.scopeType} = 'project' and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 0) or (${t.scopeType} = 'task' and ${t.taskId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'module' and ${t.moduleId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'feature' and ${t.featureId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1)), false)`,
+    ),
+    check(
+      "file_scope_ready",
+      sql`${t.scopeType} is null or ${t.status} = 'ready'`,
+    ),
   ],
 );
 
@@ -527,16 +614,26 @@ export const files = pgTable(
 export const commentOutbox = pgTable(
   "comment_outbox",
   {
-    taskId: text().primaryKey(),
-    eventId: text().notNull().default(sql`gen_random_uuid()::text`),
+    scopeType: text().notNull().default("task"),
+    scopeId: text().notNull(),
+    taskId: text(),
+    eventId: text()
+      .notNull()
+      .default(sql`gen_random_uuid()::text`),
     attempts: integer().notNull().default(0),
     availableAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     leaseUntil: timestamp({ withTimezone: true }),
   },
-  (t) => [index("comment_outbox_available").on(t.availableAt)],
+  (t) => [
+    primaryKey({ columns: [t.scopeType, t.scopeId] }),
+    index("comment_outbox_available").on(t.availableAt),
+  ],
 );
 
 export const domainTables = {
+  project_team_members: projectTeamMembers,
+  module_team_members: moduleTeamMembers,
+  feature_team_members: featureTeamMembers,
   task_team_members: taskTeamMembers,
   files,
   departments,

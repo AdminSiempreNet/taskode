@@ -36,6 +36,20 @@
       "when": 1792293756894,
       "tag": "0004_comment_realtime",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792296180752,
+      "tag": "0005_entity_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792299115069,
+      "tag": "0006_entity_leaders_and_teams",
+      "breakpoints": true
     }
   ]
 }

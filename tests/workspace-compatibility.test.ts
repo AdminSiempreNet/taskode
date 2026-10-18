@@ -21,7 +21,7 @@ test("el proyecto renderiza snapshots anteriores sin los catálogos de tipos e i
     projects: [
       {
         id: "project",
-        ownerId: "admin",
+        leaderId: "admin",
         name: "Proyecto anterior",
         description: "",
         icon: "🌱",

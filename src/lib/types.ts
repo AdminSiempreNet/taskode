@@ -24,7 +24,8 @@ export interface Checklist {
 }
 export interface TaskComment {
   id: string;
-  taskId: string;
+  taskId: string | null;
+  scope?: EntityRef;
   content: string;
   createdAt: string;
   updatedAt: string;
@@ -51,6 +52,9 @@ export interface TaskFile {
   id: string;
   projectId: string;
   taskId: string | null;
+  scopeType?: EntityKind | null;
+  moduleId?: string | null;
+  featureId?: string | null;
   name: string;
   mimeType: string;
   size: number;
@@ -63,6 +67,22 @@ export interface TaskPermissions {
   canDelete: boolean;
   canModerateComments: boolean;
 }
+export type EntityKind = "project" | "module" | "feature" | "task";
+export interface EntityRef {
+  kind: EntityKind;
+  id: string;
+  projectId: string;
+}
+export interface EntityPermissions extends TaskPermissions {
+  canComment: boolean;
+  canManageDocuments: boolean;
+}
+export interface EntityDetailSnapshot {
+  scope: EntityRef;
+  entity: Project | ProjectModule | Feature | Task;
+  files: TaskFile[];
+  permissions: EntityPermissions;
+}
 export interface TaskStatusChange {
   id: number;
   taskId: string;
@@ -74,25 +94,28 @@ export interface TaskStatusChange {
   toStatusColor: string;
   changedAt: string;
 }
-export interface Project {
+export interface EntityAssignment {
+  teamMemberIds?: string[];
+}
+export interface Project extends EntityAssignment {
   id: string;
-  ownerId: string;
+  leaderId: string;
   name: string;
   description: string;
   icon: string;
   color: string;
   createdAt: string;
 }
-export interface ProjectModule {
+export interface ProjectModule extends EntityAssignment {
   id: string;
   projectId: string;
   name: string;
   description: string;
   position: number;
-  ownerId?: string;
+  leaderId?: string;
   canManage?: boolean;
 }
-export interface Feature {
+export interface Feature extends EntityAssignment {
   id: string;
   projectId: string;
   moduleId: string | null;
@@ -101,7 +124,7 @@ export interface Feature {
   description: string;
   position: number;
   pinned: boolean;
-  ownerId?: string;
+  leaderId?: string;
   canManage?: boolean;
 }
 export interface Status {

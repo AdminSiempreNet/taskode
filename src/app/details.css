@@ -715,6 +715,19 @@
   gap: 16px;
   container-type: inline-size;
 }
+.entity-general-main {
+  flex: 1;
+}
+.entity-list-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.feature-table-header > button {
+  margin-left: auto;
+}
 .task-heading {
   display: flex;
   align-items: center;
@@ -1934,4 +1947,22 @@
   .description-writing {
     padding: 12px 8px;
   }
+}
+
+.inline-task-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.entity-type-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  height: 1.35em;
+  color: var(--muted-foreground);
+}
+
+.inline-task-title > [role="textbox"] {
+  flex: 1;
+  min-width: 0;
 }

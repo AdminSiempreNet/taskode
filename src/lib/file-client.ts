@@ -1,5 +1,6 @@
 import { fileUrl } from "./files";
-import type { TaskFile } from "./types";
+import type { TaskFile, EntityRef } from "./types";
+import { entityColumns } from "./entities";
 async function json(response: Response) {
   const data = await response.json();
   if (!response.ok)
@@ -9,17 +10,18 @@ async function json(response: Response) {
 export async function uploadFile(
   file: File,
   projectId: string,
-  taskId: string | undefined,
+  taskId: string | EntityRef | undefined,
   purpose: "image" | "document",
   progress?: (value: number) => void,
 ) {
+  const target = typeof taskId === "object" ? { scope: taskId } : { taskId };
   const upload = await json(
     await fetch("/api/files/uploads", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         projectId,
-        taskId,
+        ...target,
         name: file.name || "imagen.png",
         size: file.size,
         purpose,
@@ -48,14 +50,16 @@ export async function uploadFile(
     await fetch(`/api/files/uploads/${upload.id}/complete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(purpose === "document" ? { taskId } : {}),
+      body: JSON.stringify(purpose === "document" ? target : {}),
     }),
   );
   progress?.(100);
   return {
     ...result,
+    ...(purpose === "document" && typeof taskId === "object"
+      ? entityColumns(taskId)
+      : { taskId: purpose === "document" ? (taskId ?? null) : null }),
     projectId,
-    taskId: purpose === "document" ? (taskId ?? null) : null,
     purpose,
     createdAt: new Date().toISOString(),
     url: fileUrl(upload.id),

@@ -125,7 +125,7 @@ export class InvitationService {
       .where(eq(s.invitationProjects.invitationId, row.id));
     for (const p of projects)
       await this.repo.store.db
-        .insert(s.projectMembers)
+        .insert(s.projectTeamMembers)
         .values({ projectId: p.projectId, userId })
         .onConflictDoNothing();
   }

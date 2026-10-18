@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   TaskCommentsClient,
+  commentRequestId,
   type ChatConnection,
 } from "../src/lib/task-comments-client";
 import type { TaskComment } from "../src/lib/types";
@@ -36,15 +37,64 @@ function deferred<T>() {
 }
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
 
-test("chat: fetch nativo conserva el contexto global al consultar y enviar", async (t) => {
-  let reads = 0, writes = 0;
-  t.mock.method(globalThis, "fetch", function (this: typeof globalThis, _url: Parameters<typeof fetch>[0], init?: RequestInit) {
-    // Browsers reject calling native fetch with the controller as its receiver.
-    if (this !== globalThis) throw new TypeError("Failed to execute 'fetch' on 'Window': Illegal invocation");
-    if (init?.method === "POST") writes++;
-    else reads++;
-    return Promise.resolve(snapshot([note("native")]));
+test("chat HTTP de desarrollo: genera identificadores idempotentes sin randomUUID", () => {
+  const source = { getRandomValues: crypto.getRandomValues.bind(crypto) };
+  const first = commentRequestId(source),
+    second = commentRequestId(source);
+  assert.match(
+    first,
+    /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/,
+  );
+  assert.notEqual(first, second);
+});
+
+test("chat de entidad: usa el endpoint y el destino del scope sin enviar taskId", async () => {
+  const scope = { kind: "module" as const, id: "module", projectId: "project" };
+  const requests: { url: string; body?: Record<string, unknown> }[] = [];
+  const client = new TaskCommentsClient(scope.id, [], user, () => {}, {
+    scope,
+    fetch: async (url, init) => {
+      requests.push({
+        url: String(url),
+        body: init?.body ? JSON.parse(String(init.body)) : undefined,
+      });
+      return snapshot([]);
+    },
   });
+  try {
+    await client.refresh();
+    assert.ok(await client.mutate({ type: "comment.create", content: "Hola" }));
+    const write = requests.find((request) => request.body)!;
+    assert.equal(write.url, "/api/entities/module/module/comments");
+    assert.deepEqual(write.body!.scope, scope);
+    assert.equal(write.body!.taskId, undefined);
+    assert.match(String(write.body!.requestId), /^[a-f0-9-]{36}$/);
+  } finally {
+    client.stop();
+  }
+});
+
+test("chat: fetch nativo conserva el contexto global al consultar y enviar", async (t) => {
+  let reads = 0,
+    writes = 0;
+  t.mock.method(
+    globalThis,
+    "fetch",
+    function (
+      this: typeof globalThis,
+      _url: Parameters<typeof fetch>[0],
+      init?: RequestInit,
+    ) {
+      // Browsers reject calling native fetch with the controller as its receiver.
+      if (this !== globalThis)
+        throw new TypeError(
+          "Failed to execute 'fetch' on 'Window': Illegal invocation",
+        );
+      if (init?.method === "POST") writes++;
+      else reads++;
+      return Promise.resolve(snapshot([note("native")]));
+    },
+  );
   const client = new TaskCommentsClient("task", [], user, () => {});
   try {
     await client.refresh();
@@ -54,7 +104,9 @@ test("chat: fetch nativo conserva el contexto global al consultar y enviar", asy
     assert.equal(client.state.error, "");
     assert.equal(writes, 1);
     assert.ok(reads > 0);
-  } finally { client.stop(); }
+  } finally {
+    client.stop();
+  }
 });
 
 test("chat: un aviso remoto sincroniza altas, ediciones y eliminaciones sin duplicar conexiones", async () => {

@@ -5,8 +5,13 @@ import type { PostgresRepository } from "./postgres";
 import { commentOutbox } from "./schema";
 import { ablyConfig, commentsChannel } from "./realtime-config";
 import { DomainError } from "./repository";
+import type { EntityKind } from "../lib/types";
 
-export async function commentsToken(taskId: string, userId: string) {
+export async function commentsToken(
+  taskId: string,
+  userId: string,
+  kind: EntityKind = "task",
+) {
   const config = ablyConfig();
   if (!config)
     throw new DomainError(
@@ -14,7 +19,7 @@ export async function commentsToken(taskId: string, userId: string) {
       503,
     );
   const [keyId, secret] = config.key.split(":");
-  const channel = commentsChannel(config.namespace, taskId, userId);
+  const channel = commentsChannel(config.namespace, taskId, userId, kind);
   return new SignJWT({
     "x-ably-clientId": userId,
     "x-ably-capability": JSON.stringify({ [channel]: ["subscribe"] }),
@@ -25,7 +30,14 @@ export async function commentsToken(taskId: string, userId: string) {
     .sign(new TextEncoder().encode(secret));
 }
 
-export type CommentEvent = { taskId: string; eventId: string };
+export type CommentEvent =
+  | {
+      taskId: string;
+      eventId: string;
+      scopeType?: EntityKind;
+      scopeId?: string;
+    }
+  | { taskId: null; scopeType: EntityKind; scopeId: string; eventId: string };
 export type CommentPublisher = (
   event: CommentEvent,
   recipients: string[],
@@ -45,7 +57,14 @@ export function ablyPublisher(): CommentPublisher | null {
       await Promise.all(
         recipients.slice(offset, offset + 5).map((userId) =>
           client.channels
-            .get(commentsChannel(config.namespace, event.taskId, userId))
+            .get(
+              commentsChannel(
+                config.namespace,
+                event.scopeId ?? event.taskId!,
+                userId,
+                event.scopeType ?? "task",
+              ),
+            )
             .publish({
               id: `${event.eventId}:0`,
               name: "comments.changed",
@@ -67,16 +86,18 @@ export async function flushCommentEvents(
   if (!publish) return { sent: 0, failed: 0 };
   const claimed = await repo.store.transaction(async () => {
     const result = await repo.store.db.execute<{
-      taskId: string;
+      taskId: string | null;
+      scopeType: EntityKind;
+      scopeId: string;
       eventId: string;
       attempts: number;
     }>(sql`
       update comment_outbox set "leaseUntil" = now() + interval '60 seconds', attempts = attempts + 1
-      where "taskId" in (
-        select "taskId" from comment_outbox where "availableAt" <= now()
+      where ("scopeType", "scopeId") in (
+        select "scopeType", "scopeId" from comment_outbox where "availableAt" <= now()
         and ("leaseUntil" is null or "leaseUntil" < now())
         order by "availableAt" limit 10 for update skip locked
-      ) returning "taskId", "eventId", attempts
+      ) returning "taskId", "scopeType", "scopeId", "eventId", attempts
     `);
     return result.rows;
   });
@@ -84,9 +105,19 @@ export async function flushCommentEvents(
     failed = 0;
   for (const event of claimed) {
     try {
-      const recipients = await repo.commentRecipients(event.taskId);
+      const recipients = await repo.commentRecipients(
+        event.scopeId,
+        event.scopeType,
+      );
       await publish(
-        { taskId: event.taskId, eventId: event.eventId },
+        event.scopeType === "task"
+          ? { taskId: event.taskId!, eventId: event.eventId }
+          : {
+              taskId: null,
+              scopeType: event.scopeType,
+              scopeId: event.scopeId,
+              eventId: event.eventId,
+            },
         recipients,
       );
       await repo.store.transaction(async () => {
@@ -94,7 +125,8 @@ export async function flushCommentEvents(
           .delete(commentOutbox)
           .where(
             and(
-              eq(commentOutbox.taskId, event.taskId),
+              eq(commentOutbox.scopeType, event.scopeType),
+              eq(commentOutbox.scopeId, event.scopeId),
               eq(commentOutbox.eventId, event.eventId),
             ),
           );
@@ -114,7 +146,8 @@ export async function flushCommentEvents(
           })
           .where(
             and(
-              eq(commentOutbox.taskId, event.taskId),
+              eq(commentOutbox.scopeType, event.scopeType),
+              eq(commentOutbox.scopeId, event.scopeId),
               eq(commentOutbox.eventId, event.eventId),
             ),
           );
