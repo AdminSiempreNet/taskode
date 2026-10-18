@@ -32,6 +32,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { StatusesForm, type Confirmation, type Mutate } from "./forms";
+import { NotificationSettings, ProjectTimezoneSettings } from "./notification-settings";
 import type {
   Project,
   ProjectLabel,
@@ -46,6 +47,8 @@ type Section =
   | "impacts"
   | "labels"
   | "appearance"
+  | "notifications"
+  | "timezone"
   | "general";
 const catalogKinds = {
   priorities: "priority",
@@ -60,6 +63,8 @@ const catalogNouns = {
   label: { singular: "etiqueta", article: "la", fresh: "Nueva etiqueta" },
 } as const;
 const sections = {
+  notifications: { title: "Notificaciones", description: "Tus recordatorios y los avisos de este dispositivo.", icon: Settings2 },
+  timezone: { title: "Zona horaria", description: "Define la hora de referencia del proyecto.", icon: Settings2 },
   general: {
     title: "General",
     description: "Opciones globales de la aplicación.",
@@ -166,6 +171,7 @@ export function SettingsModal({
               "taskTypes",
               "impacts",
               "labels",
+              "timezone",
             ] as const
           ).map((id) => {
             const Icon = sections[id].icon;
@@ -186,6 +192,7 @@ export function SettingsModal({
           <div className="settings-group-label global-settings-label">
             Global
           </div>
+          <button aria-current={section === "notifications" ? "page" : undefined} onClick={() => setSection("notifications")}><Settings2 size={17} /><span>Notificaciones</span></button>
           <button
             aria-current={section === "appearance" ? "page" : undefined}
             onClick={() => setSection("appearance")}
@@ -218,7 +225,11 @@ export function SettingsModal({
               busy={busy}
             />
           )}
+          {section === "notifications" && <NotificationSettings userId={workspace.currentUser.id} />}
+          {section === "timezone" && project && <ProjectTimezoneSettings key={project.id} project={project} mutate={mutate} busy={busy} />}
           {section !== "statuses" &&
+            section !== "notifications" &&
+            section !== "timezone" &&
             section !== "appearance" &&
             section !== "general" &&
             project && (

@@ -16,6 +16,7 @@ import {
   Check,
   CheckSquare,
   FileText,
+  GitBranch,
   History,
   Layers3,
   ListChecks,
@@ -48,6 +49,7 @@ import { TaskAssignments } from "./task-people";
 import { TaskDocuments } from "./task-documents";
 import { ResizableTaskPanels } from "./resizable-task-panels";
 import { DetailTabs } from "./detail-tabs";
+import { EntityDiagrams, type DiagramPending } from "./diagrams";
 import { TaskComments } from "./task-comments";
 import { uploadFile } from "@/lib/file-client";
 import { DescriptionEditor } from "./description-editor";
@@ -199,7 +201,15 @@ export function TaskDetail({
   );
   const [dirty, setDirty] = useState(false);
   const [descriptionEditing, setDescriptionEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState("description");
+  const requestedTab = searchParams.get("tab");
+  const activeTab = ["description", "properties", "checklists", "documents", "history", "diagrams"].includes(requestedTab ?? "") ? requestedTab! : "description";
+  const [diagramState, setDiagramState] = useState<DiagramPending>({ pending: false, busy: false });
+  function setActiveTab(value: string) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", value);
+    url.searchParams.delete("diagram");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}`);
+  }
   const [documentCount, setDocumentCount] = useState(task?.files?.length ?? 0);
   useEffect(() => {
     setDocumentCount(task?.files?.length ?? 0);
@@ -241,8 +251,9 @@ export function TaskDetail({
       JSON.stringify(labels) !== JSON.stringify(task.labels)
     : dirty || !!title.trim() || !!description;
   const { requestNavigation, leaveDialog } = useUnsavedChanges(
-    pending || !!commentDraft.trim(),
-    busy,
+    pending || !!commentDraft.trim() || diagramState.pending,
+    busy || diagramState.busy,
+    diagramState.pending ? "diagrama" : "tarea",
   );
   const previousLabels = useRef(task?.labels);
   useEffect(() => {
@@ -601,8 +612,11 @@ export function TaskDetail({
             <DetailTabs
               value={activeTab}
               change={(value) => {
-                setActiveTab(value);
-                if (value !== "description") setDescriptionEditing(false);
+                if (diagramState.busy) return;
+                requestNavigation(() => {
+                  setActiveTab(value);
+                  if (value !== "description") setDescriptionEditing(false);
+                }, diagramState.pending);
               }}
               label="Secciones de la tarea"
               sections={[
@@ -628,6 +642,7 @@ export function TaskDetail({
                   icon: <Paperclip size={16} />,
                   count: documentCount,
                 },
+                ...(task ? [{ id: "diagrams", label: "Diagramas", icon: <GitBranch size={17} /> }] : []),
                 {
                   id: "history",
                   label: "Historial",
@@ -636,6 +651,9 @@ export function TaskDetail({
                 },
               ]}
             >
+              {task && <Tabs.Content value="diagrams" className="task-tab-panel">
+                {activeTab === "diagrams" && <EntityDiagrams scope={{ kind: "task", id: task.id, projectId: project.id }} guard={(action) => requestNavigation(action, diagramState.pending)} onPendingChange={setDiagramState} />}
+              </Tabs.Content>}
               <Tabs.Content
                 value="description"
                 forceMount

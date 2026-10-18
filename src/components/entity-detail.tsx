@@ -9,7 +9,9 @@ import {
   ArrowUp,
   Check,
   FileText,
+  GitBranch,
   Layers3,
+  LayoutDashboard,
   Loader2,
   MessageSquare,
   Paperclip,
@@ -26,8 +28,10 @@ import type {
   Workspace,
 } from "@/lib/types";
 import { entityNames } from "@/lib/entities";
+import { canViewDashboard } from "@/lib/dashboard";
 import {
   entityPath,
+  dashboardPath,
   getProjectView,
   projectPath,
   safeReturnTo,
@@ -48,6 +52,7 @@ import { DescriptionEditor } from "./description-editor";
 import { EmojiPicker } from "./emoji-picker";
 import { EntityAssignmentControl } from "./project-people";
 import { DetailTabs, type DetailSection } from "./detail-tabs";
+import { EntityDiagrams, type DiagramPending } from "./diagrams";
 import { EntityTable } from "./entity-table";
 import { EntityDocuments } from "./task-documents";
 import { EntityComments } from "./task-comments";
@@ -107,6 +112,7 @@ export function EntityDetail({
   const [chatOpen, setChatOpen] = useState(false);
   const [mobile, setMobile] = useState(false);
   const [draft, setDraft] = useState("");
+  const [diagramState, setDiagramState] = useState<DiagramPending>({ pending: false, busy: false });
   const conversation = useEntityComments(
     general ? undefined : scope,
     workspace.currentUser,
@@ -125,9 +131,9 @@ export function EntityDetail({
       (scope.kind === "feature" &&
         moduleId !== ((entity as Feature).moduleId ?? "general")));
   const { requestNavigation, leaveDialog } = useUnsavedChanges(
-    pending || !!draft.trim(),
-    busy || uploading > 0,
-    entityNames[scope.kind],
+    pending || !!draft.trim() || diagramState.pending,
+    busy || uploading > 0 || diagramState.busy,
+    diagramState.pending ? "diagrama" : entityNames[scope.kind],
   );
   const childTab =
     scope.kind === "project"
@@ -150,6 +156,7 @@ export function EntityDetail({
           icon: <Paperclip size={17} />,
           count: documentCount,
         },
+        { id: "diagrams", label: "Diagramas", icon: <GitBranch size={17} /> },
       ];
   const childFeatures = features.filter(
     (f) => f.moduleId === (general ? null : scope.id),
@@ -464,16 +471,23 @@ export function EntityDetail({
         <DetailTabs
           value={tab}
           change={(value) => {
-            const next = new URLSearchParams(query.toString());
-            next.set("tab", value);
-            router.replace(`${pathname}?${next}`, { scroll: false });
-            setEditing(false);
+            if (diagramState.busy) return;
+            requestNavigation(() => {
+              const next = new URLSearchParams(query.toString());
+              next.set("tab", value);
+              next.delete("diagram");
+              window.history.replaceState(null, "", `${pathname}?${next}`);
+              setEditing(false);
+            }, diagramState.pending);
           }}
           label="Secciones del detalle"
           sections={sections}
         >
           {!general && (
             <>
+              <Tabs.Content value="diagrams" className="task-tab-panel">
+                {tab === "diagrams" && <EntityDiagrams scope={scope} guard={(action) => requestNavigation(action, diagramState.pending)} onPendingChange={setDiagramState} />}
+              </Tabs.Content>
               <Tabs.Content
                 value="description"
                 forceMount
@@ -698,6 +712,25 @@ export function EntityDetail({
           {project.icon} {project.name}
         </span>
         <div className="task-header-actions">
+          {scope.kind !== "task" &&
+            canViewDashboard(workspace, { ...scope, kind: scope.kind }) && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() =>
+                  navigate(
+                    dashboardPath(
+                      project.id,
+                      scope.kind as "project" | "module" | "feature",
+                      scope.id,
+                    ),
+                  )
+                }
+              >
+                <LayoutDashboard size={16} />
+                Dashboard
+              </Button>
+            )}
           {!general && (
             <>
               {entity && (

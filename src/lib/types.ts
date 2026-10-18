@@ -1,4 +1,5 @@
 export type Priority = string;
+export type { NotificationItem, NotificationsSnapshot, NotificationPreferences } from "./notifications";
 export interface ProjectPriority {
   id: string;
   projectId: string;
@@ -99,6 +100,7 @@ export interface EntityAssignment {
 }
 export interface Project extends EntityAssignment {
   id: string;
+  timeZone?: string;
   leaderId: string;
   name: string;
   description: string;

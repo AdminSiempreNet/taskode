@@ -10,6 +10,8 @@ import { migrationsFolder } from "../src/server/migration-info";
 loadEnvConfig(process.cwd(), true);
 // Never publish test data using a developer's real Ably application.
 process.env.ABLY_API_KEY = "";
+process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY = "";
+process.env.VAPID_PRIVATE_KEY = "";
 export function testDatabaseUrl() {
   const url = process.env.TEST_DATABASE_URL;
   if (!url)

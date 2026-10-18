@@ -36,6 +36,10 @@ export function commentsChannel(
   return `${namespace}:${kind}:${hash(taskId)}:user:${hash(userId)}`;
 }
 
+export function notificationsChannel(namespace: string, userId: string) {
+  return `${namespace}:notifications:user:${createHash("sha256").update(userId).digest("hex")}`;
+}
+
 export function commentsRealtime(
   taskId: string,
   userId: string,

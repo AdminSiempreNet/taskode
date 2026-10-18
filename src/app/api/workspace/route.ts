@@ -4,6 +4,7 @@ import { commandSchema } from "@/lib/validation";
 import { repository } from "@/server";
 import { DomainError, isDomainError } from "@/server/repository";
 import { deliverCommentEvents } from "@/server/comment-http";
+import { deliverNotificationEvents } from "@/server/notification-http";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
@@ -59,6 +60,7 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     const result = await repository().execute(parsed.data, actor);
+    if (/^(task\.|project\.delete|project\.team\.remove|project\.timezone\.|status\.update|trello\.)/.test(parsed.data.type)) deliverNotificationEvents();
     if (parsed.data.type.startsWith("comment.")) deliverCommentEvents();
     return NextResponse.json({
       workspace: await repository().getWorkspace(actor),

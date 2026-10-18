@@ -2,6 +2,7 @@ import { loadEnvConfig } from "@next/env";
 import { databasePoolConfig } from "../src/server/database-config";
 import { s3BackupConfig } from "../src/server/s3-backup-storage";
 import { ablyConfig } from "../src/server/realtime-config";
+import { pushConfig } from "../src/server/notification-delivery";
 
 loadEnvConfig(process.cwd());
 try {
@@ -28,6 +29,8 @@ try {
   if (process.env.BACKUP_STORAGE !== "s3") throw new Error("Configura BACKUP_STORAGE=s3.");
   s3BackupConfig();
   if (!ablyConfig()) throw new Error("Configura ABLY_API_KEY para los comentarios en tiempo real.");
+  if (!pushConfig()) throw new Error("Configura las claves VAPID para las notificaciones push.");
+  if ((process.env.NOTIFICATION_WORKER_SECRET || "").length < 32) throw new Error("Configura NOTIFICATION_WORKER_SECRET con al menos 32 caracteres.");
   if (process.env.ABLY_CHANNEL_NAMESPACE !== "taskode-production")
     throw new Error("Configura ABLY_CHANNEL_NAMESPACE=taskode-production.");
   console.log("Configuración de producción válida. No se ha conectado ni desplegado ningún servicio.");

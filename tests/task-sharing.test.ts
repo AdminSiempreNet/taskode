@@ -338,7 +338,7 @@ test("solo administrador configura el límite; respaldos v4 y v3 conservan líde
     const path = join(directory, "v4.json");
     await f.repo.exportBackup(path);
     const backup = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(backup.version, 6);
+    assert.equal(backup.version, 8);
     assert.equal(backup.tables.tasks[0].leaderId, f.leader.id);
     assert.equal(backup.tables.tasks[0].assigneeId, undefined);
     assert.deepEqual(backup.tables.task_team_members, [
@@ -369,8 +369,8 @@ test("solo administrador configura el límite; respaldos v4 y v3 conservan líde
       version3.tables.task_collaborators = version3.tables.task_team_members;
       delete version3.tables.task_team_members;
       const normalized = validateApplicationBackup(version3);
-      assert.equal(normalized.version, 6);
-      assert.deepEqual(normalized.tables, backup.tables);
+      assert.equal(normalized.version, 8);
+      assert.deepEqual(normalized.tables, { ...backup.tables, notifications: [], notification_preferences: [] });
       const path = join(directory, `${format}-v3.json`);
       await writeFile(path, JSON.stringify(version3));
       await f.repo.restoreBackup(path);

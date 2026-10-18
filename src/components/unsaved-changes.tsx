@@ -51,8 +51,8 @@ export function useUnsavedChanges(
   const [leaveAction, setLeaveAction] = useState<(() => void) | null>(null);
   const allowedTraversal = useRef<string | null>(null);
   const requestNavigation = useCallback(
-    (action: () => void) => {
-      if (pending) setLeaveAction(() => action);
+    (action: () => void, needsConfirmation = pending) => {
+      if (needsConfirmation) setLeaveAction(() => action);
       else action();
     },
     [pending],

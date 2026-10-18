@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { databasePoolConfig } from "../src/server/database-config";
+import webpush from "web-push";
 
 test("Vercel: dev y otras ramas no despliegan; solo main está habilitada", () => {
   const config = JSON.parse(readFileSync("vercel.json", "utf8"));
@@ -11,6 +12,7 @@ test("Vercel: dev y otras ramas no despliegan; solo main está habilitada", () =
 });
 
 test("Vercel: la configuración de producción se valida sin conectarse y rechaza dev/Preview", () => {
+  const vapid = webpush.generateVAPIDKeys();
   const env = {
     ...process.env, VERCEL: "1", VERCEL_ENV: "production", VERCEL_GIT_COMMIT_REF: "main",
     DATABASE_URL: "postgresql://taskode:example@db.example.com:5432/taskode", DATABASE_SSL: "verify-full",
@@ -19,6 +21,7 @@ test("Vercel: la configuración de producción se valida sin conectarse y rechaz
     S3_ENDPOINT: "https://example.r2.cloudflarestorage.com", S3_REGION: "auto", S3_BUCKET: "private",
     S3_ACCESS_KEY_ID: "example", S3_SECRET_ACCESS_KEY: "example", S3_PREFIX: "tareas/test/",
     ABLY_API_KEY: "test.key:example", ABLY_CHANNEL_NAMESPACE: "taskode-production",
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY: vapid.publicKey, VAPID_PRIVATE_KEY: vapid.privateKey, VAPID_SUBJECT: "https://tareas.siempre.net.co", NOTIFICATION_WORKER_SECRET: "s".repeat(32),
   };
   const check = (overrides: Record<string, string> = {}) => spawnSync(process.execPath, ["--import", "tsx", "scripts/check-production.ts"], { env: { ...env, ...overrides }, encoding: "utf8", windowsHide: true });
   const valid = check();
@@ -31,6 +34,8 @@ test("Vercel: la configuración de producción se valida sin conectarse y rechaz
   assert.equal(check({ BACKUP_STORAGE: "filesystem" }).status, 1);
   assert.equal(check({ ABLY_API_KEY: "" }).status, 1);
   assert.equal(check({ ABLY_CHANNEL_NAMESPACE: "taskode-development" }).status, 1);
+  assert.equal(check({ VAPID_PRIVATE_KEY: "" }).status, 1);
+  assert.equal(check({ NOTIFICATION_WORKER_SECRET: "" }).status, 1);
 });
 
 test("PostgreSQL: valida TLS, CA y tamaño del pool sin permitir que la URL reemplace TLS", () => {

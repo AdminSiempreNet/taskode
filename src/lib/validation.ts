@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validTimeZone } from "./project-time";
 const id = z.string().min(1).max(200);
 export const entityKindSchema = z.enum([
   "project",
@@ -105,6 +106,7 @@ const assignmentFields = {
   teamMemberIds: z.array(id).max(1000),
 };
 const currentCommandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("project.timezone.update"), id, timeZone: z.string().refine(validTimeZone, "Zona horaria inválida.") }),
   z.object({ type: z.literal("client.create"), name, cityId: id }),
   z.object({ type: z.literal("client.update"), id, name, cityId: id }),
   z.object({ type: z.literal("client.delete"), id }),

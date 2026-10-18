@@ -26,8 +26,10 @@ import {
   type CalendarMode,
 } from "@/lib/calendar";
 import type { Status, Task } from "@/lib/types";
+import { projectClock, DEFAULT_TIME_ZONE } from "@/lib/project-time";
 
 type Props = {
+  timeZone?: string;
   tasks: Task[];
   statuses: Status[];
   open: (task: Task) => void;
@@ -55,6 +57,7 @@ function ordered(tasks: Task[]) {
 }
 
 export function CalendarView({
+  timeZone = DEFAULT_TIME_ZONE,
   tasks,
   statuses,
   open,
@@ -63,7 +66,8 @@ export function CalendarView({
   busy,
 }: Props) {
   const [mode, setMode] = useState<CalendarMode>("month");
-  const [anchor, setAnchor] = useState(() => new Date());
+  const currentDay = () => new Date(`${projectClock(new Date(), timeZone).day}T12:00:00`);
+  const [anchor, setAnchor] = useState(currentDay);
   const [agenda, setAgenda] = useState<string | null>(null);
   const openingTask = useRef(false);
   const monthGrid = useRef<HTMLDivElement>(null);
@@ -72,7 +76,7 @@ export function CalendarView({
   const month = monthDates(anchor);
   const week = weekDates(anchor);
   const weeks = month.length / 7;
-  const today = dateKey(new Date());
+  const today = projectClock(new Date(), timeZone).day;
   const undated = tasks.filter((task) => !task.dueDate && !task.startDate);
   const agendaTasks = ordered(
     agenda === "undated"
@@ -160,7 +164,7 @@ export function CalendarView({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setAnchor(new Date())}
+            onClick={() => setAnchor(currentDay())}
           >
             Hoy
           </Button>

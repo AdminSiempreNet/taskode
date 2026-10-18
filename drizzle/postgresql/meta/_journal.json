@@ -50,6 +50,27 @@
       "when": 1792299115069,
       "tag": "0006_entity_leaders_and_teams",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792309631200,
+      "tag": "0007_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792311935472,
+      "tag": "0008_notification_order",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792355522303,
+      "tag": "0009_diagrams",
+      "breakpoints": true
     }
   ]
 }

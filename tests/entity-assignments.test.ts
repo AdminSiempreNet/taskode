@@ -309,7 +309,7 @@ test("respaldo v6 conserva equipos y v5 conserva líderes y equipo de proyecto s
     const path = join(directory, "backup.json");
     await f.repo.exportBackup(path);
     const json = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(json.version, 6);
+    assert.equal(json.version, 8);
     const before = await f.repo.getWorkspace(f.leader);
     await f.repo.restoreBackup(path);
     assert.deepEqual(await f.repo.getWorkspace(f.leader), before);
@@ -319,7 +319,7 @@ test("respaldo v6 conserva equipos y v5 conserva líderes y equipo de proyecto s
     stripAssignmentColumns(json.tables);
     json.version = 5;
     const normalized = validateApplicationBackup(json);
-    assert.equal(normalized.version, 6);
+    assert.equal(normalized.version, 8);
     assert.equal(normalized.tables.projects[0].leaderId, f.leader.id);
     assert.equal(normalized.tables.project_team_members.length, 2);
     assert.deepEqual(normalized.tables.module_team_members, []);

@@ -19,12 +19,14 @@ export function AuthScreen({
   invitation,
   email,
   error,
+  returnTo = "/dashboard",
 }: {
   providers: { google: boolean; github: boolean };
   bootstrap?: boolean;
   invitation?: string;
   email?: string;
   error?: string;
+  returnTo?: string;
 }) {
   const [pending, setPending] = useState(""),
     [message, setMessage] = useState(error || "");
@@ -34,8 +36,8 @@ export function AuthScreen({
     try {
       const result = await authClient.signIn.social({
         provider,
-        callbackURL: "/projects",
-        newUserCallbackURL: "/projects",
+        callbackURL: returnTo,
+        newUserCallbackURL: returnTo,
         errorCallbackURL: invitation ? `/invite/${invitation}` : "/login",
         requestSignUp: bootstrap || Boolean(invitation),
         additionalData: invitation ? { invitation } : undefined,

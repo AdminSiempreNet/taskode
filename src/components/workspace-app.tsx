@@ -70,13 +70,24 @@ import { BackupModal } from "./backup-modal";
 import { EntityDetail } from "./entity-detail";
 import { TaskDetail, type TaskDefaults } from "./task-detail";
 import { ClientsManager } from "./clients-manager";
+import { Dashboard, ProjectsDirectory } from "./dashboard";
+import type { DashboardScope } from "@/lib/dashboard";
 import { AccountMenu, ProfileModal } from "./account-menu";
+import { NotificationBell, NotificationsPage } from "./notifications";
 import { UsersModal } from "./invitation-manager";
 import { ProjectPeopleModal } from "./project-people";
 import { useProjectFilter } from "./status-filter";
 import { TaskFilterControls } from "./task-filter-controls";
-import { MINE_FILTER, UNASSIGNED_FILTER, matchesTaskFilters } from "@/lib/task-filters";
-import { filterGroupValues, groupedFilterIds, taskFilterOptions } from "@/lib/task-filter-options";
+import {
+  MINE_FILTER,
+  UNASSIGNED_FILTER,
+  matchesTaskFilters,
+} from "@/lib/task-filters";
+import {
+  filterGroupValues,
+  groupedFilterIds,
+  taskFilterOptions,
+} from "@/lib/task-filter-options";
 import { readPreference } from "@/lib/preferences";
 import {
   readProjectPreferences,
@@ -94,17 +105,24 @@ export function WorkspaceApp({
   menuSection,
   entityRoute,
   initialEntityDetail,
+  dashboardScope,
+  initialNow,
+  notificationOpenId,
 }: {
   initialWorkspace: Workspace;
   projectId?: string;
   taskId?: string;
   taskDefaults?: TaskDefaults;
   initialTaskCreation?: TaskDefaults;
-  menuSection?: "dashboard" | "clients";
+  menuSection?: "dashboard" | "clients" | "projects" | "notifications";
+  notificationOpenId?: string;
   entityRoute?: { kind: Exclude<EntityKind, "task">; id: string };
   initialEntityDetail?: EntityDetailSnapshot;
+  dashboardScope?: DashboardScope;
+  initialNow?: string;
 }) {
   const menuMode = !!menuSection;
+  const contextRoute = entityRoute ?? dashboardScope;
   const router = useWorkspaceRouter();
   const searchParams = useSearchParams();
   const view = getProjectView(searchParams.get("view"));
@@ -300,8 +318,11 @@ export function WorkspaceApp({
   const impacts =
     workspace?.impacts?.filter((option) => option.projectId === projectId) ??
     [];
-  const priorities = workspace?.priorities.filter((option) => option.projectId === projectId) ?? [];
-  const labels = workspace?.labels.filter((option) => option.projectId === projectId) ?? [];
+  const priorities =
+    workspace?.priorities.filter((option) => option.projectId === projectId) ??
+    [];
+  const labels =
+    workspace?.labels.filter((option) => option.projectId === projectId) ?? [];
   const filterOptions = taskFilterOptions(workspace, projectId);
   const [selectedStatusIds, setStatusIds] = useProjectFilter(
     projectId,
@@ -320,8 +341,17 @@ export function WorkspaceApp({
     impacts,
     true,
   );
-  const [selectedPriorityIds, setPriorityIds] = useProjectFilter(projectId, "priority", priorities);
-  const [selectedLabelIds, setLabelIds] = useProjectFilter(projectId, "label", labels, true);
+  const [selectedPriorityIds, setPriorityIds] = useProjectFilter(
+    projectId,
+    "priority",
+    priorities,
+  );
+  const [selectedLabelIds, setLabelIds] = useProjectFilter(
+    projectId,
+    "label",
+    labels,
+    true,
+  );
   const [selectedUserIds, setUserIds] = useProjectFilter(
     `${currentUserId ?? ""}.${projectId}`,
     "user",
@@ -438,6 +468,7 @@ export function WorkspaceApp({
   return (
     <ProjectCatalog.Provider
       value={{
+        timeZone: project?.timeZone,
         taskTypes,
         impacts,
         priorities:
@@ -446,13 +477,36 @@ export function WorkspaceApp({
           workspace?.labels.filter((l) => l.projectId === projectId) ?? [],
       }}
     >
-      <div className="app-shell" data-sidebar-collapsed={sidebarCollapsed}>
+      <div
+        className="app-shell"
+        data-sidebar-collapsed={sidebarCollapsed}
+        data-page-scroll={menuMode || !!dashboardScope}
+      >
         <ResizableSidebar
           collapsed={sidebarCollapsed}
           edgeControl={desktopSidebarControl}
           mobileOpen={mobileSidebarOpen}
           onMobileOpenChange={setMobileSidebarOpen}
           triggerRef={sidebarTrigger}
+          collapsedActions={
+            workspace && <NotificationBell userId={workspace.currentUser.id} />
+          }
+          footer={
+            workspace && (
+              <div className="sidebar-bottom">
+                <NotificationBell userId={workspace.currentUser.id} />
+                <AccountMenu
+                  user={workspace.currentUser}
+                  busy={busy}
+                  onProfile={() => setProfileOpen(true)}
+                  onImport={() => setModal({ type: "import" })}
+                  onSettings={() => setSettingsOpen(true)}
+                  onBackup={() => setBackupOpen(true)}
+                  onUsers={() => setUsersOpen(true)}
+                />
+              </div>
+            )
+          }
         >
           <div className="sidebar-navigation">
             <div
@@ -537,7 +591,7 @@ export function WorkspaceApp({
                 select={(id) => {
                   setFeatureId(id);
                   setMobileSidebarOpen(false);
-                  if (taskId || entityRoute) {
+                  if (taskId || entityRoute || dashboardScope) {
                     const path = projectPath(projectId, view);
                     router.push(
                       `${path}${path.includes("?") ? "&" : "?"}featureId=${encodeURIComponent(id)}`,
@@ -547,12 +601,12 @@ export function WorkspaceApp({
                 createFeature={() =>
                   setModal({
                     type: "feature",
-                    ...(entityRoute?.kind === "module"
+                    ...(contextRoute?.kind === "module"
                       ? {
                           moduleId:
-                            entityRoute.id === "general"
+                            contextRoute.id === "general"
                               ? null
-                              : entityRoute.id,
+                              : contextRoute.id,
                         }
                       : {}),
                   })
@@ -564,8 +618,8 @@ export function WorkspaceApp({
                     defaults: {
                       typeId,
                       featureId:
-                        entityRoute?.kind === "feature"
-                          ? entityRoute.id
+                        contextRoute?.kind === "feature"
+                          ? contextRoute.id
                           : (selectedFeature?.id ?? selectedTask?.featureId),
                     },
                   })
@@ -594,6 +648,15 @@ export function WorkspaceApp({
                   Dashboard
                 </Link>
                 <Link
+                  href="/projects"
+                  className="nav-item"
+                  aria-current={menuSection === "projects" ? "page" : undefined}
+                  onClick={() => setMobileSidebarOpen(false)}
+                >
+                  <FolderKanban size={17} />
+                  Proyectos
+                </Link>
+                <Link
                   href="/clients"
                   className="nav-item"
                   aria-current={menuSection === "clients" ? "page" : undefined}
@@ -604,25 +667,12 @@ export function WorkspaceApp({
                 </Link>
               </nav>
             ) : null}
-            <div className="sidebar-bottom">
-              {workspace && (
-                <AccountMenu
-                  user={workspace.currentUser}
-                  busy={busy}
-                  onProfile={() => setProfileOpen(true)}
-                  onImport={() => setModal({ type: "import" })}
-                  onSettings={() => setSettingsOpen(true)}
-                  onBackup={() => setBackupOpen(true)}
-                  onUsers={() => setUsersOpen(true)}
-                />
-              )}
-            </div>
           </div>
         </ResizableSidebar>
         <div className="main-shell">
           {(loadError ||
             !workspace ||
-            !project ||
+            (!project && menuSection !== "dashboard" && menuSection !== "projects") ||
             (taskId && !showTaskDetail)) && (
             <div className="workspace-navigation">{sidebarControls}</div>
           )}
@@ -643,15 +693,27 @@ export function WorkspaceApp({
                 <span>Preparando tu espacio…</span>
               </div>
             ) : menuMode ? (
-              menuSection === "clients" ? (
+              menuSection === "notifications" ? <NotificationsPage userId={workspace.currentUser.id} openId={notificationOpenId} /> : menuSection === "clients" ? (
                 <ClientsManager
                   clients={workspace.clients ?? []}
                   mutate={mutate}
                   busy={busy}
                   confirm={setConfirmation}
                 />
+              ) : menuSection === "projects" ? (
+                <ProjectsDirectory
+                  workspace={workspace}
+                  createProject={() => setModal({ type: "project" })}
+                  sidebarControls={sidebarControls}
+                />
               ) : (
-                <h1 className="sr-only">Dashboard</h1>
+                <Dashboard
+                  workspace={workspace}
+                  initialNow={initialNow!}
+                  refresh={load}
+                  createProject={() => setModal({ type: "project" })}
+                  sidebarControls={sidebarControls}
+                />
               )
             ) : !project ? (
               <Empty
@@ -673,6 +735,15 @@ export function WorkspaceApp({
                     </Button>
                   </>
                 }
+              />
+            ) : dashboardScope ? (
+              <Dashboard
+                workspace={workspace}
+                scope={dashboardScope}
+                initialNow={initialNow!}
+                refresh={load}
+                createProject={() => setModal({ type: "project" })}
+                sidebarControls={sidebarControls}
               />
             ) : entityRoute ? (
               <EntityDetail
@@ -989,6 +1060,7 @@ export function WorkspaceApp({
                     />
                   ) : (
                     <CalendarView
+                      timeZone={project.timeZone}
                       tasks={tasks}
                       statuses={statuses}
                       open={openTask}

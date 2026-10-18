@@ -176,7 +176,7 @@ test("HTTP: página de tarea, inicio/fin, catálogos, checklist y comentarios pe
   }
 });
 test("HTTP: la landing es pública, conserva la marca y todos sus assets JS/CSS responden", async () => {
-  const r = await fetch(base);
+  const r = await globalThis.fetch(base);
   assert.equal(r.status, 200);
   const html = await r.text();
   assert.match(html, /<html lang="es"/);
@@ -188,6 +188,11 @@ test("HTTP: la landing es pública, conserva la marca y todos sus assets JS/CSS 
   const publicPage = await globalThis.fetch(base);
   assert.equal(publicPage.status, 200);
   assert.match(await publicPage.text(), /Tu próximo deploy empieza con/);
+  for (const path of ["/", "/login", "/onboarding"]) {
+    const response = await fetch(base + path, { redirect: "manual" });
+    assert.equal(response.status, 307);
+    assert.equal(response.headers.get("location"), "/dashboard");
+  }
   const assets = [
     ...new Set(
       [...html.matchAll(/(?:src|href)="([^\"]*\/_next\/static\/[^\"]+)"/g)].map(
@@ -215,11 +220,8 @@ test("HTTP: rutas de proyectos, enlaces antiguos, recarga y proyecto eliminado",
     const path = `/projects/${encodeURIComponent(projectId)}`;
     for (const entry of ["/projects"]) {
       const root = await fetch(new URL(entry, base), { redirect: "manual" });
-      assert.equal(root.status, 307);
-      assert.equal(
-        root.headers.get("location"),
-        `/projects/${created.workspace.projects[0].id}`,
-      );
+      assert.equal(root.status, 200);
+      assert.match(await root.text(), /Buscar proyectos/);
     }
 
     for (const url of [path, path, path + "?project=ignorado"]) {
@@ -236,8 +238,14 @@ test("HTTP: rutas de proyectos, enlaces antiguos, recarga y proyecto eliminado",
       redirect: "manual",
     });
     assert.equal(legacy.status, 307);
-    assert.equal(legacy.headers.get("location"), `/projects?project=${projectId}`);
-    const legacyProject = await fetch(new URL(legacy.headers.get("location"), base), { redirect: "manual" });
+    assert.equal(
+      legacy.headers.get("location"),
+      `/projects?project=${projectId}`,
+    );
+    const legacyProject = await fetch(
+      new URL(legacy.headers.get("location"), base),
+      { redirect: "manual" },
+    );
     assert.equal(legacyProject.status, 307);
     assert.equal(legacyProject.headers.get("location"), path);
 
@@ -250,33 +258,37 @@ test("HTTP: rutas de proyectos, enlaces antiguos, recarga y proyecto eliminado",
     projectId = undefined;
     assert.equal((await fetch(base + removedPath)).status, 404);
     const landing = await fetch(base + "/projects", { redirect: "manual" });
-    if (deleted.workspace.projects.length) {
-      assert.equal(landing.status, 307);
-      assert.equal(
-        landing.headers.get("location"),
-        `/projects/${deleted.workspace.projects[0].id}`,
-      );
-    } else {
-      assert.equal(landing.status, 200);
+    assert.equal(landing.status, 200);
+    if (!deleted.workspace.projects.length) {
       assert.match(await landing.text(), /Todo empieza con una idea/);
     }
   } finally {
     if (projectId) await send({ type: "project.delete", id: projectId });
   }
 });
-test("HTTP: menú vacío, último proyecto recordado y preferencia sin acceso", async () => {
+test("HTTP: dashboards y directorio no redirigen por la preferencia del último proyecto", async () => {
   const ids = [];
   try {
     for (const name of ["Proyecto recordado", "Proyecto alternativo"]) {
-      const created = await send({ type: "project.create", name, description: "", icon: "📋", color: "#059669" });
+      const created = await send({
+        type: "project.create",
+        name,
+        description: "",
+        icon: "📋",
+        color: "#059669",
+      });
       ids.push(created.createdId);
     }
     const remembered = ids[0];
     const cookie = `${fixture.cookie}; ${lastProjectCookieName("test-admin")}=${remembered}`;
-    const get = (path, value = cookie) => globalThis.fetch(base + path, { redirect: "manual", headers: { Cookie: value } });
+    const get = (path, value = cookie) =>
+      globalThis.fetch(base + path, {
+        redirect: "manual",
+        headers: { Cookie: value },
+      });
     const entry = await get("/projects");
-    assert.equal(entry.status, 307);
-    assert.equal(entry.headers.get("location"), `/projects/${remembered}`);
+    assert.equal(entry.status, 200);
+    assert.match(await entry.text(), /Buscar proyectos/);
     const explicit = await get(`/projects?project=${ids[1]}`);
     assert.equal(explicit.headers.get("location"), `/projects/${ids[1]}`);
 
@@ -287,23 +299,227 @@ test("HTTP: menú vacío, último proyecto recordado y preferencia sin acceso", 
     assert.match(html, /<h1[^>]*>Dashboard<\/h1>/);
     assert.doesNotMatch(html, /aria-label="Features del proyecto"/);
     assert.doesNotMatch(html, /Todo empieza con una idea/);
-    assert.equal((await get("/projects")).headers.get("location"), `/projects/${remembered}`);
+    assert.equal((await get("/projects")).status, 200);
 
-    const anonymous = await globalThis.fetch(base + "/dashboard", { redirect: "manual" });
+    const anonymous = await globalThis.fetch(base + "/dashboard", {
+      redirect: "manual",
+    });
     assert.equal(anonymous.status, 307);
-    assert.equal(new URL(anonymous.headers.get("location"), base).pathname, "/login");
+    assert.equal(
+      new URL(anonymous.headers.get("location"), base).pathname,
+      "/login",
+    );
 
     await send({ type: "project.delete", id: remembered });
     ids.shift();
     const fallback = await get("/projects");
-    assert.equal(fallback.status, 307);
-    assert.notEqual(fallback.headers.get("location"), `/projects/${remembered}`);
-    const otherUser = await get("/projects", `${fixture.cookie}; ${lastProjectCookieName("another-user")}=${ids[0]}`);
-    assert.equal(otherUser.headers.get("location"), fallback.headers.get("location"));
+    assert.equal(fallback.status, 200);
+    assert.equal(fallback.headers.get("location"), null);
+    const otherUser = await get(
+      "/projects",
+      `${fixture.cookie}; ${lastProjectCookieName("another-user")}=${ids[0]}`,
+    );
+    assert.equal(
+      otherUser.headers.get("location"),
+      fallback.headers.get("location"),
+    );
+    assert.equal((await get("/projects?project=inexistente")).status, 200);
   } finally {
     for (const id of ids) await send({ type: "project.delete", id });
   }
 });
+test("HTTP: dashboards por jerarquía, acceso directo y datos privados", async () => {
+  const projectIds = [];
+  const userIds = [
+    "dash-project-leader",
+    "dash-module-leader",
+    "dash-feature-leader",
+    "dash-member",
+    "dash-outsider",
+  ];
+  const cookies = {};
+  try {
+    for (const id of userIds) {
+      await addUser(fixture.repo, id);
+      const token = randomUUID();
+      const now = new Date();
+      await fixture.repo.store.db
+        .insert(session)
+        .values({
+          id: randomUUID(),
+          token,
+          userId: id,
+          createdAt: now,
+          updatedAt: now,
+          expiresAt: new Date(Date.now() + 86400000),
+        });
+      cookies[id] = (
+        await serializeSignedCookie(
+          "better-auth.session_token",
+          token,
+          authConfig.BETTER_AUTH_SECRET,
+          { path: "/" },
+        )
+      ).split(";")[0];
+    }
+    const getAs = (id, path) =>
+      globalThis.fetch(base + path, {
+        redirect: "manual",
+        headers: { Cookie: cookies[id] },
+      });
+    const created = await send({
+      type: "project.create",
+      name: "Proyecto dashboard HTTP",
+      description: "",
+      icon: "P",
+      color: "#059669",
+    });
+    const projectId = created.createdId;
+    projectIds.push(projectId);
+    const otherId = (
+      await send({
+        type: "project.create",
+        name: "Otro dashboard HTTP",
+        description: "",
+        icon: "P",
+        color: "#059669",
+      })
+    ).createdId;
+    projectIds.push(otherId);
+    await send({
+      type: "project.assignment.update",
+      id: projectId,
+      leaderId: userIds[0],
+      teamMemberIds: userIds.slice(1, 4),
+    });
+    const moduleId = (
+      await send({
+        type: "module.create",
+        projectId,
+        name: "Módulo dashboard",
+        description: "",
+      })
+    ).createdId;
+    await send({
+      type: "module.assignment.update",
+      id: moduleId,
+      leaderId: userIds[1],
+      teamMemberIds: [userIds[3]],
+    });
+    const featureId = (
+      await send({
+        type: "feature.create",
+        projectId,
+        moduleId,
+        name: "Feature dashboard",
+        description: "",
+      })
+    ).createdId;
+    await send({
+      type: "feature.assignment.update",
+      id: featureId,
+      leaderId: userIds[2],
+      teamMemberIds: [userIds[3]],
+    });
+    const taskFields = {
+      type: "task.create",
+      projectId,
+      featureId,
+      priority: created.workspace.priorities.find(
+        (p) => p.projectId === projectId,
+      ).id,
+      statusId: created.workspace.statuses.find(
+        (s) => s.projectId === projectId && !s.isDone,
+      ).id,
+      description: "",
+      dueDate: null,
+    };
+    await send({
+      ...taskFields,
+      title: "Tarea privada dashboard HTTP",
+      leaderId: "test-admin",
+      teamMemberIds: [],
+    });
+    const assigned = (
+      await send({
+        ...taskFields,
+        title: "Entrega personal dashboard HTTP",
+        leaderId: userIds[3],
+        teamMemberIds: [],
+      })
+    ).createdId;
+    const root = `/projects/${projectId}`;
+    const paths = [
+      `${root}/dashboard`,
+      `${root}/modules/${moduleId}/dashboard`,
+      `${root}/features/${featureId}/dashboard`,
+      `${root}/modules/general/dashboard`,
+    ];
+    for (const path of paths) {
+      const page = await fetch(base + path);
+      assert.equal(page.status, 200, path);
+      assert.match(await page.text(), /Avance completado/);
+      assert.equal((await getAs(userIds[4], path)).status, 404);
+      assert.equal((await getAs(userIds[3], path)).status, 404);
+      const anonymous = await globalThis.fetch(base + path, {
+        redirect: "manual",
+      });
+      assert.equal(anonymous.status, 307);
+      assert.equal(anonymous.headers.get("location"), "/login");
+      assert.equal((await getAs(userIds[0], path)).status, 200);
+    }
+    assert.equal((await getAs(userIds[1], paths[0])).status, 404);
+    assert.equal((await getAs(userIds[1], paths[1])).status, 200);
+    assert.equal((await getAs(userIds[1], paths[2])).status, 200);
+    assert.equal((await getAs(userIds[2], paths[1])).status, 404);
+    assert.equal((await getAs(userIds[2], paths[2])).status, 200);
+    assert.equal(
+      (await fetch(base + `/projects/${otherId}/modules/${moduleId}/dashboard`))
+        .status,
+      404,
+    );
+    assert.equal(
+      (
+        await fetch(
+          base + `/projects/${otherId}/features/${featureId}/dashboard`,
+        )
+      ).status,
+      404,
+    );
+    assert.equal(
+      (await fetch(base + `${root}/modules/${randomUUID()}/dashboard`)).status,
+      404,
+    );
+    const personal = await getAs(userIds[3], "/dashboard");
+    const html = await personal.text();
+    assert.match(html, /Entrega personal dashboard HTTP/);
+    assert.doesNotMatch(html, /Tarea privada dashboard HTTP/);
+    assert.match(
+      await (await getAs(userIds[1], "/dashboard")).text(),
+      /Equipos que lidero/,
+    );
+    const taskPage = await getAs(
+      userIds[3],
+      `${root}/tasks/${assigned}?returnTo=%2Fdashboard`,
+    );
+    assert.equal(taskPage.status, 200);
+    const details = await fetch(base + `${root}/modules/${moduleId}`);
+    assert.match(await details.text(), /Dashboard/);
+    await send({
+      type: "project.assignment.update",
+      id: projectId,
+      leaderId: "test-admin",
+      teamMemberIds: userIds.slice(1, 4),
+    });
+    assert.equal((await getAs(userIds[0], paths[0])).status, 404);
+    await send({ type: "project.delete", id: projectId });
+    projectIds.shift();
+    assert.equal((await fetch(base + paths[0])).status, 404);
+  } finally {
+    for (const id of projectIds) await send({ type: "project.delete", id });
+  }
+});
+
 test("HTTP: JSON inválido, fechas imposibles y solicitudes de otro origen se rechazan", async () => {
   const invalid = await fetch(base + "/api/workspace", {
     method: "POST",
@@ -555,7 +771,7 @@ test("HTTP: clientes globales, geografía y relación opcional con tareas", asyn
     const edited = await send({ type: "client.update", id: clientId, name: "Cliente editado HTTP", cityId: "11001" });
     assert.equal(edited.workspace.clients.find((client) => client.id === clientId).departmentId, "11");
     const backup = await (await fetch(base + "/api/backup")).json();
-    assert.equal(backup.version, 6);
+    assert.equal(backup.version, 8);
     assert.ok(backup.tables.task_clients.some((link) => link.clientId === clientId && link.taskId === taskId));
     await send({ type: "task.clients.update", id: taskId, clientIds: [] });
   } finally {
@@ -592,7 +808,7 @@ test("HTTP: proyectos y API requieren sesión; landing, healthcheck y login son 
   assert.match(html, /Vuelve a tu proyecto/);
   const signedInLogin = await fetch(base + "/login", { redirect: "manual" });
   assert.equal(signedInLogin.status, 307);
-  assert.equal(signedInLogin.headers.get("location"), "/projects");
+  assert.equal(signedInLogin.headers.get("location"), "/dashboard");
   assert.equal((await globalThis.fetch(base + "/api/health")).status, 200);
 });
 
@@ -848,6 +1064,78 @@ test("HTTP: equipos propios, contratos de liderazgo y documentos con permisos de
     // Tabs opened with the previous project membership contract still work.
     await send({ type: "project.member.remove", projectId, userId: member.id });
     assert.equal((await asMember(`/api/entities/module/${moduleId}/comments/token`, {})).status, 404);
+  } finally { if (projectId) await send({ type: "project.delete", id: projectId }); }
+});
+
+test("HTTP: notificaciones, lectura y PWA funcionan entre dos usuarios", async () => {
+  const member = await addUser(fixture.repo, "notifications-http-member");
+  let projectId;
+  try {
+    const created = await send({ type: "project.create", name: "Avisos HTTP", description: "", icon: "🔔", color: "#059669" });
+    projectId = created.createdId;
+    await send({ type: "project.team.add", projectId, userId: member.id });
+    const taskId = (await send({ type: "task.create", projectId,
+      featureId: created.workspace.features.find((f) => f.projectId === projectId).id,
+      statusId: created.workspace.statuses.find((s) => s.projectId === projectId).id,
+      title: "Aviso entre usuarios", description: "", priority: "medium", dueDate: null, labels: [], leaderId: member.id,
+    })).createdId;
+    const now = new Date(), token = randomUUID();
+    await fixture.repo.store.db.insert(session).values({ id: randomUUID(), userId: member.id, token, createdAt: now, updatedAt: now, expiresAt: new Date(Date.now() + 86400000) });
+    const cookie = (await serializeSignedCookie("better-auth.session_token", token, authConfig.BETTER_AUTH_SECRET, { path: "/" })).split(";")[0];
+    const asMember = (path, init = {}) => globalThis.fetch(base + path, { ...init, headers: { Cookie: cookie, ...init.headers } });
+    const snapshot = await (await asMember("/api/notifications")).json();
+    assert.equal(snapshot.unreadCount, 1);
+    const item = snapshot.items[0]; assert.equal(item.taskId, taskId);
+    assert.equal((await fetch(base + `/api/notifications/${item.id}`)).status, 404);
+    const page = await asMember("/notifications"); assert.equal(page.status, 200); assert.match(await page.text(), /Notificaciones/);
+    const read = await asMember(`/api/notifications/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Origin: base }, body: JSON.stringify({ read: true }) });
+    assert.equal(read.status, 200, await read.text());
+    assert.equal((await (await asMember("/api/notifications")).json()).unreadCount, 0);
+    await asMember(`/api/notifications/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ read: false }) });
+    assert.equal((await asMember("/api/notifications/read-all", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ through: snapshot.through }) })).status, 200);
+    const manifest = await (await globalThis.fetch(base + "/manifest.webmanifest")).json();
+    assert.equal(manifest.display, "standalone");
+    const icon = await globalThis.fetch(base + "/pwa-icon/192"); assert.equal(icon.status, 200); assert.match(icon.headers.get("content-type"), /image\/png/);
+    const worker = await globalThis.fetch(base + "/sw.js"); assert.equal(worker.status, 200); assert.match(worker.headers.get("cache-control"), /no-store/);
+    assert.equal((await globalThis.fetch(base + "/api/internal/notifications/process", { method: "POST" })).status, 401);
+    const process = await globalThis.fetch(base + "/api/internal/notifications/process", { method: "POST", headers: { Authorization: "Bearer test-notification-worker-secret-32-characters" } });
+    assert.equal(process.status, 200, await process.text());
+    const unauthenticated = await globalThis.fetch(base + `/notifications?open=${item.id}`, { redirect: "manual" });
+    assert.equal(unauthenticated.status, 307); assert.match(unauthenticated.headers.get("location"), /returnTo=/);
+  } finally { if (projectId) await send({ type: "project.delete", id: projectId }); }
+});
+
+test("HTTP: diagramas privados, guardado, enlace anónimo y revocación", async () => {
+  let projectId;
+  try {
+    projectId = (await send({ type: "project.create", name: "Diagramas HTTP", description: "", icon: "D", color: "#059669" })).createdId;
+    const endpoint = `/api/entities/project/${projectId}/diagrams`;
+    const input = { title: "Flujo HTTP", description: "Diagrama de integración", scene: { elements: [], appState: { viewBackgroundColor: "#ffffff" }, files: {} } };
+    assert.equal((await globalThis.fetch(base + endpoint)).status, 401);
+    const created = await fetch(base + endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+    assert.equal(created.status, 200, await created.clone().text());
+    const doc = await created.json();
+    const listing = await (await fetch(base + endpoint)).json();
+    assert.equal(listing.diagrams.length, 1); assert.equal("scene" in listing.diagrams[0], false);
+    const forged = await fetch(base + `/api/diagrams/${doc.id}`, { method: "PUT", headers: { Origin: "https://outside.invalid", "Content-Type": "application/json" }, body: JSON.stringify({ ...input, revision: 1 }) });
+    assert.equal(forged.status, 403);
+    const shared = await (await fetch(base + `/api/diagrams/${doc.id}/share`, { method: "POST" })).json();
+    const publicEndpoint = `/api/public/diagrams/${shared.publicPath.split("/").at(-1)}`;
+    const publicResponse = await globalThis.fetch(base + publicEndpoint);
+    assert.equal(publicResponse.status, 200); assert.match(publicResponse.headers.get("cache-control"), /no-store/);
+    assert.deepEqual(Object.keys(await publicResponse.json()).sort(), ["description", "scene", "title"]);
+    const page = await globalThis.fetch(base + shared.publicPath);
+    assert.equal(page.status, 200); assert.match(await page.text(), /Flujo HTTP/);
+    const saved = await fetch(base + `/api/diagrams/${doc.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...input, title: "Actualizado", revision: 1 }) });
+    assert.equal(saved.status, 200, await saved.clone().text());
+    assert.equal((await (await globalThis.fetch(base + publicEndpoint)).json()).title, "Actualizado");
+    assert.equal((await fetch(base + `/api/diagrams/${doc.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...input, revision: 1 }) })).status, 409);
+    await fetch(base + `/api/diagrams/${doc.id}/share`, { method: "DELETE" });
+    assert.equal((await globalThis.fetch(base + publicEndpoint)).status, 404);
+    assert.equal((await globalThis.fetch(base + shared.publicPath)).status, 404);
+    assert.equal((await fetch(base + `/projects/wrong/diagrams/${doc.id}`)).status, 404);
+    const oversized = await fetch(base + `/api/diagrams/${doc.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...input, description: "a".repeat(3_000_001), revision: 2 }) });
+    assert.equal(oversized.status, 413);
   } finally { if (projectId) await send({ type: "project.delete", id: projectId }); }
 });
 

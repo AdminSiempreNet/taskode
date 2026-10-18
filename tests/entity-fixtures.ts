@@ -33,6 +33,10 @@ export function stripEntityColumns(
 export function stripAssignmentColumns(
   tables: Record<string, Record<string, unknown>[]>,
 ) {
+  delete tables.diagrams;
+  delete tables.notification_preferences;
+  delete tables.notifications;
+  for (const project of tables.projects ?? []) delete project.timeZone;
   if (!tables.project_team_members) return;
   tables.project_members = tables.project_team_members;
   delete tables.project_team_members;
@@ -47,6 +51,7 @@ export function stripAssignmentColumns(
 export async function removeAssignmentSchema(repo: PostgresRepository) {
   if (!/^taskode_test_[a-f0-9]{32}$/.test(repo.store.schemaName))
     throw new Error("Esquema de prueba inválido.");
+  await repo.store.pool.query(`drop table if exists diagrams, notification_deliveries, push_subscriptions, task_reminders, notifications, notification_preferences; alter table projects drop column if exists "timeZone";`);
   await repo.store.pool.query(
     "drop table module_team_members, feature_team_members",
   );

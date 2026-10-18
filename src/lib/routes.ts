@@ -23,6 +23,17 @@ export function taskPath(
   return `${projectPath(projectId)}/tasks/${encodeURIComponent(taskId)}${viewQuery(view)}`;
 }
 
+export function dashboardPath(
+  projectId: string,
+  kind: "project" | "module" | "feature" = "project",
+  id = projectId,
+) {
+  const root = `/projects/${encodeURIComponent(projectId)}`;
+  return kind === "project"
+    ? `${root}/dashboard`
+    : `${root}/${kind === "module" ? "modules" : "features"}/${encodeURIComponent(id)}/dashboard`;
+}
+
 export function entityPath(
   projectId: string,
   kind: EntityKind,
@@ -60,9 +71,17 @@ export function safeReturnTo(
     const root = `/projects/${encodeURIComponent(projectId)}`;
     const rest = url.pathname.slice(root.length);
     if (
+      url.origin === "http://taskode.invalid" &&
+      (url.pathname === "/dashboard" || url.pathname === "/projects") &&
+      !url.search
+    )
+      return url.pathname;
+    if (
       url.origin !== "http://taskode.invalid" ||
       !url.pathname.startsWith(root) ||
-      !/^(?:|\/details|\/(?:modules|features|tasks)\/[^/]+)$/.test(rest)
+      !/^(?:|\/details|\/dashboard|\/(?:modules|features)\/[^/]+(?:\/dashboard)?|\/tasks\/[^/]+)$/.test(
+        rest,
+      )
     )
       return null;
     return `${url.pathname}${url.search}`;

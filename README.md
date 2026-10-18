@@ -1,5 +1,7 @@
 # Taskode · Proyectos y tareas de desarrollo
 
+Proyectos, módulos, features y tareas incluyen una pestaña **Diagramas** con Excalidraw: guardado manual en PostgreSQL, imágenes incluidas hasta 3 MB, pantalla completa y enlaces públicos revocables de solo lectura. La [guía de diagramas](docs/diagramas.md) detalla permisos, migración y respaldos versión 8.
+
 Gestión de proyectos de software, módulos, features y tareas en español. Del backlog al siguiente deploy. Construida con Next.js, React, TypeScript, shadcn/ui y PostgreSQL mediante Drizzle ORM. Better Auth gestiona el acceso con Google/GitHub y las invitaciones.
 
 La [decisión de arquitectura y sus fases](docs/migracion-sqlite-postgresql.md) documenta las alternativas analizadas. Esta edición usa exclusivamente PostgreSQL y comienza con una base vacía. Los archivos y volúmenes SQLite anteriores se conservan, sin importarlos ni modificarlos.
@@ -112,9 +114,10 @@ La primera cuenta que acceda a la base nueva será administradora y realizará e
 
 ## Uso
 
-La ruta `/` muestra una landing pública con la presentación y funciones de Taskode. `/login` ofrece acceso con Google y GitHub; después de acceder, `/projects` abre el espacio de trabajo y deriva al asistente inicial cuando corresponde. Los proyectos siguen requiriendo sesión.
+La ruta `/` muestra una landing pública sin sesión y redirige a `/dashboard` cuando el usuario ya está autenticado. `/login` ofrece acceso con Google y GitHub; el acceso, las invitaciones y la finalización del asistente llevan al dashboard. El administrador sigue completando el asistente inicial cuando corresponde.
 
-- Cambia de proyecto desde el selector desplegable en la parte superior del sidebar. «Menú» ocupa siempre la primera posición: abre `/dashboard`, por ahora vacío, y sustituye los módulos y features por el menú principal. «Nuevo proyecto» sigue disponible. El selector muestra hasta cinco proyectos, priorizando los favoritos (estrella) y los abiertos recientemente; «Buscar proyectos…» busca también fuera de esos accesos, sin distinguir mayúsculas ni tildes. Los resultados de búsqueda se desplazan dentro de una lista con un máximo de cinco filas visibles. Puedes recorrer las opciones con las flechas y activarlas con Enter; Tab permite acceder también a las estrellas. Favoritos y recientes se guardan por usuario en este navegador. Cada proyecto tiene su propia URL `/projects/<projectId>`; puedes abrirla directamente, recargarla y usar Atrás/Adelante. `/projects` abre el último proyecto visitado por ese usuario en este navegador, incluso después de cerrar sesión; la preferencia dura un año y solo se usa si el usuario conserva acceso. Entrar en Menú conserva ese último proyecto. Sin una preferencia válida, abre el primer proyecto disponible o la pantalla de creación si el espacio está vacío. Los enlaces antiguos `/?project=<id>` redirigen a través de `/projects?project=<id>` y tienen prioridad sobre la preferencia guardada; un identificador inexistente en la ruta de proyecto muestra una página 404.
+- Cambia de proyecto desde el selector superior del sidebar. «Menú» abre `/dashboard` y sustituye los módulos y features por las opciones **Dashboard**, **Proyectos** y **Clientes**. El selector abre el tablero `/projects/<projectId>`, conserva **Nuevo proyecto** y muestra hasta cinco accesos, priorizando favoritos y recientes. Su búsqueda incluye todos los proyectos accesibles e ignora mayúsculas y tildes. Puedes recorrer las opciones con flechas y Enter, y acceder a las estrellas con Tab. Las preferencias se guardan por usuario en este navegador.
+- **Proyectos** abre `/projects`: un directorio buscable con acceso al tablero y acciones **Editar** y **Dashboard** para el administrador y el líder del proyecto. La preferencia del último proyecto no redirige desde el directorio. Los enlaces antiguos `/?project=<id>` y `/projects?project=<id>` siguen abriendo proyectos accesibles; un parámetro inválido muestra el directorio. Un identificador inexistente en una ruta directa de proyecto muestra 404.
 - La barra superior reúne las vistas, la búsqueda y el filtro por estados. El filtro permite marcar varios estados sin cerrar el menú y muestra las tareas de cualquiera de ellos en las tres vistas. La selección se guarda por proyecto en este navegador y se recupera al recargar, cambiar de proyecto o volver del detalle de una tarea. «Todos los estados» o «Limpiar filtros» restablecen la vista completa; desmarcar el último estado también muestra todos. Crea tareas desde el «+» de una columna, la lista o un espacio del calendario. La creación abre un modal con título, descripción y propiedades. **Crear** es la acción por defecto y cierra el modal; **Crear y editar** abre el detalle de la tarea guardada. Las etiquetas, checklists y comentarios se añaden desde ese detalle. El menú de tres puntos permite editar el proyecto, consultar su descripción y acceder a las tareas archivadas.
 - El dropdown «Nuevo» de la barra lateral permite crear módulos, features y tareas. Para crear una tarea se elige su tipo; el modal permite elegir la feature. Al crear una feature se debe elegir su módulo, incluido **General**. Al editarla, las flechas permiten subirla o bajarla dentro de su módulo y guardan el orden al pulsarlas, igual que en los módulos. «Todas las features» reúne las tareas del proyecto; selecciona una para concentrarte en ella.
 - «Nuevo → Módulo» permite añadir módulos con nombre y descripción. Cada módulo es una sección contraíble, expandida por defecto, con código de al menos dos dígitos (01, 02, …). Su menú permite editarlo, cambiar el orden con las flechas o eliminarlo; al eliminar un módulo, sus features pasan a General y conservan sus tareas.
@@ -160,12 +163,31 @@ Las tareas permiten seleccionar cero, uno o varios clientes desde el modal de cr
 
 La migración `0001_global_clients` incorpora una copia fija del catálogo DANE DIVIPOLA: 33 grupos departamentales y 1.122 ubicaciones, incluyendo Bogotá, municipios, San Andrés y áreas no municipalizadas. Los códigos conservan sus ceros iniciales. La [procedencia del catálogo](src/server/catalogs/README.md) documenta la descarga; ni migrar ni usar la aplicación requiere consultar servicios geográficos externos. Las instalaciones existentes deben aplicar las migraciones antes de arrancar la nueva versión.
 
+## Dashboards
+
+El administrador ve el panorama de todos los proyectos, su avance, próximas entregas, vencimientos y carga del equipo. El miembro ve las tareas donde es líder o integrante y un bloque separado de los proyectos, módulos y features que lidera. La carga de cada persona incluye sus asignaciones directas; una tarea compartida puede aparecer para varias personas, pero los totales generales cuentan cada tarea una sola vez.
+
+El avance es el porcentaje de tareas activas cuyo estado tiene marcada la opción **Cuenta como finalizado**. No depende del nombre del estado ni del checklist. Las tareas archivadas quedan excluidas. Sin tareas se muestra **Sin tareas**, sin asumir un avance del 100 %. Los vencimientos usan la hora de Bogotá: una fecha sin hora vence al finalizar ese día; una fecha con hora respeta ese momento. La agenda distingue vencidas, pendientes para hoy, próximos siete días y pendientes sin fecha. Los filtros guardados del tablero no cambian estas métricas. **Actualizar** vuelve a consultar el espacio de trabajo.
+
+Los dashboards de proyecto, módulo y feature están en `/projects/<projectId>/dashboard`, `/projects/<projectId>/modules/<moduleId>/dashboard` y `/projects/<projectId>/features/<featureId>/dashboard`. Solo acceden el administrador, el líder del elemento y sus líderes superiores. Las cabeceras de edición incluyen **Dashboard** según esos permisos. General reúne las features sin módulo y hereda los permisos del proyecto. Los enlaces a tareas y detalles conservan el retorno al dashboard de origen y la protección de cambios sin guardar.
+
+Para evaluar ambas vistas con las dos cuentas locales existentes:
+
+```powershell
+npm run db:seed:dashboard
+npm run db:seed:dashboard -- --apply
+```
+
+El primer comando solo muestra una vista previa. El segundo crea **Portal de clientes** y **Operaciones internas**, con cuatro módulos, diez features, cuarenta tareas y cuarenta checklists en total. Cada proyecto tiene dos tareas archivadas, distintos niveles de avance, fechas y asignaciones. Las cuentas se identifican por ID y rol; se requiere el administrador de la instalación y exactamente un miembro. Un proyecto es liderado por cada cuenta y el miembro también lidera un módulo del primero. Las tareas llevan las etiquetas **Ejemplo** y **Dashboard**, y su descripción aclara que los datos son simulados.
+
+La carga exige PostgreSQL local, conserva los proyectos anteriores, se confirma en una sola transacción y se puede repetir sin duplicar ejemplos ni cambiar las fechas de los ya cargados. `--date=2026-10-18` fija la fecha de referencia; por defecto usa el día actual en Bogotá. No se ejecuta al iniciar la aplicación ni forma parte de las migraciones.
+
 ## Respaldo y restauración
 
 El administrador conserva el panel **Respaldo**: permite listar, generar, descargar, eliminar y restaurar desde una copia del servidor o un archivo adjunto.
 
-- Formato: `.taskode-backup.json`, con identificador `taskode-backup`, versión 2, fecha y una lista explícita de tablas. Incluye geografía, clientes globales y relaciones con tareas.
-- Las copias anteriores Taskode y `.brote-backup.json` de versión 1 siguen disponibles para listar, descargar y restaurar, tanto en archivos locales como en S3. Al restaurarlas se incorpora el catálogo geográfico y se comienza sin clientes ni asociaciones. Las exportaciones nuevas usan exclusivamente Taskode versión 2.
+- Formato: `.taskode-backup.json`, con identificador `taskode-backup`, versión 8, fecha y una lista explícita de tablas. Incluye geografía, clientes, asignaciones, notificaciones y diagramas con sus imágenes.
+- Las copias anteriores Taskode y `.brote-backup.json` de versión 1 siguen disponibles para listar, descargar y restaurar, tanto en archivos locales como en S3. Al restaurarlas se incorpora el catálogo geográfico y se comienza sin clientes ni asociaciones. Las exportaciones nuevas usan exclusivamente Taskode versión 8; también se admiten las versiones 2–7.
 - Incluye usuarios, cuentas OAuth vinculadas, líderes, equipos, configuración inicial, invitaciones y todos los datos de negocio, incluidas tareas archivadas, comentarios, checklist e historial.
 - Excluye sesiones, verificaciones temporales y metadatos de migraciones. El archivo puede contener información sensible de las cuentas y debe conservarse protegido.
 - La exportación lee un snapshot consistente y la carpeta se configura con `BACKUP_DIR`.
@@ -236,6 +258,8 @@ Las tareas tienen **Líder**, **Equipo** y permisos por tarea, con acceso superi
 
 Los participantes del proyecto pueden consultar los nuevos detalles, descargar documentos y comentar, incluidas imágenes en el chat. Los líderes del elemento y sus superiores gestionan sus usuarios, movimientos y eliminación. Los equipos propios de módulos y features también editan contenido y documentos. Los permisos específicos de las tareas se conservan.
 
-Consulta [permisos, migración y respaldo de archivos](docs/uso-compartido-y-archivos.md) antes de actualizar. Aplica `0005_entity_details` y `0006_entity_leaders_and_teams` antes de arrancar la nueva versión. Los JSON nuevos usan la versión 6 y se admiten las versiones 1–5; los archivos físicos se copian y restauran por separado.
+Consulta [permisos, migración y respaldo de archivos](docs/uso-compartido-y-archivos.md) antes de actualizar. Aplica todas las migraciones hasta `0009_diagrams` antes de arrancar la nueva versión. Los JSON nuevos usan la versión 8 y se admiten las versiones 1–7. Las imágenes de diagramas se incluyen en el JSON; los demás archivos físicos se copian y restauran por separado.
+
+La campana y el [centro de notificaciones y recordatorios](docs/notificaciones.md) incluyen asignaciones, tareas compartidas, preferencias personales, zonas por proyecto y push web opcional por dispositivo. Dokploy ejecuta el programador cada minuto; configura VAPID y `NOTIFICATION_WORKER_SECRET` antes de desplegar.
 
 Los detalles de proyecto, módulo, feature y tarea muestran un icono propio junto al título. Su cabecera incluye **Usuarios**, con **Líder** y **Equipo** en el mismo lugar. Los equipos de cada módulo y feature son independientes y solo admiten usuarios con acceso al proyecto. Pertenecer a esos equipos no concede acceso a tareas privadas. El sidebar conserva los grupos expandidos mientras navegas por el proyecto durante la sesión; cambiar de proyecto los contrae de nuevo.

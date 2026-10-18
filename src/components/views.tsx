@@ -43,6 +43,7 @@ import {
 } from "./project-catalog";
 import type { Mutate } from "./forms";
 import { dateKey, taskScheduleLabel } from "@/lib/calendar";
+import { taskOverdue } from "@/lib/project-time";
 import { boardDropTarget, type BoardDropTarget } from "@/lib/board-drop";
 export { dateKey } from "@/lib/calendar";
 
@@ -80,8 +81,8 @@ function CardContent({
   feature?: Feature;
   status?: Status;
 }) {
-  const late =
-    task.dueDate && task.dueDate < dateKey(new Date()) && !status?.isDone;
+  const { timeZone } = useProjectCatalog();
+  const late = taskOverdue(task, new Date(), timeZone) && !status?.isDone && !task.archived;
   return (
     <>
       <div className="card-labels">
@@ -655,6 +656,7 @@ export function ListView({
   add: () => void;
   archived: boolean;
 }) {
+  const { timeZone } = useProjectCatalog();
   if (!tasks.length)
     return (
       <Empty
@@ -694,8 +696,7 @@ export function ListView({
             <ul className={styles.rows} aria-label={`Tareas de ${f.name}`}>
               {rows.map((task) => {
                 const status = statuses.find((s) => s.id === task.statusId);
-                const overdue = !!task.dueDate &&
-                  task.dueDate < dateKey(new Date()) && !status?.isDone && !archived;
+                const overdue = taskOverdue(task, new Date(), timeZone) && !status?.isDone && !archived;
                 return (
                   <li key={task.id} className={styles.row} onClick={() => open(task)}>
                     <div className={styles.heading}>

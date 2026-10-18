@@ -1,4 +1,5 @@
 import { relations, sql } from "drizzle-orm";
+import type { DiagramScene } from "../lib/diagrams";
 import {
   pgTable,
   text,
@@ -149,6 +150,7 @@ export const projects = pgTable(
     description: text().notNull(),
     icon: text().notNull(),
     color: text().notNull(),
+    timeZone: text().notNull().default("America/Bogota"),
     createdAt: text().notNull(),
   },
   (t) => [index("project_leader").on(t.leaderId)],
@@ -611,6 +613,26 @@ export const files = pgTable(
 );
 
 // Delivery state is operational data, deliberately excluded from JSON backups.
+export const diagrams = pgTable("diagrams", {
+  id: text().primaryKey(),
+  projectId: text().notNull().references(() => projects.id, { onDelete: "cascade" }),
+  scopeType: text().notNull(),
+  taskId: text(), moduleId: text(), featureId: text(),
+  title: text().notNull(), description: text().notNull().default(""),
+  scene: jsonb().$type<DiagramScene>().notNull(),
+  revision: integer().notNull().default(1),
+  publicToken: text(),
+  createdAt: text().notNull(), updatedAt: text().notNull(),
+}, (t) => [
+  index("diagram_scope").on(t.projectId, t.scopeType, t.taskId, t.moduleId, t.featureId),
+  uniqueIndex("diagram_public_token").on(t.publicToken),
+  foreignKey({ columns: [t.taskId, t.projectId], foreignColumns: [tasks.id, tasks.projectId] }).onDelete("cascade"),
+  foreignKey({ columns: [t.moduleId, t.projectId], foreignColumns: [modules.id, modules.projectId] }).onDelete("cascade"),
+  foreignKey({ columns: [t.featureId, t.projectId], foreignColumns: [features.id, features.projectId] }).onDelete("cascade"),
+  check("diagram_revision", sql`${t.revision} > 0`),
+  check("diagram_scope_target", sql`(${t.scopeType} = 'project' and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 0) or (${t.scopeType} = 'task' and ${t.taskId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'module' and ${t.moduleId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'feature' and ${t.featureId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1)`),
+]);
+
 export const commentOutbox = pgTable(
   "comment_outbox",
   {
@@ -629,6 +651,66 @@ export const commentOutbox = pgTable(
     index("comment_outbox_available").on(t.availableAt),
   ],
 );
+
+export const notifications = pgTable("notifications", {
+  id: text().primaryKey(),
+  sequence: bigint({ mode: "number" }).generatedByDefaultAsIdentity().notNull(),
+  recipientId: text().notNull().references(() => user.id, { onDelete: "cascade" }),
+  actorId: text().references(() => user.id, { onDelete: "set null" }),
+  taskId: text().notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  type: text({ enum: ["assigned", "shared", "reminder"] }).notNull(),
+  taskTitle: text().notNull(),
+  offsetMinutes: integer(),
+  dedupKey: text().notNull(),
+  createdAt: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  readAt: timestamp({ withTimezone: true, mode: "date" }),
+}, (t) => [uniqueIndex("notification_dedup").on(t.dedupKey),
+  index("notification_inbox").on(t.recipientId, t.createdAt, t.id),
+  index("notification_unread").on(t.recipientId).where(sql`${t.readAt} is null`),
+  uniqueIndex("notification_sequence").on(t.sequence),
+  index("notification_recipient_sequence").on(t.recipientId, t.sequence)]);
+
+export const notificationPreferences = pgTable("notification_preferences", {
+  userId: text().primaryKey().references(() => user.id, { onDelete: "cascade" }),
+  // String arrays keep the portable backup representation consistent.
+  offsets: jsonb().$type<string[]>().notNull().default(["1440", "60"]),
+  dateOnlyTime: text().notNull().default("08:00"),
+}, (t) => [check("reminder_time", sql`${t.dateOnlyTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`)]);
+
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: text().primaryKey(),
+  userId: text().notNull().references(() => user.id, { onDelete: "cascade" }),
+  sessionId: text().notNull().references(() => session.id, { onDelete: "cascade" }),
+  endpoint: text().notNull(),
+  p256dh: text().notNull(),
+  auth: text().notNull(),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("push_endpoint").on(t.endpoint), index("push_user").on(t.userId)]);
+
+export const taskReminders = pgTable("task_reminders", {
+  id: text().primaryKey(),
+  taskId: text().notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  userId: text().notNull().references(() => user.id, { onDelete: "cascade" }),
+  offsetMinutes: integer().notNull(),
+  scheduledFor: timestamp({ withTimezone: true }).notNull(),
+  expiresAt: timestamp({ withTimezone: true }).notNull(),
+  dedupKey: text().notNull(),
+  processedAt: timestamp({ withTimezone: true }),
+}, (t) => [uniqueIndex("reminder_dedup").on(t.dedupKey),
+  index("reminder_pending").on(t.scheduledFor).where(sql`${t.processedAt} is null`)]);
+
+// One row per transport/device, so successful recipients are not sent again.
+export const notificationDeliveries = pgTable("notification_deliveries", {
+  id: text().primaryKey(),
+  recipientId: text().notNull().references(() => user.id, { onDelete: "cascade" }),
+  notificationId: text().references(() => notifications.id, { onDelete: "cascade" }),
+  subscriptionId: text().references(() => pushSubscriptions.id, { onDelete: "cascade" }),
+  transport: text({ enum: ["ably", "push"] }).notNull(),
+  attempts: integer().notNull().default(0),
+  availableAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp({ withTimezone: true }).notNull(),
+  leaseUntil: timestamp({ withTimezone: true }),
+}, (t) => [index("notification_delivery_pending").on(t.availableAt)]);
 
 export const domainTables = {
   project_team_members: projectTeamMembers,
