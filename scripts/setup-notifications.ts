@@ -29,7 +29,7 @@ try {
   if (!env.VAPID_SUBJECT)
     set(
       "VAPID_SUBJECT",
-      production ? "https://tareas.siempre.net.co" : "mailto:admin@example.com",
+      production ? "https://taskode.siempre.net.co" : "mailto:admin@example.com",
     );
   pushConfig(env);
   if (!env.NOTIFICATION_WORKER_SECRET)

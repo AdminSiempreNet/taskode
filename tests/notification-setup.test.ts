@@ -41,7 +41,7 @@ test("configuración genera secretos sin imprimirlos, conserva claves y rechaza 
       await readFile(join(directory, ".env.production.local"), "utf8"),
     );
     assert.notEqual(production.VAPID_PRIVATE_KEY, env.VAPID_PRIVATE_KEY);
-    assert.equal(production.VAPID_SUBJECT, "https://tareas.siempre.net.co");
+    assert.equal(production.VAPID_SUBJECT, "https://taskode.siempre.net.co");
     const bad = "NEXT_PUBLIC_VAPID_PUBLIC_KEY=broken\n";
     await writeFile(join(directory, ".env.local"), bad);
     assert.equal(run().status, 1);

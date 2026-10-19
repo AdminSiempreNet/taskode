@@ -21,7 +21,7 @@ Generar un par VAPID distinto por entorno con `npx web-push generate-vapid-keys`
 ```dotenv
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=<clave pública>
 VAPID_PRIVATE_KEY=<clave privada>
-VAPID_SUBJECT=https://tareas.siempre.net.co
+VAPID_SUBJECT=https://taskode.siempre.net.co
 NOTIFICATION_WORKER_SECRET=<secreto aleatorio de al menos 32 caracteres>
 ```
 
@@ -36,7 +36,7 @@ En iPhone/iPad se requiere Safari con soporte Web Push y añadir Taskode a la pa
 La aplicación continúa en Vercel. `compose.dokploy.yaml` contiene PostgreSQL y un servicio `notifications` basado en Node 24 que llama cada minuto a:
 
 ```text
-POST https://tareas.siempre.net.co/api/internal/notifications/process
+POST https://taskode.siempre.net.co/api/internal/notifications/process
 Authorization: Bearer <NOTIFICATION_WORKER_SECRET>
 ```
 

@@ -1,13 +1,13 @@
 # Servidor MCP
 
-Taskode publica un servidor [Model Context Protocol](https://modelcontextprotocol.io) en `https://tareas.siempre.net.co/api/mcp`. Asistentes como Claude, Claude Code o Cursor pueden consultar y gestionar proyectos, tareas, comentarios, documentos, diagramas, archivos, tickets, clientes y avisos en nombre de la persona que autoriza la conexión. Actúan con sus mismos permisos: cada herramienta pasa por los servicios y comprobaciones de acceso que usa la interfaz, y lo que una persona no puede ver ni modificar tampoco lo puede hacer su asistente.
+Taskode publica un servidor [Model Context Protocol](https://modelcontextprotocol.io) en `https://taskode.siempre.net.co/api/mcp`. Asistentes como Claude, Claude Code o Cursor pueden consultar y gestionar proyectos, tareas, comentarios, documentos, diagramas, archivos, tickets, clientes y avisos en nombre de la persona que autoriza la conexión. Actúan con sus mismos permisos: cada herramienta pasa por los servicios y comprobaciones de acceso que usa la interfaz, y lo que una persona no puede ver ni modificar tampoco lo puede hacer su asistente.
 
 El transporte es Streamable HTTP sin estado, compatible con la revisión 2026-07-28 del protocolo y con clientes de 2025. La autorización es OAuth 2.1 con PKCE, servida por Better Auth (`@better-auth/mcp`, `@better-auth/oauth-provider` y `@better-auth/cimd`, fijados en 1.7.10). Los tokens de acceso son JWT firmados para el recurso `/api/mcp`; no se aceptan cookies de sesión en ese endpoint.
 
 ## Conectar un asistente
 
-- **Claude (web, escritorio y móvil):** **Configuración → Conectores → Añadir conector personalizado** con la URL `https://tareas.siempre.net.co/api/mcp`. Claude se identifica con un documento de metadatos (CIMD) y la pantalla de consentimiento muestra su dominio verificado.
-- **Claude Code:** `claude mcp add --transport http taskode https://tareas.siempre.net.co/api/mcp` y después `/mcp` para iniciar sesión.
+- **Claude (web, escritorio y móvil):** **Configuración → Conectores → Añadir conector personalizado** con la URL `https://taskode.siempre.net.co/api/mcp`. Claude se identifica con un documento de metadatos (CIMD) y la pantalla de consentimiento muestra su dominio verificado.
+- **Claude Code:** `claude mcp add --transport http taskode https://taskode.siempre.net.co/api/mcp` y después `/mcp` para iniciar sesión.
 - **Cursor y otros clientes:** usan la misma URL y el registro dinámico de clientes (RFC 7591). La pantalla de consentimiento los marca como **Registrada automáticamente**: confirma que reconoces la aplicación antes de permitirla.
 - **MCP Inspector:** `npx @modelcontextprotocol/inspector`, transporte Streamable HTTP y la URL anterior (en desarrollo, `http://localhost:5010/api/mcp`). En modo directo desde el navegador su origen debe figurar en `MCP_ALLOWED_ORIGINS`.
 
@@ -67,8 +67,8 @@ MCP_JWKS_URL=http://127.0.0.1:5010/api/auth/jwks
 4. Comprueba los metadatos públicos:
 
 ```text
-GET https://tareas.siempre.net.co/.well-known/oauth-protected-resource/api/mcp
-GET https://tareas.siempre.net.co/.well-known/oauth-authorization-server/api/auth
+GET https://taskode.siempre.net.co/.well-known/oauth-protected-resource/api/mcp
+GET https://taskode.siempre.net.co/.well-known/oauth-authorization-server/api/auth
 ```
 
 Una petición sin token a `/api/mcp` debe responder 401 con `WWW-Authenticate` y `resource_metadata`.

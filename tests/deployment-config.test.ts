@@ -9,6 +9,8 @@ test("Vercel: dev y otras ramas no despliegan; solo main está habilitada", () =
   const config = JSON.parse(readFileSync("vercel.json", "utf8"));
   assert.deepEqual(config.git.deploymentEnabled, { "*": false, dev: false, main: true });
   assert.equal(config.buildCommand, "npm run build:vercel");
+  const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts;
+  assert.equal(scripts["build:vercel"], "npm run check:production && npm run build && npm run db:migrate");
 });
 
 test("Vercel: la configuración de producción se valida sin conectarse y rechaza dev/Preview", () => {
@@ -16,13 +18,14 @@ test("Vercel: la configuración de producción se valida sin conectarse y rechaz
   const env = {
     ...process.env, VERCEL: "1", VERCEL_ENV: "production", VERCEL_GIT_COMMIT_REF: "main",
     DATABASE_URL: "postgresql://taskode:example@db.example.com:5432/taskode", DATABASE_SSL: "verify-full",
-    DATABASE_POOL_MAX: "5", BETTER_AUTH_URL: "https://tareas.siempre.net.co", BETTER_AUTH_SECRET: "x".repeat(32),
-    GOOGLE_CLIENT_ID: "test", GOOGLE_CLIENT_SECRET: "test", BACKUP_STORAGE: "s3",
+    DATABASE_POOL_MAX: "5", BETTER_AUTH_URL: "https://taskode.siempre.net.co", BETTER_AUTH_SECRET: "x".repeat(32),
+    GOOGLE_CLIENT_ID: "test", GOOGLE_CLIENT_SECRET: "test", BACKUP_STORAGE: "s3", ATTACHMENT_STORAGE: "s3",
     S3_ENDPOINT: "https://example.r2.cloudflarestorage.com", S3_REGION: "auto", S3_BUCKET: "private",
     S3_ACCESS_KEY_ID: "example", S3_SECRET_ACCESS_KEY: "example", S3_PREFIX: "tareas/test/",
     ABLY_API_KEY: "test.key:example", ABLY_CHANNEL_NAMESPACE: "taskode-production",
     RESEND_API_KEY: "re_test", RESEND_FROM_EMAIL: "Taskode <avisos@example.com>",
-    NEXT_PUBLIC_VAPID_PUBLIC_KEY: vapid.publicKey, VAPID_PRIVATE_KEY: vapid.privateKey, VAPID_SUBJECT: "https://tareas.siempre.net.co", NOTIFICATION_WORKER_SECRET: "s".repeat(32),
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY: vapid.publicKey, VAPID_PRIVATE_KEY: vapid.privateKey, VAPID_SUBJECT: "https://taskode.siempre.net.co", NOTIFICATION_WORKER_SECRET: "s".repeat(32),
+    MCP_ENABLED: "true", MCP_ALLOWED_ORIGINS: "",
   };
   const check = (overrides: Record<string, string> = {}) => spawnSync(process.execPath, ["--import", "tsx", "scripts/check-production.ts"], { env: { ...env, ...overrides }, encoding: "utf8", windowsHide: true });
   const valid = check();
@@ -33,6 +36,8 @@ test("Vercel: la configuración de producción se valida sin conectarse y rechaz
   assert.equal(check({ VERCEL_ENV: "preview" }).status, 1);
   assert.equal(check({ DATABASE_SSL: "disable" }).status, 1);
   assert.equal(check({ BACKUP_STORAGE: "filesystem" }).status, 1);
+  assert.equal(check({ ATTACHMENT_STORAGE: "filesystem" }).status, 1);
+  assert.equal(check({ BETTER_AUTH_URL: "https://tareas.siempre.net.co" }).status, 1);
   assert.equal(check({ ABLY_API_KEY: "" }).status, 1);
   assert.equal(check({ ABLY_CHANNEL_NAMESPACE: "taskode-development" }).status, 1);
   assert.equal(check({ VAPID_PRIVATE_KEY: "" }).status, 1);
