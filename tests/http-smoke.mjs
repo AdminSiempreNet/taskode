@@ -70,7 +70,6 @@ test("HTTP: página de tarea, inicio/fin, catálogos, checklist y comentarios pe
       title: "Tarea con duración",
       description: "Detalle persistente",
       priority,
-      ticketNumber: "001234",
       typeId: created.workspace.taskTypes.find(
         (option) => option.projectId === projectId,
       ).id,
@@ -84,6 +83,7 @@ test("HTTP: página de tarea, inicio/fin, catálogos, checklist y comentarios pe
       dueTime: "11:30",
     };
     const taskId = (await send(task)).createdId;
+    const ticketId = (await send({ type: "ticket.create", number: "001234", description: "", url: null, clientId: null, scope: { kind: "task", id: taskId, projectId } })).createdId;
     const route = `/projects/${projectId}/tasks/${taskId}`;
     const page = await fetch(base + route);
     assert.equal(page.status, 200);
@@ -131,7 +131,9 @@ test("HTTP: página de tarea, inicio/fin, catálogos, checklist y comentarios pe
     assert.equal(saved.startTime, task.startTime);
     assert.equal(saved.typeId, task.typeId);
     assert.equal(saved.impactId, task.impactId);
-    assert.equal(saved.ticketNumber, "001234");
+    assert.deepEqual(saved.ticketIds, [ticketId]);
+    assert.equal(fresh.tickets.find((ticket) => ticket.id === ticketId).number, "001234");
+    assert.equal("ticketNumber" in saved, false);
     assert.equal(saved.checklists[0].items[0].completed, true);
     assert.equal(saved.comments[0].content, "Comentario editado");
     const reloaded = await fetch(base + route);
@@ -755,7 +757,8 @@ test("HTTP: clientes globales, geografía y relación opcional con tareas", asyn
     assert.doesNotMatch(detailHtml, /<section[^>]*aria-label="Usuarios"/);
     assert.doesNotMatch(detailHtml, /id="task-leader"/);
     assert.match(detailHtml, /aria-label="Propiedades"/);
-    assert.match(detailHtml, /aria-label="Clientes"/);
+    assert.match(detailHtml, /class="task-tab-label">Clientes<\/span>/);
+    assert.match(detailHtml, /class="task-tab-label">Tickets<\/span>/);
     assert.match(detailHtml, /aria-label="Guardar"/);
     assert.doesNotMatch(detailHtml, />Guardar participantes</);
     assert.match(detailHtml, /test-admin@example.com/);
@@ -771,7 +774,7 @@ test("HTTP: clientes globales, geografía y relación opcional con tareas", asyn
     const edited = await send({ type: "client.update", id: clientId, name: "Cliente editado HTTP", cityId: "11001" });
     assert.equal(edited.workspace.clients.find((client) => client.id === clientId).departmentId, "11");
     const backup = await (await fetch(base + "/api/backup")).json();
-    assert.equal(backup.version, 10);
+    assert.equal(backup.version, 11);
     assert.ok(backup.tables.task_clients.some((link) => link.clientId === clientId && link.taskId === taskId));
     await send({ type: "task.clients.update", id: taskId, clientIds: [] });
   } finally {

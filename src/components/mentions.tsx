@@ -27,13 +27,14 @@ import {
 } from "@/lib/mentions";
 import { UserAvatar } from "./user-avatar";
 
-const empty = { users: [], clients: [] } satisfies MentionOptions;
+const empty = { users: [], clients: [], tickets: [] } satisfies MentionOptions;
 type Snapshot = { options: MentionOptions; loading: boolean; error: string };
 const initial: Snapshot = { options: empty, loading: true, error: "" };
 type Entry = {
   snapshot: Snapshot;
   listeners: Set<() => void>;
   started: boolean;
+  generation: number;
   refresh: () => void;
 };
 const entries = new Map<string, Entry>();
@@ -44,7 +45,9 @@ function entryFor(key: string): Entry {
       snapshot: initial,
       listeners: new Set(),
       started: false,
+      generation: 0,
       refresh: () => {
+        const generation = ++created.generation;
         created.started = true;
         created.snapshot = { ...created.snapshot, loading: true, error: "" };
         created.listeners.forEach((fn) => fn());
@@ -63,9 +66,11 @@ function entryFor(key: string): Entry {
             return data as MentionOptions;
           })
           .then((options) => {
+            if (generation !== created.generation) return;
             created.snapshot = { options, loading: false, error: "" };
           })
           .catch((error) => {
+            if (generation !== created.generation) return;
             created.snapshot = {
               options: empty,
               loading: false,
@@ -79,6 +84,9 @@ function entryFor(key: string): Entry {
     entry = created;
   }
   return entry;
+}
+export function invalidateMentionOptions() {
+  for (const entry of entries.values()) if (entry.listeners.size) entry.refresh();
 }
 export function useMentionOptions(context?: MentionContext) {
   const key = context ? JSON.stringify(context) : "";
@@ -128,8 +136,9 @@ export function MentionDisplay({
     reference.type === "client"
       ? options.clients.find((c) => c.id === reference.id)
       : undefined;
-  const name = user?.name ?? client?.name ?? label;
-  if (compact || (!user && !client))
+  const ticket = reference.type === "ticket" ? options.tickets.find((ticket) => ticket.id === reference.id) : undefined;
+  const name = user?.name ?? client?.name ?? ticket?.number ?? label;
+  if (compact || (!user && !client && !ticket))
     return <span className={`mention mention-${reference.type}`}>{name}</span>;
   return (
     <HoverCard.Root openDelay={200} closeDelay={150}>
@@ -149,6 +158,13 @@ export function MentionDisplay({
               <UserAvatar name={user.name} image={user.image} />
               <strong>{user.name}</strong>
               <span>{user.email}</span>
+            </>
+          ) : ticket ? (
+            <>
+              <strong>Ticket {ticket.number}</strong>
+              <span>{ticket.clientName ?? "Sin cliente"}</span>
+              {ticket.description && <span className="mention-ticket-description">{ticket.description}</span>}
+              {ticket.url && <a href={ticket.url} target="_blank" rel="noopener noreferrer">Abrir ticket</a>}
             </>
           ) : (
             <>
@@ -195,7 +211,7 @@ export const Mention = Node.create({
       getAttrs: (element) => {
         const id = element.getAttribute("data-mention-id"),
           type = element.getAttribute("data-mention-type");
-        return id && id.length <= 200 && (type === "user" || type === "client")
+        return id && id.length <= 200 && (type === "user" || type === "client" || type === "ticket")
           ? { id, type, label: element.textContent }
           : false;
       },
@@ -285,10 +301,10 @@ export function MentionSuggestions({
   const dismissed = useRef("");
   const listId = useId();
   const items = suggestion
-    ? (suggestion.type === "user" ? options.users : options.clients)
+    ? (suggestion.type === "user" ? options.users : suggestion.type === "client" ? options.clients : options.tickets.map((ticket) => ({ ...ticket, name: ticket.number })))
         .filter((item) =>
           normalizeClientText(
-            `${item.name} ${"email" in item ? item.email : `${item.cityName} ${item.departmentName}`}`,
+            `${item.name} ${"email" in item ? item.email : "number" in item ? `${item.clientName ?? ""} ${item.description} ${item.url ?? ""}` : `${item.cityName} ${item.departmentName}`}`,
           ).includes(normalizeClientText(suggestion.query)),
         )
         .slice(0, 30)
@@ -400,7 +416,7 @@ export function MentionSuggestions({
         id={listId}
         role="listbox"
         aria-label={
-          suggestion.type === "user" ? "Mencionar usuario" : "Mencionar cliente"
+          suggestion.type === "user" ? "Mencionar usuario" : suggestion.type === "client" ? "Mencionar cliente" : "Mencionar ticket"
         }
       >
         {loading ? (
@@ -432,7 +448,7 @@ export function MentionSuggestions({
                 <small>
                   {"email" in item
                     ? item.email
-                    : `${item.cityName} · ${item.departmentName}`}
+                    : "number" in item ? `${item.clientName ?? "Sin cliente"} · ${item.description || item.url || "Sin descripción"} · ${item.id.slice(-8)}` : `${item.cityName} · ${item.departmentName}`}
                 </small>
               </span>
             </button>

@@ -26,6 +26,8 @@ import {
   Pencil,
   Plus,
   Trash2,
+  Users,
+  Ticket as TicketIcon,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -43,6 +45,7 @@ import { Field, type Confirmation, type Mutate } from "./forms";
 import { useProjectCatalog } from "./project-catalog";
 import { CatalogCombobox } from "./catalog-combobox";
 import { ClientPicker } from "./client-picker";
+import { TicketPicker } from "./tickets";
 import { InlineTaskTitle, TaskLabelPicker } from "./task-heading";
 import { FeatureCombobox } from "./feature-combobox";
 import { TaskAssignments } from "./task-people";
@@ -177,7 +180,10 @@ export function TaskDetail({
   );
   const [impactId, setImpactId] = useState(task?.impactId ?? "");
   const [clientIds, setClientIds] = useState(task?.clientIds ?? []);
-  const [ticketNumber, setTicketNumber] = useState(task?.ticketNumber ?? "");
+  const [ticketIds, setTicketIds] = useState(task?.ticketIds ?? []);
+  useEffect(() => {
+    if (task) { setClientIds(task.clientIds); setTicketIds(task.ticketIds); }
+  }, [task]);
   const [dueDate, setDueDate] = useState(
     task?.dueDate ?? defaults.dueDate ?? "",
   );
@@ -196,6 +202,7 @@ export function TaskDetail({
   const [teamMemberIds, setTeamMemberIds] = useState(task?.teamMemberIds ?? []);
   const assignmentSaving = useRef(false);
   const [uploading, setUploading] = useState(0);
+  const canEdit = !task || task.permissions?.canEdit !== false;
   const canManage = !task || (task.permissions?.canManageAccess ?? true);
   const people = (workspace.people ?? []).filter(
     (p) => p.projectId === project.id,
@@ -203,7 +210,7 @@ export function TaskDetail({
   const [dirty, setDirty] = useState(false);
   const [descriptionEditing, setDescriptionEditing] = useState(false);
   const requestedTab = searchParams.get("tab");
-  const activeTab = ["description", "properties", "checklists", "files", "documents", "history", "diagrams"].includes(requestedTab ?? "") ? requestedTab! : "description";
+  const activeTab = ["description", "properties", "clients", "tickets", "checklists", "files", "documents", "history", "diagrams"].includes(requestedTab ?? "") ? requestedTab! : "description";
   const [documentState, setDocumentState] = useState<DocumentPending>({ pending: false, busy: false });
   const [diagramState, setDiagramState] = useState<DiagramPending>({ pending: false, busy: false });
   function setActiveTab(value: string) {
@@ -252,7 +259,6 @@ export function TaskDetail({
       priority !== task.priority ||
       typeId !== (task.typeId ?? "") ||
       impactId !== (task.impactId ?? "") ||
-      ticketNumber.trim() !== (task.ticketNumber ?? "") ||
       startDate !== (task.startDate ?? "") ||
       startTime !== (task.startTime ?? "") ||
       dueDate !== (task.dueDate ?? "") ||
@@ -303,7 +309,7 @@ export function TaskDetail({
     }
   }
   async function saveClients(values: string[]) {
-    if (busy || assignmentSaving.current) return;
+    if (busy || assignmentSaving.current || !canEdit) return;
     const previous = clientIds;
     setClientIds(values);
     if (!task) {
@@ -314,8 +320,8 @@ export function TaskDetail({
     try {
       if (
         !(await mutate({
-          type: "task.clients.update",
-          id: task.id,
+          type: "entity.clients.update",
+          scope: { kind: "task", id: task.id, projectId: project.id },
           clientIds: values,
         }))
       )
@@ -323,6 +329,20 @@ export function TaskDetail({
     } finally {
       assignmentSaving.current = false;
     }
+  }
+  async function saveTickets(values: string[], addedClientId?: string | null) {
+    if (busy || assignmentSaving.current || !canEdit) return;
+    const previous = ticketIds;
+    setTicketIds(values);
+    if (!task) {
+      setDirty(true);
+      setClientIds((clients) => [...new Set([...clients, ...(addedClientId ? [addedClientId] : []), ...workspace.tickets.filter((ticket) => values.includes(ticket.id) && !previous.includes(ticket.id) && ticket.clientId).map((ticket) => ticket.clientId!)])]);
+      return;
+    }
+    assignmentSaving.current = true;
+    try {
+      if (!(await mutate({ type: "entity.tickets.update", scope: { kind: "task", id: task.id, projectId: project.id }, ticketIds: values }))) setTicketIds(previous);
+    } finally { assignmentSaving.current = false; }
   }
   async function saveTitle(value: string) {
     const next = value.trim();
@@ -347,7 +367,7 @@ export function TaskDetail({
     }
     const result = await mutate({
       type: task ? "task.update" : "task.create",
-      ...(!task ? { leaderId, teamMemberIds, clientIds } : {}),
+      ...(!task ? { leaderId, teamMemberIds, clientIds, ticketIds } : {}),
       id: task?.id,
       projectId: project.id,
       title: title.trim(),
@@ -357,7 +377,6 @@ export function TaskDetail({
       priority,
       typeId: typeId || null,
       impactId: impactId || null,
-      ticketNumber: ticketNumber.trim() || null,
       startDate: startDate || null,
       startTime: startDate ? startTime || null : null,
       dueDate: dueDate || null,
@@ -639,6 +658,8 @@ export function TaskDetail({
                   label: "Propiedades",
                   icon: <Layers3 size={16} />,
                 },
+                { id: "clients", label: "Clientes", icon: <Users size={16} />, count: clientIds.length },
+                { id: "tickets", label: "Tickets", icon: <TicketIcon size={16} />, count: ticketIds.length },
                 {
                   id: "checklists",
                   label: "Checklist",
@@ -661,6 +682,15 @@ export function TaskDetail({
                 },
               ]}
             >
+              <Tabs.Content value="clients" className="task-tab-panel">
+                <h2 className="relation-panel-title">Clientes</h2>
+                <ClientPicker id="task-clients" clients={workspace.clients} values={clientIds} onChange={(values) => void saveClients(values)} mutate={mutate} busy={busy || !canEdit} />
+              </Tabs.Content>
+              <Tabs.Content value="tickets" className="task-tab-panel">
+                <h2 className="relation-panel-title">Tickets</h2>
+                <TicketPicker id="task-tickets" clients={workspace.clients} tickets={workspace.tickets} values={ticketIds} onChange={(values, clientId) => void saveTickets(values, clientId)} mutate={mutate} busy={busy || !canEdit} confirm={confirm}
+                  scope={task ? { kind: "task", id: task.id, projectId: project.id } : undefined} />
+              </Tabs.Content>
               <Tabs.Content value="documents" className="task-tab-panel">
                 {activeTab === "documents" && (task ? <EntityDocuments scope={{ kind: "task", id: task.id, projectId: project.id }} guard={(action) => requestNavigation(action, documentState.pending)} onPendingChange={setDocumentState} /> : <p className="field-hint">Guarda la tarea para crear documentos.</p>)}
               </Tabs.Content>
@@ -703,11 +733,7 @@ export function TaskDetail({
                 hidden={activeTab !== "properties"}
                 className="task-properties task-tab-panel"
               >
-                <section
-                  className="task-property-section"
-                  aria-label="Propiedades"
-                >
-                  <h2>Propiedades</h2>
+                <section aria-label="Propiedades">
                   <div className="task-properties-grid">
                     <Field label="Feature" htmlFor="task-feature">
                       <FeatureCombobox
@@ -799,21 +825,6 @@ export function TaskDetail({
                         </Field>
                       ),
                     )}
-                    <Field label="Ticket" htmlFor="task-ticket">
-                      <Input
-                        id="task-ticket"
-                        name="ticketNumber"
-                        form="task-detail-form"
-                        placeholder="Ej. 001234"
-                        maxLength={100}
-                        value={ticketNumber}
-                        disabled={busy}
-                        onChange={(event) => {
-                          setTicketNumber(event.target.value);
-                          setDirty(true);
-                        }}
-                      />
-                    </Field>
                     <div className="task-schedule-group">
                       <span>Inicio</span>
                       <div>
@@ -873,20 +884,6 @@ export function TaskDetail({
                       </div>
                     </div>
                   </div>
-                </section>
-                <section
-                  className="task-property-section"
-                  aria-label="Clientes"
-                >
-                  <h2>Clientes</h2>
-                  <ClientPicker
-                    id="task-clients"
-                    clients={workspace.clients ?? []}
-                    values={clientIds}
-                    onChange={(values) => void saveClients(values)}
-                    mutate={mutate}
-                    busy={busy}
-                  />
                 </section>
               </Tabs.Content>
               <Tabs.Content

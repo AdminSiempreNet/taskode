@@ -17,6 +17,8 @@ import {
   Paperclip,
   Plus,
   Trash2,
+  Users,
+  Ticket as TicketIcon,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -51,6 +53,8 @@ import { InlineTitle } from "./task-heading";
 import { DescriptionEditor } from "./description-editor";
 import { EmojiPicker } from "./emoji-picker";
 import { EntityAssignmentControl } from "./project-people";
+import { ClientPicker } from "./client-picker";
+import { TicketPicker } from "./tickets";
 import { DetailTabs, type DetailSection } from "./detail-tabs";
 import { EntityDiagrams, type DiagramPending } from "./diagrams";
 import { EntityDocuments, type DocumentPending } from "./documents";
@@ -158,6 +162,8 @@ export function EntityDetail({
           icon: <FileText size={17} />,
         },
         { id: "properties", label: "Propiedades", icon: <Layers3 size={17} /> },
+        { id: "clients", label: "Clientes", icon: <Users size={17} />, count: entity?.clientIds.length },
+        { id: "tickets", label: "Tickets", icon: <TicketIcon size={17} />, count: entity?.ticketIds.length },
         {
           id: "files",
           label: "Archivos",
@@ -495,6 +501,14 @@ export function EntityDetail({
         >
           {!general && (
             <>
+              <Tabs.Content value="clients" className="task-tab-panel">
+                <h2 className="relation-panel-title">Clientes</h2>
+                <ClientPicker id={`${scope.kind}-clients`} clients={workspace.clients} values={entity?.clientIds ?? []} onChange={(clientIds) => { if (canEdit && !busy) void mutate({ type: "entity.clients.update", scope, clientIds }); }} mutate={mutate} busy={busy || !canEdit} />
+              </Tabs.Content>
+              <Tabs.Content value="tickets" className="task-tab-panel">
+                <h2 className="relation-panel-title">Tickets</h2>
+                <TicketPicker id={`${scope.kind}-tickets`} clients={workspace.clients} tickets={workspace.tickets} values={entity?.ticketIds ?? []} onChange={(ticketIds) => { if (canEdit && !busy) void mutate({ type: "entity.tickets.update", scope, ticketIds }); }} mutate={mutate} busy={busy || !canEdit} confirm={confirm} scope={scope} />
+              </Tabs.Content>
               <Tabs.Content value="documents" className="task-tab-panel">
                 {tab === "documents" && <EntityDocuments scope={scope} guard={(action) => requestNavigation(action, documentState.pending)} onPendingChange={setDocumentState} />}
               </Tabs.Content>
@@ -529,8 +543,7 @@ export function EntityDetail({
                 hidden={tab !== "properties"}
                 className="task-tab-panel task-properties"
               >
-                <section className="task-property-section">
-                  <h2>Propiedades</h2>
+                <section aria-label="Propiedades">
                   <fieldset
                     className="form-stack scope-fields"
                     disabled={!canEdit || busy}

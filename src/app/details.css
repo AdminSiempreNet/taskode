@@ -1398,6 +1398,9 @@
   gap: 14px;
   align-items: start;
 }
+.task-create-tabs .task-people-fields {
+  grid-template-columns: minmax(0, 1fr);
+}
 .task-people-fields > .field {
   min-width: 0;
 }
@@ -1457,13 +1460,16 @@
 }
 .task-properties-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px 12px;
   align-items: start;
 }
 .task-properties-grid > .field {
-  grid-column: span 2;
+  grid-column: span 1;
   gap: 5px;
+}
+.task-properties-grid > .field:first-child {
+  grid-column: 1 / -1;
 }
 .task-properties-grid .field > label {
   font-size: 11px;
@@ -1571,6 +1577,14 @@
   font-weight: 600;
   color: var(--muted-foreground);
 }
+.feature-combobox-options .feature-combobox-group {
+  margin-block: 4px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--primary) 8%, var(--card));
+  color: var(--primary);
+  font-size: 12px;
+}
 .feature-combobox-options [role="option"],
 .catalog-combobox-options [role="option"] {
   display: flex;
@@ -1583,6 +1597,9 @@
   background: none;
   border: 0;
   border-radius: 4px;
+}
+.feature-combobox-options [role="option"] {
+  padding-inline-start: 26px;
 }
 .feature-combobox-options [role="option"] > span:nth-child(2),
 .catalog-combobox-options [role="option"] > span {
@@ -1601,7 +1618,7 @@
   color: var(--muted-foreground);
 }
 .task-schedule-group {
-  grid-column: span 3;
+  grid-column: span 1;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -1860,7 +1877,7 @@
     padding-inline: 5px;
   }
   .task-schedule-group {
-    grid-column: span 6;
+    grid-column: 1 / -1;
   }
   .description-toolbar {
     gap: 2px;
@@ -1923,12 +1940,6 @@
     right: 0;
     padding: 1px 3px;
     font-size: 8px;
-  }
-  .task-properties-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .task-properties-grid > .field {
-    grid-column: span 1;
   }
   .task-properties-grid .task-schedule-group {
     grid-column: 1 / -1;

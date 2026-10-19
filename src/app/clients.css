@@ -163,6 +163,41 @@
 .client-picker {
   min-width: 0;
 }
+.ticket-picker { min-width: 0; }
+.catalog-combobox-pagination { padding: 8px 10px; border-top: 1px solid var(--border); }
+.catalog-combobox-pagination nav { margin-top: 0; gap: 6px; }
+.relation-panel-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+.ticket-assignment-list > li { align-items: flex-start; padding: 12px; }
+.ticket-actions { display: flex; flex-shrink: 0; gap: 2px; }
+.ticket-description { white-space: pre-wrap; overflow-wrap: anywhere; max-width: 44rem; font-weight: 400; margin-block: 4px; }
+.ticket-link { display: inline-flex; align-items: center; gap: 5px; color: var(--primary); text-decoration: underline; font-size: 12px; }
+.ticket-record-id { display: block; color: var(--muted-foreground); font-size: 10px; font-weight: 400; margin-top: 3px; }
+.tickets-table td { vertical-align: top; }
+.tickets-table td:nth-child(2) { min-width: 200px; }
+.tickets-filters { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+.tickets-filters .clients-search { flex: 1 1 260px; margin-bottom: 0; }
+.tickets-client-filter { flex: 0 1 280px; min-width: 0; width: 100%; }
+.tickets-client-filter > button { width: 100%; }
+.ticket-edit-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; gap: 24px; }
+.ticket-linked-items { min-width: 0; border-left: 1px solid var(--border); padding-left: 24px; }
+.ticket-linked-items h3 { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+.ticket-link-group { margin-top: 16px; }
+.ticket-link-group h4 { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.ticket-link-group h4 span { color: var(--muted-foreground); font-weight: 400; }
+.ticket-link-group ul { list-style: none; margin: 0; padding: 0 4px 0 0; max-height: 200px; overflow-y: auto; overscroll-behavior: contain; }
+.ticket-link-group li + li { border-top: 1px solid var(--border); }
+.ticket-link-group li a { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; color: var(--primary); font-size: 12px; }
+.ticket-link-group li a > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.ticket-link-group li a strong { font-weight: 500; }
+.ticket-link-group li a small { display: block; color: var(--muted-foreground); font-size: 11px; margin-top: 2px; }
+.ticket-link-group li a > svg { flex-shrink: 0; }
+.ticket-link-group li a:hover strong { text-decoration: underline; }
+.ticket-link-group nav { font-size: 11px; gap: 6px; margin-top: 8px; }
+.task-create-tabs { min-width: 0; }
+.task-create-tab-list { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--border); margin-block: 12px 20px; }
+.task-create-tab-list button { flex-shrink: 0; padding: 9px 12px; font-size: 13px; border-bottom: 2px solid transparent; }
+.task-create-tab-list button[data-state="active"] { color: var(--primary); border-bottom-color: var(--primary); }
+.task-create-tab-list button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .task-client-list {
   margin-top: 8px;
   border: 1px solid var(--border);
@@ -188,8 +223,11 @@
   color: var(--muted-foreground);
 }
 @media (max-width: 600px) {
+  .tickets-client-filter { flex: 1 1 100%; }
+  .ticket-edit-layout { grid-template-columns: minmax(0, 1fr); }
+  .ticket-linked-items { border-left: 0; border-top: 1px solid var(--border); padding: 16px 0 0; }
   .clients-page {
-    padding: 12px 16px 28px;
+    padding: 12px 16px 88px;
   }
   .clients-header {
     align-items: flex-start;

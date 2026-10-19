@@ -1,3 +1,4 @@
+import { stripTicketTables } from "./entity-fixtures";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -428,7 +429,7 @@ test("respaldo actual conserva los niveles y v4 normaliza comentarios y archivos
     const path = join(directory, "v5.json");
     await f.repo.exportBackup(path);
     const backup = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(backup.version, 10);
+    assert.equal(backup.version, 11);
     validateApplicationBackup(backup);
     for (const mutation of [
       (copy: typeof backup) => {
@@ -453,12 +454,13 @@ test("respaldo actual conserva los niveles y v4 normaliza comentarios y archivos
         1,
       );
     const legacy = structuredClone(backup);
+    stripTicketTables(legacy.tables);
     legacy.version = 4;
     legacy.tables.comments = legacy.tables.comments.filter(
       (comment: { taskId: string | null }) => comment.taskId !== null,
     );
     stripEntityColumns(legacy.tables);
-    assert.equal(validateApplicationBackup(legacy).version, 10);
+    assert.equal(validateApplicationBackup(legacy).version, 11);
     const legacyPath = join(directory, "v4.json");
     await writeFile(legacyPath, JSON.stringify(legacy));
     await f.repo.restoreBackup(legacyPath);

@@ -44,7 +44,7 @@ El programador no recibe credenciales de base de datos, no solapa llamadas y rec
 
 Aplicar en este orden:
 
-1. Ejecutar `npm run db:migrate` para aplicar todas las migraciones hasta `0011_mentions`, con las instancias anteriores detenidas durante el cambio de versión de esquema. El orden de llegada y el límite de lectura usan una secuencia de base de datos para conservar los avisos nuevos incluso entre instancias con relojes diferentes.
+1. Ejecutar `npm run db:migrate` para aplicar todas las migraciones hasta `0012_clients_tickets`, con las instancias anteriores detenidas durante el cambio de versión de esquema. El orden de llegada y el límite de lectura usan una secuencia de base de datos para conservar los avisos nuevos incluso entre instancias con relojes diferentes.
 2. Configurar las variables VAPID y el secreto en Vercel; desplegar la aplicación. `npm run check:production` las valida sin conectarse a servicios.
 3. Configurar el mismo secreto y la URL en Dokploy; actualizar el Compose conservando el nombre y volumen de PostgreSQL existentes.
 4. Revisar el estado de `notifications` y los logs con fecha, recordatorios generados, entregas, fallos y pendientes. Un fallo se reintenta sin perder la notificación persistida. Los recordatorios push caducan al vencer la tarea; las otras entregas caducan en 24 horas.
@@ -54,7 +54,7 @@ Las entregas se crean en la transacción del cambio y se intentan después del c
 
 ## Respaldos
 
-Los JSON nuevos usan versión 10 e incluyen zonas, preferencias e historial, con destinos de menciones en proyectos, módulos, features, tareas y documentos. Siguen admitiendo versiones 1–9. Suscripciones push, sesiones y colas operativas no se exportan. Restaurar limpia esas tablas, no reproduce avisos históricos y permite al programador reconstruir los recordatorios futuros. Los dispositivos deben iniciar sesión de nuevo.
+Los JSON nuevos usan versión 11 e incluyen zonas, preferencias e historial, con destinos de menciones en proyectos, módulos, features, tareas y documentos. Siguen admitiendo versiones 1–10. Suscripciones push, sesiones y colas operativas no se exportan. Restaurar limpia esas tablas, no reproduce avisos históricos y permite al programador reconstruir los recordatorios futuros. Los dispositivos deben iniciar sesión de nuevo.
 
 Las menciones nuevas de usuarios en comentarios, descripciones y contenido de documentos generan avisos exclusivamente in-app. Solo aparecen usuarios con acceso; el servidor vuelve a comprobarlo al guardar y abrir el aviso. Repetir al mismo usuario en el contenido genera un solo aviso; guardar otros cambios no lo repite y las automenciones no notifican. Eliminar y volver a añadir una mención en guardados distintos genera un nuevo aviso. Al borrar el comentario, documento o entidad de origen se eliminan sus avisos. La migración `0011_mentions` conserva los avisos anteriores de tareas y amplía sus destinos.
 

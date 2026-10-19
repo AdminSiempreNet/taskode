@@ -1,5 +1,7 @@
 "use client";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
+import { Tabs } from "radix-ui";
+import { TicketPicker } from "./tickets";
 import { useSearchParams } from "next/navigation";
 import {
   entityPath,
@@ -335,6 +337,7 @@ export function WorkspaceModal({
         )}
         {modal.type === "task" && project && (
           <TaskCreateForm
+            confirm={confirm}
             project={project}
             workspace={workspace}
             defaults={modal.defaults}
@@ -355,6 +358,7 @@ function TaskCreateForm({
   mutate,
   busy,
   close,
+  confirm,
 }: {
   project: Project;
   workspace: Workspace;
@@ -362,7 +366,11 @@ function TaskCreateForm({
   mutate: Mutate;
   busy: boolean;
   close: () => void;
+  confirm: (value: Confirmation) => void;
 }) {
+  const [tab, setTab] = useState("details");
+  const [title, setTitle] = useState("");
+  const [ticketIds, setTicketIds] = useState<string[]>([]);
   const [leaderId, setLeaderId] = useState(workspace.currentUser.id);
   const [teamMemberIds, setTeamMemberIds] = useState<string[]>([]);
   const [uploading, setUploading] = useState(0);
@@ -431,26 +439,25 @@ function TaskCreateForm({
     const afterCreate = (
       (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
     )?.value;
-    const data = new FormData(event.currentTarget);
     const result = await mutate({
       type: "task.create",
       leaderId,
       teamMemberIds,
       projectId: project.id,
-      title: data.get("title"),
+      title,
       description,
-      featureId: data.get("featureId"),
-      statusId: data.get("statusId"),
-      priority: data.get("priority"),
-      typeId: data.get("typeId") || null,
-      impactId: data.get("impactId") || null,
-      ticketNumber: String(data.get("ticketNumber") ?? "").trim() || null,
+      featureId,
+      statusId,
+      priority,
+      typeId: typeId || null,
+      impactId: impactId || null,
       startDate: startDate || null,
       startTime: startDate ? startTime || null : null,
       dueDate: dueDate || null,
       dueTime: dueDate ? dueTime || null : null,
       labels: [],
       clientIds,
+      ticketIds,
     });
     if (!result) return;
     close();
@@ -485,12 +492,23 @@ function TaskCreateForm({
           <Input
             id="create-task-title"
             name="title"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
             placeholder="¿Qué hay que hacer?"
             required
             maxLength={300}
             autoFocus
           />
         </Field>
+        <Tabs.Root value={tab} onValueChange={setTab} className="task-create-tabs">
+          <Tabs.List className="task-create-tab-list" aria-label="Secciones de la nueva tarea">
+            <Tabs.Trigger type="button" value="details">Detalles</Tabs.Trigger>
+            <Tabs.Trigger type="button" value="properties">Propiedades</Tabs.Trigger>
+            <Tabs.Trigger type="button" value="users">Usuarios</Tabs.Trigger>
+            <Tabs.Trigger type="button" value="tickets">Tickets{ticketIds.length ? ` (${ticketIds.length})` : ""}</Tabs.Trigger>
+            <Tabs.Trigger type="button" value="clients">Clientes{clientIds.length ? ` (${clientIds.length})` : ""}</Tabs.Trigger>
+          </Tabs.List>
+        <Tabs.Content value="details" forceMount hidden={tab !== "details"}>
         <div className="task-create-description">
           <span className="task-create-description-label">Descripción</span>
           <DescriptionEditor
@@ -506,17 +524,13 @@ function TaskCreateForm({
             onUploadingChange={setUploading}
           />
         </div>
-        <TaskPeopleFields
-          idPrefix="create-task"
-          people={people}
-          leaderId={leaderId}
-          teamMemberIds={teamMemberIds}
-          onLeader={setLeaderId}
-          onTeamMembers={setTeamMemberIds}
-          disabled={busy}
-        />
-        <section className="task-property-section" aria-label="Propiedades">
-          <h2>Propiedades</h2>
+        </Tabs.Content>
+        <Tabs.Content
+          value="properties"
+          forceMount
+          hidden={tab !== "properties"}
+          onInvalidCapture={() => setTab("properties")}
+        >
           <div className="task-properties-grid">
             <Field label="Feature" htmlFor="create-task-feature">
               <FeatureCombobox
@@ -592,15 +606,6 @@ function TaskCreateForm({
                 />
               </Field>
             ))}
-            <Field label="Ticket (opcional)" htmlFor="create-task-ticket">
-              <Input
-                id="create-task-ticket"
-                name="ticketNumber"
-                placeholder="Ej. 001234"
-                maxLength={100}
-                disabled={busy}
-              />
-            </Field>
             <div className="task-schedule-group">
               <span>
                 Inicio <small>opcional</small>
@@ -652,20 +657,31 @@ function TaskCreateForm({
               </div>
             </div>
           </div>
-        </section>
-        <section className="task-property-section" aria-label="Clientes">
-          <h2>
-            Clientes <small>Opcional</small>
-          </h2>
-          <ClientPicker
-            id="create-task-clients"
-            clients={workspace.clients ?? []}
-            values={clientIds}
-            onChange={setClientIds}
-            mutate={mutate}
-            busy={busy}
+        </Tabs.Content>
+        <Tabs.Content value="users">
+          <TaskPeopleFields
+            idPrefix="create-task"
+            framed={false}
+            people={people}
+            leaderId={leaderId}
+            teamMemberIds={teamMemberIds}
+            onLeader={setLeaderId}
+            onTeamMembers={setTeamMemberIds}
+            disabled={busy}
           />
-        </section>
+        </Tabs.Content>
+        <Tabs.Content value="tickets">
+          <h2 className="relation-panel-title">Tickets</h2>
+          <TicketPicker id="create-task-tickets" tickets={workspace.tickets} clients={workspace.clients} values={ticketIds} onChange={(values, addedClientId) => {
+            setClientIds((clients) => [...new Set([...clients, ...(addedClientId ? [addedClientId] : []), ...workspace.tickets.filter((ticket) => values.includes(ticket.id) && !ticketIds.includes(ticket.id) && ticket.clientId).map((ticket) => ticket.clientId!)])]);
+            setTicketIds(values);
+          }} mutate={mutate} busy={busy} confirm={confirm} />
+        </Tabs.Content>
+        <Tabs.Content value="clients">
+          <h2 className="relation-panel-title">Clientes</h2>
+          <ClientPicker id="create-task-clients" clients={workspace.clients} values={clientIds} onChange={setClientIds} mutate={mutate} busy={busy} />
+        </Tabs.Content>
+        </Tabs.Root>
       </div>
       <div className="task-create-actions">
         <Button type="button" variant="ghost" disabled={busy} onClick={close}>

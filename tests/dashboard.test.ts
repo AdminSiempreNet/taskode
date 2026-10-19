@@ -32,7 +32,7 @@ function task(id: string, values: Partial<Task> = {}): Task {
     priority: "normal",
     typeId: null,
     impactId: null,
-    ticketNumber: null,
+    ticketIds: [],
     dueDate: null,
     dueTime: null,
     startDate: null,
@@ -65,7 +65,7 @@ function workspace(): Workspace {
     onboarding: { step: 2, firstProjectId: "p" },
     projects: [
       {
-        id: "p",
+        id: "p", clientIds: [], ticketIds: [],
         name: "Proyecto",
         description: "",
         icon: "P",
@@ -77,7 +77,7 @@ function workspace(): Workspace {
     ],
     modules: [
       {
-        id: "m",
+        id: "m", clientIds: [], ticketIds: [],
         projectId: "p",
         name: "Módulo",
         description: "",
@@ -87,7 +87,7 @@ function workspace(): Workspace {
     ],
     features: [
       {
-        id: "f",
+        id: "f", clientIds: [], ticketIds: [],
         projectId: "p",
         moduleId: "m",
         name: "Feature",
@@ -98,7 +98,7 @@ function workspace(): Workspace {
         leaderId: "admin",
       },
       {
-        id: "general",
+        id: "general", clientIds: [], ticketIds: [],
         projectId: "p",
         moduleId: null,
         name: "General",
@@ -133,6 +133,7 @@ function workspace(): Workspace {
     impacts: [],
     labels: [],
     clients: [],
+    tickets: [],
     people: [],
   };
 }

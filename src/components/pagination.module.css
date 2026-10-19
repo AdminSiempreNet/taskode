@@ -1,0 +1,28 @@
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.controls select {
+  height: 32px;
+  padding: 0 8px;
+  background: var(--card);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.controls select:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.page { margin-inline: 8px; white-space: nowrap; }
+.buttons { display: flex; gap: 4px; }
+.buttons button { width: 32px; height: 32px; }
+@media (max-width: 600px) {
+  .pagination { align-items: flex-start; }
+  .controls { width: 100%; }
+  .buttons { margin-left: auto; }
+}

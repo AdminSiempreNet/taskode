@@ -151,6 +151,47 @@ test("Fast Refresh retira el pool anterior y el cierre libera las conexiones", a
   }
 });
 
+test("desarrollo comparte el pool entre bundles con distintos constructores y la misma versión", async () => {
+  const fixture = await createRepository();
+  const previousEnv = { url: process.env.DATABASE_URL, schema: process.env.DATABASE_SCHEMA, mode: process.env.NODE_ENV };
+  const globals = globalThis as typeof globalThis & { taskodeRepository?: PostgresRepository; taskodeBackups?: unknown };
+  const previous = globals.taskodeRepository, previousBackups = globals.taskodeBackups;
+  class OtherBundleRepository extends PostgresRepository {}
+  const shared = new OtherBundleRepository(fixture.store.connectionString, { schema: fixture.store.schemaName });
+  try {
+    const id = (await fixture.execute({ type: "ticket.create", number: "00042", description: "Conservar catálogo", url: null, clientId: null }, actor)).createdId!;
+    await shared.store.ready;
+    assert.equal(shared.cacheVersion, PostgresRepository.cacheVersion);
+    assert.ok(shared.constructor !== PostgresRepository);
+    globals.taskodeRepository = shared;
+    const backups = {};
+    globals.taskodeBackups = backups;
+    process.env.DATABASE_URL = fixture.store.connectionString;
+    process.env.DATABASE_SCHEMA = fixture.store.schemaName;
+    Reflect.set(process.env, "NODE_ENV", "development");
+    // A page starts reading before another route/auth bundle resolves the singleton.
+    const reading = shared.getWorkspace(actor);
+    const current = repository();
+    const [workspace] = await Promise.all([reading, current.getWorkspace(actor)]);
+    assert.ok(current === shared, "el otro bundle debe conservar el repositorio activo");
+    assert.ok(globals.taskodeBackups === backups);
+    assert.equal(shared.store.pool.ending, false);
+    assert.deepEqual(workspace.tickets.map((ticket) => ticket.id), [id]);
+    assert.equal((await current.getWorkspace(actor)).tickets.length, 1);
+  } finally {
+    for (const [key, value] of [["DATABASE_URL", previousEnv.url], ["DATABASE_SCHEMA", previousEnv.schema], ["NODE_ENV", previousEnv.mode]]) {
+      if (value === undefined) delete process.env[key!];
+      else process.env[key!] = value;
+    }
+    // A failing implementation may have created a replacement; close it as well.
+    const active = globals.taskodeRepository;
+    globals.taskodeRepository = previous;
+    globals.taskodeBackups = previousBackups;
+    if (active !== previous && active !== shared) await active?.close();
+    await shared.close(); await fixture.close();
+  }
+});
+
 test("dos instancias serializan numeración y límite de cinco features fijadas", async () => {
   const repo = await createRepository();
   const peer = new PostgresRepository(repo.store.connectionString, {

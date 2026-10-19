@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const actor = await requireActor(request);
-    return NextResponse.json(await repository().getWorkspace(actor), {
+    return NextResponse.json(await repository().getWorkspace(actor, { includeCatalogs: request.nextUrl.searchParams.get("catalogs") !== "none" }), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
@@ -53,6 +53,8 @@ export async function POST(request: NextRequest) {
       chunks.push(chunk.value);
     }
     const content = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    if (content && typeof content === "object" && Object.hasOwn(content, "ticketNumber"))
+      throw new DomainError("Los tickets ahora se gestionan desde su pestaña. Recarga la página para continuar.", 409);
     const parsed = commandSchema.safeParse(content);
     if (!parsed.success)
       return NextResponse.json(
@@ -63,7 +65,7 @@ export async function POST(request: NextRequest) {
     if (/^(task\.|project\.|module\.|feature\.|comment\.|status\.update|trello\.)/.test(parsed.data.type)) deliverNotificationEvents();
     if (parsed.data.type.startsWith("comment.")) deliverCommentEvents();
     return NextResponse.json({
-      workspace: await repository().getWorkspace(actor),
+      workspace: await repository().getWorkspace(actor, { includeCatalogs: request.nextUrl.searchParams.get("catalogs") !== "none" }),
       ...result,
     });
   } catch (error) {

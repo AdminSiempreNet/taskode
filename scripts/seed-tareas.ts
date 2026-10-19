@@ -453,13 +453,11 @@ async function main() {
               skipped.tasks++;
               taskIds.push(previous.id);
             } else {
-              if (taskRows.some((row) => row.ticketNumber === ticketNumber))
-                throw new Error(`El número de ticket ya está en uso: ${ticketNumber}.`);
               added.tasks++;
               added.checklists++;
               added.items += criteria.length;
               const input = commandSchema.parse({ type: "task.create", projectId: project.id, featureId: featureId ?? "preview",
-                title, statusId, priority, typeId, impactId, ticketNumber,
+                title, statusId, priority, typeId, impactId,
                 description: `## Objetivo\n${title}.\n\n${feature.description}\n\n### Criterios de aceptación\n${criteria.map((criterion) => `- ${criterion}`).join("\n")}\n\n### Código de referencia\n${feature.sources.map((source) => `- \`${source}\``).join("\n")}\n\n${notice}\n\n${marker(taskKey)}`,
                 startDate: noDate ? null : dateAt(offset - (taskIndex === 1 ? 2 : 0)),
                 dueDate: noDate ? null : dateAt(offset),
@@ -470,6 +468,8 @@ async function main() {
               if (apply) {
                 const taskId = (await run(input)).createdId!;
                 taskIds.push(taskId);
+                await run({ type: "ticket.create", number: ticketNumber, description: "", url: null, clientId: null,
+                  scope: { kind: "task", id: taskId, projectId: project.id } });
                 const checklistId = (await run({ type: "checklist.create", taskId, title: "Criterios de aceptación" })).createdId!;
                 for (const [criterionIndex, criterion] of criteria.entries()) {
                   const itemId = (await run({ type: "checklist.item.create", checklistId, title: criterion })).createdId!;

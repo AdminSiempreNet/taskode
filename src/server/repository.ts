@@ -9,8 +9,11 @@ import type {
 } from "../lib/types";
 
 // UI and HTTP contracts remain independent of the database implementation.
+export interface WorkspaceReadOptions {
+  includeCatalogs?: boolean;
+}
 export interface WorkspaceRepository {
-  getWorkspace(actor: Actor): Promise<Workspace>;
+  getWorkspace(actor: Actor, options?: WorkspaceReadOptions): Promise<Workspace>;
   entityDetail(
     actor: Actor,
     kind: EntityKind,

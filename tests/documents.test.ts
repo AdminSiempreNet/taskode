@@ -1,3 +1,4 @@
+import { stripTicketTables } from "./entity-fixtures";
 import { test } from "node:test";
 import { randomUUID } from "node:crypto";
 import assert from "node:assert/strict";
@@ -363,12 +364,13 @@ test("documentos: imágenes protegidas, respaldos v9 y compatibilidad v8; cascad
     const path = join(directory, "backup.json");
     await f.repo.exportBackup(path);
     const backup = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(backup.version, 10);
+    assert.equal(backup.version, 11);
     assert.equal(backup.tables.documents.length, 2);
     const corrupt = structuredClone(backup);
     corrupt.tables.documents[0].projectId = "missing";
     assert.throws(() => validateApplicationBackup(corrupt));
     const legacy = structuredClone(backup);
+    stripTicketTables(legacy.tables);
     legacy.version = 8;
     delete legacy.tables.documents;
     legacy.tables.files[0].purpose = "document";

@@ -88,6 +88,10 @@ export class MentionsService {
     return {
       users: users.sort((a, b) => a.name.localeCompare(b.name, "es")),
       clients: clients.sort((a, b) => a.name.localeCompare(b.name, "es")),
+      tickets: (await this.repo.store.db.select().from(s.tickets))
+        .map((ticket) => ({ id: ticket.id, number: ticket.number, description: ticket.description, url: ticket.url,
+          clientName: clients.find((client) => client.id === ticket.clientId)?.name ?? null }))
+        .sort((a, b) => a.number.localeCompare(b.number, "es", { numeric: true }) || a.id.localeCompare(b.id)),
     };
   }
   async changed(
@@ -112,8 +116,9 @@ export class MentionsService {
         await this.repo.store.db.select({ id: s.clients.id }).from(s.clients)
       ).map((c) => c.id),
     );
+    const tickets = new Set((await this.repo.store.db.select({ id: s.tickets.id }).from(s.tickets)).map((ticket) => ticket.id));
     for (const ref of added) {
-      if (!(ref.type === "user" ? allowed : clients).has(ref.id))
+      if (!(ref.type === "user" ? allowed : ref.type === "client" ? clients : tickets).has(ref.id))
         throw new DomainError(
           "Una mención ya no está disponible o el usuario no tiene acceso. Revisa las menciones; tu borrador se conserva.",
         );

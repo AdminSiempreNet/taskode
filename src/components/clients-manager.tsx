@@ -4,7 +4,9 @@ import { useRef, useState } from "react";
 import { Pencil, Plus, Search, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import type { Client } from "@/lib/types";
-import { normalizeClientText } from "@/lib/clients";
+import { initialPage as createInitialPage, type Paginated } from "@/lib/pagination";
+import { Pagination } from "./pagination";
+import { usePaginatedList } from "./use-paginated-list";
 import { ClientFormDialog } from "./client-form";
 import type { Confirmation, Mutate } from "./forms";
 import { Button } from "./ui/button";
@@ -15,20 +17,23 @@ export function ClientsManager({
   mutate,
   busy,
   confirm,
+  initialPage,
 }: {
   clients: Client[];
   mutate: Mutate;
   busy: boolean;
   confirm: (confirmation: Confirmation) => void;
+  initialPage?: Paginated<Client>;
 }) {
-  const [search, setSearch] = useState("");
+  const list = usePaginatedList<Client>("/api/clients", initialPage ?? createInitialPage(clients));
   const [editing, setEditing] = useState<Client | "new" | null>(null);
   const opener = useRef<HTMLButtonElement | null>(null);
-  const filtered = clients.filter((client) =>
-    normalizeClientText(
-      `${client.name} ${client.cityName} ${client.departmentName}`,
-    ).includes(normalizeClientText(search)),
-  );
+  const filtered = list.error ? [] : list.data.items;
+  const mutateCatalog: Mutate = async (command) => {
+    const result = await mutate(command);
+    if (result) list.refresh();
+    return result;
+  };
   return (
     <section className="clients-page" aria-labelledby="clients-title">
       <header className="clients-header">
@@ -55,12 +60,15 @@ export function ClientsManager({
         <Input
           aria-label="Buscar clientes"
           placeholder="Buscar por nombre, ciudad o departamento…"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          value={list.query}
+          maxLength={200}
+          onChange={(event) => list.search(event.target.value)}
         />
       </div>
+      {list.loading && <p role="status" className="field-hint">Cargando clientes…</p>}
+      {list.error && <p role="alert">{list.error} <Button variant="outline" onClick={list.refresh}>Reintentar</Button></p>}
       {filtered.length ? (
-        <div className="clients-table-scroll">
+        <div className="clients-table-scroll" aria-busy={list.loading}>
           <table className="clients-table">
             <thead>
               <tr>
@@ -80,7 +88,7 @@ export function ClientsManager({
                     <Button
                       variant="ghost"
                       size="icon"
-                      disabled={busy}
+                      disabled={busy || list.loading}
                       aria-label={`Editar cliente ${client.name}`}
                       onClick={(event) => {
                         opener.current = event.currentTarget;
@@ -92,16 +100,16 @@ export function ClientsManager({
                     <Button
                       variant="ghost"
                       size="icon"
-                      disabled={busy}
+                      disabled={busy || list.loading}
                       aria-label={`Eliminar cliente ${client.name}`}
                       onClick={() =>
                         confirm({
                           title: `Eliminar «${client.name}»`,
                           description:
-                            "Solo se puede eliminar si no tiene tareas relacionadas. Esta acción no se puede deshacer.",
+                            "Solo se puede eliminar si no tiene proyectos, módulos, features, tareas o tickets relacionados. Esta acción no se puede deshacer.",
                           action: async () => {
                             if (
-                              await mutate({
+                              await mutateCatalog({
                                 type: "client.delete",
                                 id: client.id,
                               })
@@ -119,17 +127,18 @@ export function ClientsManager({
             </tbody>
           </table>
         </div>
-      ) : (
+      ) : !list.loading && !list.error ? (
         <p className="clients-empty">
-          {search
+          {list.query
             ? "No se encontraron clientes."
-            : "Aún no hay clientes. Crea el primero para relacionarlo con tus tareas."}
+            : "Aún no hay clientes. Crea el primero para relacionarlo con proyectos, módulos, features o tareas."}
         </p>
-      )}
+      ) : null}
+      <Pagination {...list.data} changePage={list.changePage} changePageSize={list.changePageSize} disabled={busy || list.loading} label="Paginación de clientes" />
       {editing && (
         <ClientFormDialog
           client={editing === "new" ? undefined : editing}
-          mutate={mutate}
+          mutate={mutateCatalog}
           busy={busy}
           close={() => setEditing(null)}
           returnFocus={opener}

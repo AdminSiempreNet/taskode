@@ -33,6 +33,7 @@ export function stripEntityColumns(
 export function stripAssignmentColumns(
   tables: Record<string, Record<string, unknown>[]>,
 ) {
+  stripTicketTables(tables);
   delete tables.documents;
   delete tables.diagrams;
   delete tables.notification_preferences;
@@ -52,6 +53,7 @@ export function stripAssignmentColumns(
 export async function removeAssignmentSchema(repo: PostgresRepository) {
   if (!/^taskode_test_[a-f0-9]{32}$/.test(repo.store.schemaName))
     throw new Error("Esquema de prueba inválido.");
+  await removeTicketSchema(repo);
   await repo.store.pool.query(`drop table if exists documents, diagrams, notification_deliveries, push_subscriptions, task_reminders, notifications, notification_preferences; alter table projects drop column if exists "timeZone";`);
   await repo.store.pool.query(
     "drop table module_team_members, feature_team_members",
@@ -78,4 +80,20 @@ export async function removeAssignmentSchema(repo: PostgresRepository) {
     await repo.store.pool.query(
       `do $$ begin if exists (select 1 from pg_constraint where conrelid = 'project_members'::regclass and conname = 'project_team_members_${column}_not_null') then alter table project_members rename constraint "project_team_members_${column}_not_null" to "project_members_${column}_not_null"; end if; end $$;`,
     );
+}
+
+export const ticketTables = ["tickets", "project_clients", "module_clients", "feature_clients", "project_tickets", "module_tickets", "feature_tickets", "task_tickets"];
+
+export function stripTicketTables(tables: Record<string, Record<string, unknown>[]>) {
+  if (!tables.tickets) return;
+  for (const task of tables.tasks) {
+    const link = tables.task_tickets.find((link) => link.taskId === task.id);
+    task.ticketNumber = tables.tickets.find((ticket) => ticket.id === link?.ticketId)?.number ?? null;
+  }
+  for (const name of ticketTables) delete tables[name];
+}
+
+export async function removeTicketSchema(repo: PostgresRepository) {
+  if (!/^taskode_test_[a-f0-9]{32}$/.test(repo.store.schemaName)) throw new Error("Esquema de prueba inválido.");
+  await repo.store.pool.query(`drop table project_clients, module_clients, feature_clients, project_tickets, module_tickets, feature_tickets, task_tickets, tickets; alter table tasks add column "ticketNumber" text`);
 }

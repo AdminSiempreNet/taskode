@@ -11,6 +11,9 @@
   color: var(--foreground);
   background: var(--accent);
 }
+.mention-ticket { color: var(--primary); background: color-mix(in srgb, var(--primary) 9%, var(--accent)); }
+.mention-ticket-description { white-space: pre-wrap; max-height: 160px; overflow: auto; }
+.mention-card > a { color: var(--primary); text-decoration: underline; font-size: 12px; }
 .mention[tabindex] {
   cursor: default;
 }

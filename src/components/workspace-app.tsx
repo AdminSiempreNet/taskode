@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useWorkspaceRouter } from "./unsaved-changes";
 import Link from "next/link";
@@ -27,6 +27,7 @@ import {
   Code2,
   Upload,
   Users,
+  Ticket as TicketIcon,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -53,6 +54,7 @@ import {
   type MutationResult,
 } from "./forms";
 import type {
+  Client,
   Workspace,
   Task,
   EntityDetailSnapshot,
@@ -70,6 +72,8 @@ import { BackupModal } from "./backup-modal";
 import { EntityDetail } from "./entity-detail";
 import { TaskDetail, type TaskDefaults } from "./task-detail";
 import { ClientsManager } from "./clients-manager";
+import { TicketsManager } from "./tickets";
+import { invalidateMentionOptions } from "./mentions";
 import { Dashboard, ProjectsDirectory } from "./dashboard";
 import type { DashboardScope } from "@/lib/dashboard";
 import { AccountMenu, ProfileModal } from "./account-menu";
@@ -89,6 +93,9 @@ import {
   taskFilterOptions,
 } from "@/lib/task-filter-options";
 import { readPreference } from "@/lib/preferences";
+import { normalizeWorkspaceSnapshot } from "@/lib/workspace";
+import type { CatalogTicket } from "@/lib/catalogs";
+import type { Paginated } from "@/lib/pagination";
 import {
   readProjectPreferences,
   rememberProject,
@@ -108,13 +115,17 @@ export function WorkspaceApp({
   dashboardScope,
   initialNow,
   notificationOpenId,
+  initialClientsPage,
+  initialTicketsPage,
 }: {
   initialWorkspace: Workspace;
+  initialClientsPage?: Paginated<Client>;
+  initialTicketsPage?: Paginated<CatalogTicket>;
   projectId?: string;
   taskId?: string;
   taskDefaults?: TaskDefaults;
   initialTaskCreation?: TaskDefaults;
-  menuSection?: "dashboard" | "clients" | "projects" | "notifications";
+  menuSection?: "dashboard" | "clients" | "tickets" | "projects" | "notifications";
   notificationOpenId?: string;
   entityRoute?: { kind: Exclude<EntityKind, "task">; id: string };
   initialEntityDetail?: EntityDetailSnapshot;
@@ -122,12 +133,18 @@ export function WorkspaceApp({
   initialNow?: string;
 }) {
   const menuMode = !!menuSection;
+  const workspaceUrl = menuSection === "clients" || menuSection === "tickets"
+    ? "/api/workspace?catalogs=none" : "/api/workspace";
   const contextRoute = entityRoute ?? dashboardScope;
   const router = useWorkspaceRouter();
   const searchParams = useSearchParams();
   const view = getProjectView(searchParams.get("view"));
-  const [workspace, setWorkspace] = useState<Workspace | null>(
+  const [workspaceSnapshot, setWorkspace] = useState<Workspace | null>(
     initialWorkspace,
+  );
+  const workspace = useMemo(
+    () => workspaceSnapshot ? normalizeWorkspaceSnapshot(workspaceSnapshot) : null,
+    [workspaceSnapshot],
   );
   const [featureId, setFeatureId] = useState(
     searchParams.get("featureId") ?? "all",
@@ -168,7 +185,7 @@ export function WorkspaceApp({
   const load = useCallback(async () => {
     setLoadError("");
     try {
-      const r = await fetch("/api/workspace", { cache: "no-store" });
+      const r = await fetch(workspaceUrl, { cache: "no-store" });
       if (r.status === 401) {
         window.location.assign("/login");
         return;
@@ -189,7 +206,7 @@ export function WorkspaceApp({
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Error de conexión.");
     }
-  }, [projectId, router, menuMode]);
+  }, [projectId, router, menuMode, workspaceUrl]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -229,7 +246,7 @@ export function WorkspaceApp({
       mutating.current = true;
       setBusy(true);
       try {
-        const r = await fetch("/api/workspace", {
+        const r = await fetch(workspaceUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(command),
@@ -241,6 +258,7 @@ export function WorkspaceApp({
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || "No se pudo guardar.");
         setWorkspace(data.workspace);
+        if (/^(client|ticket)\./.test(String((command as { type?: string })?.type))) invalidateMentionOptions();
         const w = data.workspace as Workspace;
         if (
           projectId &&
@@ -271,7 +289,7 @@ export function WorkspaceApp({
         setBusy(false);
       }
     },
-    [projectId, router],
+    [projectId, router, workspaceUrl],
   );
   const project = workspace?.projects.find((p) => p.id === projectId);
   const currentUserId = workspace?.currentUser.id;
@@ -398,7 +416,7 @@ export function WorkspaceApp({
         includeUnlabeled: selectedLabelIds.includes(UNASSIGNED_FILTER),
       }) &&
       (!search ||
-        `${t.title} ${t.description} ${t.ticketNumber ?? ""} ${t.labels.join(" ")}`
+        `${t.title} ${t.description} ${workspace?.tickets.filter((ticket) => t.ticketIds.includes(ticket.id)).map((ticket) => ticket.number).join(" ")} ${t.labels.join(" ")}`
           .toLocaleLowerCase("es")
           .includes(search.toLocaleLowerCase("es"))),
   );
@@ -665,6 +683,9 @@ export function WorkspaceApp({
                   <Users size={17} />
                   Clientes
                 </Link>
+                <Link href="/tickets" className="nav-item" aria-current={menuSection === "tickets" ? "page" : undefined} onClick={() => setMobileSidebarOpen(false)}>
+                  <TicketIcon size={17} />Tickets
+                </Link>
               </nav>
             ) : null}
           </div>
@@ -696,10 +717,13 @@ export function WorkspaceApp({
               menuSection === "notifications" ? <NotificationsPage userId={workspace.currentUser.id} openId={notificationOpenId} /> : menuSection === "clients" ? (
                 <ClientsManager
                   clients={workspace.clients ?? []}
+                  initialPage={initialClientsPage}
                   mutate={mutate}
                   busy={busy}
                   confirm={setConfirmation}
                 />
+              ) : menuSection === "tickets" ? (
+                <TicketsManager tickets={workspace.tickets} clients={workspace.clients} initialPage={initialTicketsPage} mutate={mutate} busy={busy} confirm={setConfirmation} />
               ) : menuSection === "projects" ? (
                 <ProjectsDirectory
                   workspace={workspace}

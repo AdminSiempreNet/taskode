@@ -1,3 +1,4 @@
+import { stripTicketTables } from "./entity-fixtures";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -456,7 +457,7 @@ test("clientes: mencionar no asocia clientes ni genera avisos", async () => {
   }
 });
 
-test("respaldo v10 conserva menciones y normaliza avisos v9 sin generar entregas", async () => {
+test("respaldo v11 conserva menciones y normaliza avisos v9 sin generar entregas", async () => {
   const f = await fixture(),
     directory = await mkdtemp(join(tmpdir(), "mentions-backup-"));
   try {
@@ -468,8 +469,9 @@ test("respaldo v10 conserva menciones y normaliza avisos v9 sin generar entregas
     const path = join(directory, "backup.json");
     await f.repo.exportBackup(path);
     const backup = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(validateApplicationBackup(backup).version, 10);
+    assert.equal(validateApplicationBackup(backup).version, 11);
     const legacy = structuredClone(backup);
+    stripTicketTables(legacy.tables);
     legacy.version = 9;
     legacy.tables.notifications = legacy.tables.notifications.filter(
       (n: { type: string }) => n.type !== "mention",

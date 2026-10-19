@@ -98,7 +98,11 @@ export interface TaskStatusChange {
 export interface EntityAssignment {
   teamMemberIds?: string[];
 }
-export interface Project extends EntityAssignment {
+export interface EntityRelations {
+  clientIds: string[];
+  ticketIds: string[];
+}
+export interface Project extends EntityAssignment, EntityRelations {
   id: string;
   timeZone?: string;
   leaderId: string;
@@ -108,7 +112,7 @@ export interface Project extends EntityAssignment {
   color: string;
   createdAt: string;
 }
-export interface ProjectModule extends EntityAssignment {
+export interface ProjectModule extends EntityAssignment, EntityRelations {
   id: string;
   projectId: string;
   name: string;
@@ -117,7 +121,7 @@ export interface ProjectModule extends EntityAssignment {
   leaderId?: string;
   canManage?: boolean;
 }
-export interface Feature extends EntityAssignment {
+export interface Feature extends EntityAssignment, EntityRelations {
   id: string;
   projectId: string;
   moduleId: string | null;
@@ -137,7 +141,7 @@ export interface Status {
   position: number;
   isDone: boolean;
 }
-export interface Task {
+export interface Task extends EntityRelations {
   id: string;
   projectId: string;
   featureId: string;
@@ -147,7 +151,6 @@ export interface Task {
   priority: Priority;
   typeId: string | null;
   impactId: string | null;
-  ticketNumber: string | null;
   dueDate: string | null;
   dueTime: string | null;
   startDate: string | null;
@@ -155,7 +158,6 @@ export interface Task {
   archived: boolean;
   position: number;
   labels: string[];
-  clientIds: string[];
   createdAt: string;
   updatedAt: string;
   checklists: Checklist[];
@@ -182,6 +184,7 @@ export interface Workspace {
   impacts: ProjectImpact[];
   labels: ProjectLabel[];
   clients: Client[];
+  tickets: Ticket[];
   people?: ProjectPerson[];
   settings?: { maxAttachmentBytes: number };
 }
@@ -206,6 +209,15 @@ export interface Client {
   cityName: string;
   departmentId: string;
   departmentName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface Ticket {
+  id: string;
+  number: string;
+  description: string;
+  url: string | null;
+  clientId: string | null;
   createdAt: string;
   updatedAt: string;
 }

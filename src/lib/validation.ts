@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { validTimeZone } from "./project-time";
+import { ticketInputSchema } from "./tickets";
 const id = z.string().min(1).max(200);
 export const entityKindSchema = z.enum([
   "project",
@@ -43,7 +44,6 @@ const taskFields = {
   priority: id,
   typeId: id.nullish(),
   impactId: id.nullish(),
-  ticketNumber: z.string().trim().max(100).nullish(),
   dueDate: date,
   startDate: date.optional(),
   startTime: z
@@ -106,6 +106,11 @@ const assignmentFields = {
   teamMemberIds: z.array(id).max(1000),
 };
 const currentCommandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("entity.clients.update"), scope: entityRefSchema, clientIds: z.array(id).max(1000) }),
+  z.object({ type: z.literal("entity.tickets.update"), scope: entityRefSchema, ticketIds: z.array(id).max(1000) }),
+  z.object({ type: z.literal("ticket.create"), ...ticketInputSchema.shape, scope: entityRefSchema.optional() }),
+  z.object({ type: z.literal("ticket.update"), id, ...ticketInputSchema.shape }),
+  z.object({ type: z.literal("ticket.delete"), id }),
   z.object({ type: z.literal("project.timezone.update"), id, timeZone: z.string().refine(validTimeZone, "Zona horaria inválida.") }),
   z.object({ type: z.literal("client.create"), name, cityId: id }),
   z.object({ type: z.literal("client.update"), id, name, cityId: id }),
@@ -180,6 +185,7 @@ const currentCommandSchema = z.discriminatedUnion("type", [
     type: z.literal("task.create"),
     projectId: id,
     ...taskFields,
+    ticketIds: z.array(id).max(1000).optional(),
     leaderId: id.optional(),
     teamMemberIds: z.array(id).max(1000).optional(),
   }),
@@ -294,6 +300,8 @@ export const commandSchema = z.preprocess(
     if (!input || typeof input !== "object" || Array.isArray(input))
       return input;
     const command = input as Record<string, unknown>;
+    if (Object.hasOwn(command, "ticketNumber"))
+      return { ...command, type: "__outdated_ticket_field__" };
     const legacyType = String(command.type);
     if (/^(project|module|feature)\.transferOwnership$/.test(legacyType))
       return {

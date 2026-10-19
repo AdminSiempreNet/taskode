@@ -30,6 +30,8 @@ import {
   CircleCheck,
   Layers3,
   Plus,
+  Ticket,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "./markdown-content";
@@ -83,17 +85,30 @@ function CardContent({
 }) {
   const { timeZone } = useProjectCatalog();
   const late = taskOverdue(task, new Date(), timeZone) && !status?.isDone && !task.archived;
+  const relations = [
+    { count: task.clientIds.length, Icon: Users, singular: "cliente", plural: "clientes" },
+    { count: task.ticketIds.length, Icon: Ticket, singular: "ticket", plural: "tickets" },
+  ].filter(({ count }) => count > 0);
   return (
     <>
-      <div className="card-labels">
-        <Priority priority={task.priority} />
-        <TaskCategoryChip kind="type" id={task.typeId} />
-        <TaskCategoryChip kind="impact" id={task.impactId} />
-        {task.labels.slice(0, 2).map((l, i) => (
-          <LabelChip name={l} key={i} />
-        ))}
-        {task.labels.length > 2 && (
-          <span className="label-chip">+{task.labels.length - 2}</span>
+      <div className="card-header">
+        <div className="card-labels">
+          <Priority priority={task.priority} />
+          <TaskCategoryChip kind="type" id={task.typeId} />
+          <TaskCategoryChip kind="impact" id={task.impactId} />
+        </div>
+        {relations.length > 0 && (
+          <div className="card-relations">
+            {relations.map(({ count, Icon, singular, plural }) => {
+              const label = `${count} ${count === 1 ? singular : plural}`;
+              return (
+                <span className="card-relation" key={plural} role="img" aria-label={label} title={label}>
+                  <Icon size={16} aria-hidden="true" />
+                  <span className="card-relation-count" aria-hidden="true">{Math.min(count, 9)}</span>
+                </span>
+              );
+            })}
+          </div>
         )}
       </div>
       <h3>{task.title}</h3>
@@ -101,6 +116,16 @@ function CardContent({
       {task.description && (
         <div className="card-description">
           <MarkdownContent compact>{task.description}</MarkdownContent>
+        </div>
+      )}
+      {task.labels.length > 0 && (
+        <div className="card-labels">
+          {task.labels.slice(0, 2).map((l, i) => (
+            <LabelChip name={l} key={i} />
+          ))}
+          {task.labels.length > 2 && (
+            <span className="label-chip">+{task.labels.length - 2}</span>
+          )}
         </div>
       )}
       <div className="card-footer">

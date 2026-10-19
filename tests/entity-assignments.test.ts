@@ -1,3 +1,4 @@
+import { stripTicketTables } from "./entity-fixtures";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
@@ -309,7 +310,7 @@ test("respaldo v6 conserva equipos y v5 conserva líderes y equipo de proyecto s
     const path = join(directory, "backup.json");
     await f.repo.exportBackup(path);
     const json = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(json.version, 10);
+    assert.equal(json.version, 11);
     const before = await f.repo.getWorkspace(f.leader);
     await f.repo.restoreBackup(path);
     assert.deepEqual(await f.repo.getWorkspace(f.leader), before);
@@ -317,9 +318,10 @@ test("respaldo v6 conserva equipos y v5 conserva líderes y equipo de proyecto s
     invalid.tables.module_team_members[0].userId = f.outsider.id;
     assert.throws(() => validateApplicationBackup(invalid));
     stripAssignmentColumns(json.tables);
+    stripTicketTables(json.tables);
     json.version = 5;
     const normalized = validateApplicationBackup(json);
-    assert.equal(normalized.version, 10);
+    assert.equal(normalized.version, 11);
     assert.equal(normalized.tables.projects[0].leaderId, f.leader.id);
     assert.equal(normalized.tables.project_team_members.length, 2);
     assert.deepEqual(normalized.tables.module_team_members, []);

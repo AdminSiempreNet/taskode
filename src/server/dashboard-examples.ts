@@ -319,7 +319,6 @@ export async function seedDashboardExamples(
           impactId:
             workspace.impacts.find((t) => t.projectId === projectId)?.id ??
             null,
-          ticketNumber: `DEMO-${definition.key.toUpperCase()}-${String(index + 1).padStart(3, "0")}`,
           description: `## Objetivo\n${title}.\n\n### Criterios de aceptación\n- El flujo principal funciona de principio a fin.\n- El equipo valida la entrega.\n\n${notice}\n\n${marker(key)}`,
           dueDate: noDate ? null : dateAt(offset),
           startDate: noDate ? null : dateAt(offset - 2),
@@ -331,6 +330,8 @@ export async function seedDashboardExamples(
               ? []
               : [taskLeader === admin.id ? member.id : admin.id],
         });
+        await run({ type: "ticket.create", number: `DEMO-${definition.key.toUpperCase()}-${String(index + 1).padStart(3, "0")}`, description: "", url: null, clientId: null,
+          scope: { kind: "task", id: taskId, projectId } });
         const checklistId = await run({
           type: "checklist.create",
           taskId,

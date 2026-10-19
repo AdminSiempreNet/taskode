@@ -85,6 +85,13 @@
       "when": 1792360815312,
       "tag": "0011_mentions",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792369239167,
+      "tag": "0012_clients_tickets",
+      "breakpoints": true
     }
   ]
 }

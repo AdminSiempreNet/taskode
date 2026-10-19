@@ -365,7 +365,6 @@ export const tasks = pgTable(
     priority: text().notNull(),
     typeId: text().references(() => taskTypes.id),
     impactId: text().references(() => impacts.id),
-    ticketNumber: text(),
     dueDate: text(),
     dueTime: text(),
     startDate: text(),
@@ -546,6 +545,51 @@ export const taskClients = pgTable(
     index("task_client_client").on(t.clientId),
   ],
 );
+
+export const tickets = pgTable("tickets", {
+  id: text().primaryKey(),
+  number: text().notNull(),
+  description: text().notNull().default(""),
+  url: text(),
+  clientId: text().references(() => clients.id, { onDelete: "restrict" }),
+  createdAt: text().notNull(),
+  updatedAt: text().notNull(),
+}, (t) => [index("ticket_client").on(t.clientId), index("ticket_number").on(t.number)]);
+
+export const projectClients = pgTable("project_clients", {
+  projectId: text().notNull().references(() => projects.id, { onDelete: "cascade" }),
+  clientId: text().notNull().references(() => clients.id, { onDelete: "restrict" }),
+}, (t) => [primaryKey({ columns: [t.projectId, t.clientId] }), index("project_clients_client").on(t.clientId)]);
+
+export const projectTickets = pgTable("project_tickets", {
+  projectId: text().notNull().references(() => projects.id, { onDelete: "cascade" }),
+  ticketId: text().notNull().references(() => tickets.id, { onDelete: "restrict" }),
+}, (t) => [primaryKey({ columns: [t.projectId, t.ticketId] }), index("project_tickets_ticket").on(t.ticketId)]);
+
+export const moduleClients = pgTable("module_clients", {
+  moduleId: text().notNull().references(() => modules.id, { onDelete: "cascade" }),
+  clientId: text().notNull().references(() => clients.id, { onDelete: "restrict" }),
+}, (t) => [primaryKey({ columns: [t.moduleId, t.clientId] }), index("module_clients_client").on(t.clientId)]);
+
+export const moduleTickets = pgTable("module_tickets", {
+  moduleId: text().notNull().references(() => modules.id, { onDelete: "cascade" }),
+  ticketId: text().notNull().references(() => tickets.id, { onDelete: "restrict" }),
+}, (t) => [primaryKey({ columns: [t.moduleId, t.ticketId] }), index("module_tickets_ticket").on(t.ticketId)]);
+
+export const featureClients = pgTable("feature_clients", {
+  featureId: text().notNull().references(() => features.id, { onDelete: "cascade" }),
+  clientId: text().notNull().references(() => clients.id, { onDelete: "restrict" }),
+}, (t) => [primaryKey({ columns: [t.featureId, t.clientId] }), index("feature_clients_client").on(t.clientId)]);
+
+export const featureTickets = pgTable("feature_tickets", {
+  featureId: text().notNull().references(() => features.id, { onDelete: "cascade" }),
+  ticketId: text().notNull().references(() => tickets.id, { onDelete: "restrict" }),
+}, (t) => [primaryKey({ columns: [t.featureId, t.ticketId] }), index("feature_tickets_ticket").on(t.ticketId)]);
+
+export const taskTickets = pgTable("task_tickets", {
+  taskId: text().notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  ticketId: text().notNull().references(() => tickets.id, { onDelete: "restrict" }),
+}, (t) => [primaryKey({ columns: [t.taskId, t.ticketId] }), index("task_tickets_ticket").on(t.ticketId)]);
 
 export const taskTeamMembers = pgTable(
   "task_team_members",
@@ -750,6 +794,14 @@ export const domainTables = {
   cities,
   clients,
   task_clients: taskClients,
+  project_clients: projectClients,
+  module_clients: moduleClients,
+  feature_clients: featureClients,
+  tickets,
+  project_tickets: projectTickets,
+  module_tickets: moduleTickets,
+  feature_tickets: featureTickets,
+  task_tickets: taskTickets,
   projects,
   modules,
   features,

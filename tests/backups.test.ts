@@ -41,13 +41,13 @@ async function setup() {
         priority: "medium",
         typeId: workspace.taskTypes[0].id,
         impactId: workspace.impacts[0].id,
-        ticketNumber: "001234",
         labels: ["Original"],
         dueDate: null,
       },
       actor,
     )
   ).createdId!;
+  await repo.execute({ type: "ticket.create", number: "001234", description: "", url: null, clientId: null, scope: { kind: "task", id: taskId, projectId } }, actor);
   await repo.execute(
     {
       type: "task.move",
@@ -114,7 +114,7 @@ test("respaldo JSON: lista, descarga, restaura con copia previa y elimina; reaju
       (await s.manager.download(backup.id)).toString(),
     ) as ApplicationBackup;
     assert.equal(file.format, "taskode-backup");
-    assert.equal(file.version, 10);
+    assert.equal(file.version, 11);
     assert.equal(file.tables.session, undefined);
     assert.equal(file.tables.verification, undefined);
     assert.deepEqual(await s.manager.list(), [backup]);

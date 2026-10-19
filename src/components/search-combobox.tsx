@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Check, ChevronsUpDown, Plus, Search } from "lucide-react";
 import { Popover } from "radix-ui";
 import { Button } from "./ui/button";
@@ -48,6 +48,13 @@ export function SearchCombobox({
   searchPlaceholder,
   clearLabel,
   preserveOrder = false,
+  createLabel = "Crear cliente",
+  required,
+  onSearchChange,
+  onOpenChange,
+  loading = false,
+  footer,
+  selectedOptions,
 }: {
   id: string;
   label: string;
@@ -62,6 +69,13 @@ export function SearchCombobox({
   searchPlaceholder?: string;
   clearLabel?: string;
   preserveOrder?: boolean;
+  createLabel?: string;
+  required?: boolean;
+  onSearchChange?: (query: string) => void;
+  onOpenChange?: (open: boolean) => void;
+  loading?: boolean;
+  footer?: ReactNode;
+  selectedOptions?: SearchOption[];
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -82,7 +96,7 @@ export function SearchCombobox({
     );
   const index = Math.min(active, Math.max(0, filtered.length - 1));
   const current = filtered[index];
-  const selected = options.filter((option) => values.includes(option.id));
+  const selected = (selectedOptions ?? options).filter((option) => values.includes(option.id));
   const groups = [...new Set(filtered.map((option) => option.group ?? ""))];
   useEffect(() => {
     if (open && current)
@@ -91,7 +105,7 @@ export function SearchCombobox({
         ?.scrollIntoView({ block: "nearest" });
   }, [open, current?.id, listId]);
   function select(value: string) {
-    if (disabled) return;
+    if (disabled || loading) return;
     onChange(
       multiple
         ? values.includes(value)
@@ -99,12 +113,14 @@ export function SearchCombobox({
           : [...values, value]
         : [value],
     );
-    if (!multiple) setOpen(false);
+    if (!multiple) changeOpen(false);
   }
   function changeOpen(next: boolean) {
     setOpen(next);
+    onOpenChange?.(next);
     if (next) {
       setQuery("");
+      onSearchChange?.("");
       setActive(0);
     }
   }
@@ -121,7 +137,7 @@ export function SearchCombobox({
           aria-expanded={open}
           aria-controls={listId}
           aria-haspopup="listbox"
-          aria-required={!multiple}
+          aria-required={required ?? !multiple}
           disabled={disabled}
           className={`catalog-combobox-trigger client-combobox-trigger${multiple ? " client-combobox-add-trigger" : ""}`}
           onKeyDown={(event) => {
@@ -185,6 +201,7 @@ export function SearchCombobox({
               value={query}
               onChange={(event) => {
                 setQuery(event.target.value);
+                onSearchChange?.(event.target.value);
                 setActive(0);
               }}
               onKeyDown={(event) => {
@@ -240,7 +257,7 @@ export function SearchCombobox({
                       tabIndex={-1}
                       aria-selected={values.includes(option.id)}
                       data-active={current?.id === option.id}
-                      disabled={disabled}
+                      disabled={disabled || loading}
                       onMouseEnter={() => setActive(filtered.indexOf(option))}
                       onMouseDown={(event) => event.preventDefault()}
                       onClick={() => select(option.id)}
@@ -251,8 +268,10 @@ export function SearchCombobox({
                   ))}
               </div>
             ))}
-            {!filtered.length && <p>No se encontraron opciones.</p>}
+            {loading && <p role="status">Cargando…</p>}
+            {!loading && !filtered.length && <p>No se encontraron opciones.</p>}
           </div>
+          {footer}
           {clearLabel && (
             <Button
               type="button"
@@ -272,12 +291,12 @@ export function SearchCombobox({
               disabled={disabled}
               onClick={() => {
                 creating.current = true;
-                setOpen(false);
+                changeOpen(false);
                 onCreate(query.trim());
               }}
             >
               <Plus size={15} />
-              Crear cliente{query.trim() ? ` «${query.trim()}»` : ""}…
+              {createLabel}{query.trim() ? ` «${query.trim()}»` : ""}…
             </Button>
           )}
         </Popover.Content>

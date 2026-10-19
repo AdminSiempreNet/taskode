@@ -13,7 +13,7 @@ import {
 import type { Project } from "../src/lib/types";
 
 const projects: Project[] = Array.from({ length: 8 }, (_, index) => ({
-  id: `project-${index}`,
+  id: `project-${index}`, clientIds: [], ticketIds: [],
   leaderId: "user-a",
   name: index === 0 ? "Administración" : `Proyecto ${index}`,
   description: "",

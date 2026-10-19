@@ -16,7 +16,7 @@ export const mentionContextSchema = z.union([
   }),
 ]);
 export type MentionContext = z.infer<typeof mentionContextSchema>;
-export type MentionRef = { type: "user" | "client"; id: string };
+export type MentionRef = { type: "user" | "client" | "ticket"; id: string };
 export type MentionUser = {
   id: string;
   name: string;
@@ -29,20 +29,21 @@ export type MentionClient = {
   cityName: string;
   departmentName: string;
 };
-export type MentionOptions = { users: MentionUser[]; clients: MentionClient[] };
+export type MentionTicket = { id: string; number: string; description: string; url: string | null; clientName: string | null };
+export type MentionOptions = { users: MentionUser[]; clients: MentionClient[]; tickets: MentionTicket[] };
 
 export function mentionPath(ref: MentionRef) {
-  return `/mentions/${ref.type === "user" ? "users" : "clients"}/${encodeURIComponent(ref.id)}`;
+  return `/mentions/${ref.type === "user" ? "users" : ref.type === "client" ? "clients" : "tickets"}/${encodeURIComponent(ref.id)}`;
 }
 export function parseMention(href: unknown): MentionRef | null {
   if (typeof href !== "string") return null;
-  const match = /^\/mentions\/(users|clients)\/([^/?#]+)$/.exec(href);
+  const match = /^\/mentions\/(users|clients|tickets)\/([^/?#]+)$/.exec(href);
   if (!match) return null;
   try {
     const value = decodeURIComponent(match[2]);
     if (!value || value.length > 200 || /[\u0000-\u001f]/.test(value))
       return null;
-    return { type: match[1] === "users" ? "user" : "client", id: value };
+    return { type: match[1] === "users" ? "user" : match[1] === "clients" ? "client" : "ticket", id: value };
   } catch {
     return null;
   }
@@ -53,13 +54,13 @@ export function mentionMarkdown(ref: MentionRef, label: string) {
 
 export function mentionQuery(text: string) {
   const match =
-    /(?:^|[^\p{L}\p{N}_/.:@#-])([@#])([\p{L}\p{N} ._-]{0,80})$/u.exec(text);
+    /(?:^|[^\p{L}\p{N}_/.:@#!-])([@#!])([\p{L}\p{N} ._-]{0,100})$/u.exec(text);
   if (!match) return null;
   const start = text.length - match[2].length - 1;
   const prefix = text.slice(0, start).split(/\s/).at(-1) ?? "";
   if (/(?:https?:\/\/|www\.)/i.test(prefix)) return null;
   return {
-    type: match[1] === "@" ? ("user" as const) : ("client" as const),
+    type: match[1] === "@" ? ("user" as const) : match[1] === "#" ? ("client" as const) : ("ticket" as const),
     query: match[2],
     start,
   };
