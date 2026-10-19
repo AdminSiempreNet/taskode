@@ -9,7 +9,7 @@ export type TaskFilterOption = {
   image?: string | null;
   color?: string;
 };
-export type TaskFilterGroup = "status" | "label" | "priority" | "type" | "impact";
+export type TaskFilterGroup = "status" | "label" | "priority" | "type" | "impact" | "application";
 
 export const filterGroupValues = (ids: string[], group: TaskFilterGroup) =>
   ids.filter((id) => id.startsWith(`${group}:`)).map((id) => id.slice(group.length + 1));
@@ -17,7 +17,7 @@ export const filterGroupValues = (ids: string[], group: TaskFilterGroup) =>
 export const groupedFilterIds = (ids: string[], group: TaskFilterGroup) =>
   ids.map((id) => `${group}:${id}`);
 
-type Catalogs = Pick<Workspace, "statuses" | "labels" | "priorities" | "taskTypes" | "impacts" | "people">;
+type Catalogs = Pick<Workspace, "statuses" | "labels" | "priorities" | "taskTypes" | "impacts" | "people"> & Partial<Pick<Workspace, "applications">>;
 
 export function taskFilterOptions(workspace: Catalogs | null, projectId: string) {
   const userOptions: TaskFilterOption[] = [
@@ -49,6 +49,10 @@ export function taskFilterOptions(workspace: Catalogs | null, projectId: string)
     ...(workspace?.impacts ?? []).filter((option) => option.projectId === projectId)
       .sort((a, b) => a.position - b.position)
       .map((option) => ({ ...option, id: `impact:${option.id}`, group: "Impacto" })),
+    { id: `application:${UNASSIGNED_FILTER}`, name: "Sin aplicación", group: "Aplicaciones" },
+    ...(workspace?.applications ?? []).filter(option => option.projectId === projectId)
+      .sort((a, b) => a.position - b.position)
+      .map(option => ({ ...option, id: `application:${option.id}`, group: "Aplicaciones" })),
   ];
   return { userOptions, stateOptions, classificationOptions };
 }

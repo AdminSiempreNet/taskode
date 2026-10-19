@@ -532,6 +532,18 @@ export const impacts = pgTable(
   },
   (t) => [uniqueIndex("impact_name").on(t.projectId, sql`lower(${t.name})`)],
 );
+export const applications = pgTable("applications", {
+  id: text().primaryKey(),
+  projectId: text().notNull().references(() => projects.id, { onDelete: "cascade" }),
+  name: text().notNull(),
+  color: text().notNull(),
+  position: doublePrecision().notNull(),
+  isDefault: boolean().notNull().default(false),
+}, (t) => [
+  uniqueIndex("application_name").on(t.projectId, sql`lower(${t.name})`),
+  uniqueIndex("application_default").on(t.projectId).where(sql`${t.isDefault}`),
+]);
+
 export const labels = pgTable(
   "labels",
   {
@@ -789,6 +801,19 @@ export const taskTickets = pgTable("task_tickets", {
   ticketId: text().notNull().references(() => tickets.id, { onDelete: "restrict" }),
 }, (t) => [primaryKey({ columns: [t.taskId, t.ticketId] }), index("task_tickets_ticket").on(t.ticketId)]);
 
+export const moduleApplications = pgTable("module_applications", {
+  moduleId: text().notNull().references(() => modules.id, { onDelete: "cascade" }),
+  applicationId: text().notNull().references(() => applications.id, { onDelete: "cascade" }),
+}, (t) => [primaryKey({ columns: [t.moduleId, t.applicationId] }), index("module_applications_application").on(t.applicationId)]);
+export const featureApplications = pgTable("feature_applications", {
+  featureId: text().notNull().references(() => features.id, { onDelete: "cascade" }),
+  applicationId: text().notNull().references(() => applications.id, { onDelete: "cascade" }),
+}, (t) => [primaryKey({ columns: [t.featureId, t.applicationId] }), index("feature_applications_application").on(t.applicationId)]);
+export const taskApplications = pgTable("task_applications", {
+  taskId: text().notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  applicationId: text().notNull().references(() => applications.id, { onDelete: "cascade" }),
+}, (t) => [primaryKey({ columns: [t.taskId, t.applicationId] }), index("task_applications_application").on(t.applicationId)]);
+
 export const taskTeamMembers = pgTable(
   "task_team_members",
   {
@@ -985,6 +1010,10 @@ export const notificationDeliveries = pgTable("notification_deliveries", {
   check("notification_delivery_target", sql`(${t.invitationId} is not null and ${t.transport} = 'email' and num_nonnulls(${t.recipientId}, ${t.notificationId}, ${t.subscriptionId}) = 0) or (${t.invitationId} is null and ${t.recipientId} is not null and (${t.transport} = 'ably' or (${t.notificationId} is not null and (${t.transport} = 'email' or (${t.transport} = 'push' and ${t.subscriptionId} is not null)))))`)]);
 
 export const domainTables = {
+  applications,
+  module_applications: moduleApplications,
+  feature_applications: featureApplications,
+  task_applications: taskApplications,
   project_team_members: projectTeamMembers,
   module_team_members: moduleTeamMembers,
   feature_team_members: featureTeamMembers,

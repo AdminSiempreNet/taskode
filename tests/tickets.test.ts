@@ -133,11 +133,12 @@ test("migración 0012 y respaldos v10 convierten cada número sin fusionar ni in
     stripTicketTables(legacy.tables); legacy.version = 10;
     legacy.tables.tasks.forEach((task: { id: string; ticketNumber: string }) => { task.ticketNumber = cases[taskIds.indexOf(task.id)].number; });
     const normalized = validateApplicationBackup(legacy);
-    assert.equal(normalized.version, 12); assert.equal(normalized.tables.tickets.length, 3);
+    assert.equal(normalized.version, 13); assert.equal(normalized.tables.tickets.length, 3);
     await removeTicketSchema(f.repo);
     for (const [index, id] of taskIds.entries()) await f.repo.store.pool.query('update tasks set "ticketNumber" = $1 where id = $2', [cases[index].number, id]);
     await f.repo.store.pool.query(await readFile("drizzle/postgresql/0012_clients_tickets.sql", "utf8"));
     await f.repo.store.pool.query(await readFile("drizzle/postgresql/0014_oauth_mcp.sql", "utf8"));
+    await f.repo.store.pool.query(await readFile("drizzle/postgresql/0015_applications.sql", "utf8"));
     const workspace = await f.repo.getWorkspace(actor);
     assert.equal(workspace.tickets.length, 3);
     for (const [index, id] of taskIds.entries()) {
@@ -154,7 +155,7 @@ test("migración 0012 y respaldos v10 convierten cada número sin fusionar ni in
     assert.deepEqual(await f.repo.getWorkspace(actor), workspace);
     await f.repo.exportBackup(join(directory, "after.json"));
     const current = JSON.parse(await readFile(join(directory, "after.json"), "utf8"));
-    assert.equal(current.version, 12); assert.equal("ticketNumber" in current.tables.tasks[0], false);
+    assert.equal(current.version, 13); assert.equal("ticketNumber" in current.tables.tasks[0], false);
     const bad = structuredClone(current); bad.tables.task_tickets[0].ticketId = "missing";
     assert.throws(() => validateApplicationBackup(bad));
     await f.repo.restoreBackup(join(directory, "after.json")); assert.deepEqual(await f.repo.getWorkspace(actor), workspace);

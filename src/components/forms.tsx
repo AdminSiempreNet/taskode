@@ -12,6 +12,7 @@ import {
 import { useWorkspaceRouter } from "./unsaved-changes";
 import { FeatureCombobox } from "./feature-combobox";
 import { CatalogCombobox } from "./catalog-combobox";
+import { ApplicationPicker } from "./application-picker";
 import { ClientPicker } from "./client-picker";
 import { formatFeatureNumber } from "@/lib/features";
 import { EntityAssignments } from "./task-people";
@@ -421,6 +422,8 @@ function TaskCreateForm({
       : "",
   );
   const [impactId, setImpactId] = useState("");
+  const applications = (workspace.applications ?? []).filter(option => option.projectId === project.id);
+  const [applicationIds, setApplicationIds] = useState(() => applications.filter(option => option.isDefault).map(option => option.id));
   const [clientIds, setClientIds] = useState<string[]>([]);
   const [startDate, setStartDate] = useState(defaults.startDate ?? "");
   const [description, setDescription] = useState("");
@@ -451,6 +454,7 @@ function TaskCreateForm({
       priority,
       typeId: typeId || null,
       impactId: impactId || null,
+      applicationIds,
       startDate: startDate || null,
       startTime: startDate ? startTime || null : null,
       dueDate: dueDate || null,
@@ -606,6 +610,9 @@ function TaskCreateForm({
                 />
               </Field>
             ))}
+            <Field label="Aplicaciones" htmlFor="create-task-applications">
+              <ApplicationPicker id="create-task-applications" options={applications} values={applicationIds} onChange={setApplicationIds} disabled={busy} />
+            </Field>
             <div className="task-schedule-group">
               <span>
                 Inicio <small>opcional</small>

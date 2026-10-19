@@ -75,6 +75,7 @@ function task(id: string, dueTime: string | null, position = 0): Task {
     typeId: null,
     impactId: null,
     ticketIds: [],
+    applicationIds: [],
     dueDate: "2026-10-15",
     startDate: null,
     startTime: null,

@@ -36,6 +36,7 @@ const featureFields = { name, description, moduleId: id.nullish() };
 const statusFields = { name: name.max(60), color, isDone: z.boolean() };
 const taskTitle = z.string().trim().min(1, "Escribe un título.").max(300);
 const taskFields = {
+  applicationIds: z.array(id).max(1000).optional(),
   clientIds: z.array(id).max(1000).optional(),
   title: taskTitle,
   description,
@@ -106,6 +107,7 @@ const assignmentFields = {
   teamMemberIds: z.array(id).max(1000),
 };
 const currentCommandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("entity.applications.update"), scope: entityRefSchema.extend({ kind: z.enum(["module", "feature", "task"]) }), applicationIds: z.array(id).max(1000) }),
   z.object({ type: z.literal("entity.clients.update"), scope: entityRefSchema, clientIds: z.array(id).max(1000) }),
   z.object({ type: z.literal("entity.tickets.update"), scope: entityRefSchema, ticketIds: z.array(id).max(1000) }),
   z.object({ type: z.literal("ticket.create"), ...ticketInputSchema.shape, scope: entityRefSchema.optional() }),
@@ -230,7 +232,7 @@ const currentCommandSchema = z.discriminatedUnion("type", [
     color,
   }),
   z.object({ type: z.literal("priority.delete"), projectId: id, id }),
-  ...(["taskType", "impact"] as const).flatMap((kind) => [
+  ...(["taskType", "impact", "application"] as const).flatMap((kind) => [
     z.object({
       type: z.literal(`${kind}.create`),
       projectId: id,

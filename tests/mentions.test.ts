@@ -471,7 +471,7 @@ test("respaldo v11 conserva menciones y normaliza avisos v9 sin generar entregas
     const path = join(directory, "backup.json");
     await f.repo.exportBackup(path);
     const backup = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(validateApplicationBackup(backup).version, 12);
+    assert.equal(validateApplicationBackup(backup).version, 13);
     const legacy = structuredClone(backup);
     stripTicketTables(legacy.tables);
     legacy.version = 9;

@@ -328,11 +328,11 @@ test("respaldos v8 conservan preferencias e historial, sin suscripciones ni trab
     const path = join(dir, "backup.json");
     await f.repo.exportBackup(path);
     const backup = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(backup.version, 12);
+    assert.equal(backup.version, 13);
     assert.equal(backup.tables.projects[0].timeZone, "America/Bogota");
     assert.equal(backup.tables.notifications.length, 2);
     assert.equal(backup.tables.push_subscriptions, undefined);
-    assert.equal(validateApplicationBackup(backup).version, 12);
+    assert.equal(validateApplicationBackup(backup).version, 13);
     await f.repo.restoreBackup(path);
     assert.deepEqual(await f.repo.notifications.preferences(f.leader), {
       offsets: [4320],
@@ -540,7 +540,7 @@ test("respaldo v6 recibe zona inicial y tablas vacías; acciones propias no gene
     delete v6.tables.notification_preferences;
     for (const project of v6.tables.projects) delete project.timeZone;
     const normalized = validateApplicationBackup(v6);
-    assert.equal(normalized.version, 12);
+    assert.equal(normalized.version, 13);
     assert.equal(normalized.tables.projects[0].timeZone, "America/Bogota");
     assert.deepEqual(normalized.tables.notifications, []);
   } finally {

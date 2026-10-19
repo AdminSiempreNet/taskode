@@ -65,6 +65,9 @@ export function AuthScreen({
       setPending("");
     }
   }
+
+
+
   return (
     <main className="auth-shell">
       <div className="auth-layout">

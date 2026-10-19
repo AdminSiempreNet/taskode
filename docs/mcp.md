@@ -1,5 +1,7 @@
 # Servidor MCP
 
+El catálogo de [aplicaciones por proyecto](aplicaciones.md) también está disponible: `get_project_tree` lo consulta, `upsert_project_option` y `delete_item` aceptan `application`, y `set_links` asigna `applicationIds` a módulos, features y tareas. `create_task` y `update_task` aceptan la selección, y `search_tasks` filtra por aplicaciones o `__unassigned__` para tareas sin aplicación.
+
 Taskode publica un servidor [Model Context Protocol](https://modelcontextprotocol.io) en `https://taskode.siempre.net.co/api/mcp`. Asistentes como Claude, Claude Code o Cursor pueden consultar y gestionar proyectos, tareas, comentarios, documentos, diagramas, archivos, tickets, clientes y avisos en nombre de la persona que autoriza la conexión. Actúan con sus mismos permisos: cada herramienta pasa por los servicios y comprobaciones de acceso que usa la interfaz, y lo que una persona no puede ver ni modificar tampoco lo puede hacer su asistente.
 
 El transporte es Streamable HTTP sin estado, compatible con la revisión 2026-07-28 del protocolo y con clientes de 2025. La autorización es OAuth 2.1 con PKCE, servida por Better Auth (`@better-auth/mcp`, `@better-auth/oauth-provider` y `@better-auth/cimd`, fijados en 1.7.10). Los tokens de acceso son JWT firmados para el recurso `/api/mcp`; no se aceptan cookies de sesión en ese endpoint.
@@ -52,7 +54,7 @@ Las claves de firma se guardan cifradas con `BETTER_AUTH_SECRET` en la tabla `jw
 
 ## Despliegue
 
-1. Aplica la migración `0014_oauth_mcp` (`npm run db:migrate`; `build:vercel` la ejecuta antes de compilar). Es aditiva: crea las tablas OAuth, `jwks` y `mcp_activity`.
+1. `npm run db:migrate` aplica las migraciones pendientes, incluida `0014_oauth_mcp`, que crea las tablas OAuth, `jwks` y `mcp_activity`, y `0015_applications`, con su backfill de aplicaciones. `build:vercel` las ejecuta después de compilar y antes de publicar.
 2. No hay variables obligatorias nuevas: issuer, recurso y metadatos derivan de `BETTER_AUTH_URL`.
 3. Variables opcionales:
 

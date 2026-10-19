@@ -1,3 +1,4 @@
+import { normalizeApplicationIdentity } from "./entity-fixtures";
 import { stripTicketTables } from "./entity-fixtures";
 import { removeEntitySchema, stripEntityColumns } from "./entity-fixtures";
 import { test } from "node:test";
@@ -180,7 +181,7 @@ test("la migración aditiva actualiza el esquema anterior conservando proyectos 
       migrationsFolder: migrationsFolder(),
       migrationsSchema: repo.store.schemaName,
     });
-    assert.deepEqual(await repo.getWorkspace(actor), before);
+    assert.deepEqual(normalizeApplicationIdentity(await repo.getWorkspace(actor)), normalizeApplicationIdentity(before));
     assert.equal(
       (await repo.getGeography(actor)).cities.length,
       divipola.cityCount,
@@ -327,7 +328,7 @@ test("respaldos v2 conservan clientes y relaciones; v1 Taskode y Brote restauran
     const path = join(directory, "backup.json");
     await repo.exportBackup(path);
     const file = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(file.version, 12);
+    assert.equal(file.version, 13);
     validateApplicationBackup(file);
     for (const mutate of [
       (copy: typeof file) => {

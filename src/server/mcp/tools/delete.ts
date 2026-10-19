@@ -28,12 +28,13 @@ const TYPES = [
   "priority",
   "task_type",
   "impact",
+  "application",
   "label",
   "client",
   "ticket",
 ] as const;
 type DeletableType = (typeof TYPES)[number];
-const OPTION_PREFIX = { priority: "priority", task_type: "taskType", impact: "impact", label: "label" } as const;
+const OPTION_PREFIX = { priority: "priority", task_type: "taskType", impact: "impact", application: "application", label: "label" } as const;
 const normalize = (value: string) => value.normalize("NFC").trim().replace(/\s+/g, " ");
 const first = <T>(rows: T[]) => {
   if (!rows[0]) throw new DomainError("El elemento no existe o no tienes acceso.", 404);
@@ -115,7 +116,7 @@ export function registerDeleteTool(server: McpServer, ctx: McpContext) {
                 ? workspace.taskTypes
                 : type === "impact"
                   ? workspace.impacts
-                  : workspace.labels;
+                  : type === "application" ? workspace.applications : workspace.labels;
         const option = first(options.filter((candidate) => candidate.id === targetId));
         return {
           name: option.name,
@@ -138,7 +139,7 @@ export function registerDeleteTool(server: McpServer, ctx: McpContext) {
     input: z.object({
       type: z.enum(TYPES),
       id,
-      projectId: id.optional().describe("Obligatorio para status, priority, task_type, impact y label."),
+      projectId: id.optional().describe("Obligatorio para status, priority, task_type, impact, application y label."),
       confirm,
     }),
     target: (args) => ({ type: args.type, id: args.id }),

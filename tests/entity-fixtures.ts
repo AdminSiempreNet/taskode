@@ -1,5 +1,26 @@
 import type { PostgresRepository } from "../src/server/postgres";
 
+// Catalogs introduced after a historical schema are seeded with fresh identities.
+// Compare their names, properties and associations without assuming old ids existed.
+export function normalizeApplicationIdentity<T>(value: T): T {
+  const aliases = new Map<string, string>();
+  const collect = (item: unknown) => {
+    if (!item || typeof item !== "object") return;
+    const object = item as Record<string, unknown>;
+    if (Array.isArray(object.applications)) for (const app of object.applications)
+      aliases.set(app.id, `${app.projectId}:${app.name}`);
+    for (const child of Object.values(object)) collect(child);
+  };
+  collect(value);
+  const convert = (item: unknown): unknown => {
+    if (typeof item === "string") return aliases.get(item) ?? item;
+    if (Array.isArray(item)) return item.map(convert);
+    if (item && typeof item === "object") return Object.fromEntries(Object.entries(item).map(([key, child]) => [key, convert(child)]));
+    return item;
+  };
+  return convert(value) as T;
+}
+
 // Restore the pre-0005 shape only inside disposable test schemas before replaying migrations.
 export async function removeEntitySchema(repo: PostgresRepository) {
   if (!/^taskode_test_[a-f0-9]{32}$/.test(repo.store.schemaName))
@@ -84,7 +105,12 @@ export async function removeAssignmentSchema(repo: PostgresRepository) {
 
 export const ticketTables = ["tickets", "project_clients", "module_clients", "feature_clients", "project_tickets", "module_tickets", "feature_tickets", "task_tickets"];
 
+export function stripApplicationTables(tables: Record<string, Record<string, unknown>[]>) {
+  for (const name of ["applications", "module_applications", "feature_applications", "task_applications"]) delete tables[name];
+}
+
 export function stripTicketTables(tables: Record<string, Record<string, unknown>[]>) {
+  stripApplicationTables(tables);
   // Account/access notifications were introduced after all historical fixtures.
   if (tables.notifications) tables.notifications = tables.notifications.filter(n => n.scopeType !== "account");
   if (!tables.tickets) return;
@@ -98,6 +124,7 @@ export function stripTicketTables(tables: Record<string, Record<string, unknown>
 // 0014: OAuth/MCP tables are additive and independent of earlier migrations.
 export async function removeOAuthSchema(repo: PostgresRepository) {
   if (!/^taskode_test_[a-f0-9]{32}$/.test(repo.store.schemaName)) throw new Error("Esquema de prueba inválido.");
+  await repo.store.pool.query("drop table if exists task_applications, feature_applications, module_applications, applications");
   await repo.store.pool.query(
     "drop table if exists oauth_access_token, oauth_refresh_token, oauth_consent, oauth_client_resource, oauth_client, oauth_resource, oauth_client_assertion, jwks, mcp_activity",
   );

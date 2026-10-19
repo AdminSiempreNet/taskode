@@ -363,6 +363,7 @@ export function WorkspaceApp({
     "priority",
     priorities,
   );
+  const [selectedApplicationIds, setApplicationIds] = useProjectFilter(projectId, "application", workspace?.applications.filter(option => option.projectId === projectId) ?? [], true);
   const [selectedLabelIds, setLabelIds] = useProjectFilter(
     projectId,
     "label",
@@ -385,6 +386,7 @@ export function WorkspaceApp({
     ...groupedFilterIds(selectedPriorityIds, "priority"),
     ...groupedFilterIds(selectedTypeIds, "type"),
     ...groupedFilterIds(selectedImpactIds, "impact"),
+    ...groupedFilterIds(selectedApplicationIds, "application"),
   ];
   const hasCategoryFilters =
     selectedUserIds.length !== 1 ||
@@ -392,6 +394,7 @@ export function WorkspaceApp({
     selectedStatusIds.length > 0 ||
     selectedTypeIds.length > 0 ||
     selectedImpactIds.length > 0 ||
+    selectedApplicationIds.length > 0 ||
     selectedPriorityIds.length > 0 ||
     selectedLabelIds.length > 0;
   const allTasks =
@@ -410,6 +413,7 @@ export function WorkspaceApp({
         statusIds: selectedStatusIds,
         typeIds: selectedTypeIds,
         impactIds: selectedImpactIds,
+        applicationIds: selectedApplicationIds,
         priorityIds: selectedPriorityIds,
         labelNames: selectedLabelNames,
         includeUnlabeled: selectedLabelIds.includes(UNASSIGNED_FILTER),
@@ -485,6 +489,7 @@ export function WorkspaceApp({
         timeZone: project?.timeZone,
         taskTypes,
         impacts,
+        applications: workspace?.applications.filter(option => option.projectId === projectId) ?? [],
         priorities:
           workspace?.priorities.filter((p) => p.projectId === projectId) ?? [],
         labels:
@@ -881,6 +886,7 @@ export function WorkspaceApp({
                         setPriorityIds(filterGroupValues(ids, "priority"));
                         setTypeIds(filterGroupValues(ids, "type"));
                         setImpactIds(filterGroupValues(ids, "impact"));
+                        setApplicationIds(filterGroupValues(ids, "application"));
                       }}
                     />
                     <DropdownMenu>
@@ -998,6 +1004,7 @@ export function WorkspaceApp({
                             setStatusIds([]);
                             setTypeIds([]);
                             setImpactIds([]);
+                            setApplicationIds([]);
                             setPriorityIds([]);
                             setLabelIds([]);
                           }}

@@ -159,6 +159,8 @@ export function registerReadTools(server: McpServer, ctx: McpContext) {
         workspace.taskTypes.map((type) => `- ${inline(type.name)} (id: \`${type.id}\`)`).join("\n") || "_Ninguno._",
         "## Impactos",
         workspace.impacts.map((impact) => `- ${inline(impact.name)} (id: \`${impact.id}\`)`).join("\n") || "_Ninguno._",
+        "## Aplicaciones",
+        workspace.applications.map(app => `- ${inline(app.name)} (id: \`${app.id}\`)${app.isDefault ? " — predeterminada" : ""}`).join("\n") || "_Ninguna._",
         "## Etiquetas",
         workspace.labels.map((label) => `- ${inline(label.name)} (id: \`${label.id}\`)`).join("\n") || "_Ninguna._",
         "## Personas con acceso",
@@ -168,14 +170,15 @@ export function registerReadTools(server: McpServer, ctx: McpContext) {
       ];
       return textResult(sections.filter(Boolean).join("\n\n"), {
         project: { id: project.id, name: project.name, leaderId: project.leaderId, timeZone: project.timeZone ?? "America/Bogota" },
-        modules: workspace.modules.map(({ id, name, leaderId }) => ({ id, name, leaderId: leaderId ?? null })),
-        features: workspace.features.map(({ id, number, name, moduleId, pinned, leaderId }) => ({
-          id, number, name, moduleId, pinned, leaderId: leaderId ?? null,
+        modules: workspace.modules.map(({ id, name, leaderId, applicationIds }) => ({ id, name, leaderId: leaderId ?? null, applicationIds })),
+        features: workspace.features.map(({ id, number, name, moduleId, pinned, leaderId, applicationIds }) => ({
+          id, number, name, moduleId, pinned, leaderId: leaderId ?? null, applicationIds,
         })),
         statuses: workspace.statuses.map(({ id, name, isDone, position }) => ({ id, name, isDone, position })),
         priorities: workspace.priorities.map(({ id, name }) => ({ id, name })),
         taskTypes: workspace.taskTypes.map(({ id, name }) => ({ id, name })),
         impacts: workspace.impacts.map(({ id, name }) => ({ id, name })),
+        applications: workspace.applications.map(({ id, name, color, isDefault }) => ({ id, name, color, isDefault })),
         labels: workspace.labels.map(({ id, name }) => ({ id, name })),
         people: (workspace.people ?? []).map(({ id, name, email }) => ({ id, name, email })),
       });
@@ -186,7 +189,7 @@ export function registerReadTools(server: McpServer, ctx: McpContext) {
     name: "search_tasks",
     title: "Buscar tareas",
     description:
-      "Busca tareas visibles para ti con filtros combinables (proyecto, módulo, feature, texto, estado, responsable, prioridad, tipo, impacto, etiquetas, cliente, ticket, fechas, vencidas, archivadas). Devuelve una línea por tarea con su id; usa get_task para el detalle.",
+      "Busca tareas visibles para ti con filtros combinables (proyecto, módulo, feature, texto, estado, responsable, prioridad, tipo, impacto, aplicaciones, etiquetas, cliente, ticket, fechas, vencidas, archivadas). Devuelve una línea por tarea con su id; usa get_task para el detalle.",
     access: "read",
     input: z.object({
       projectId: id.optional(),
@@ -199,6 +202,7 @@ export function registerReadTools(server: McpServer, ctx: McpContext) {
       priorityIds: z.array(id).max(20).optional(),
       typeIds: z.array(z.string().max(200)).max(20).optional(),
       impactIds: z.array(z.string().max(200)).max(20).optional(),
+      applicationIds: z.array(id).max(20).optional().describe("Coincide con cualquiera de estas aplicaciones; __unassigned__ incluye tareas sin aplicación."),
       labels: z.array(z.string().max(60)).max(20).optional().describe("Nombres de etiqueta (cualquiera)."),
       clientId: id.optional(),
       ticketId: id.optional(),
@@ -283,6 +287,7 @@ export function registerReadTools(server: McpServer, ctx: McpContext) {
         teamMemberIds?: string[];
         clientIds: string[];
         ticketIds: string[];
+        applicationIds?: string[];
       };
       const workspace = await loadWorkspace(ctx, [detail.scope.projectId], true);
       const names = lookups(workspace);
@@ -296,6 +301,7 @@ export function registerReadTools(server: McpServer, ctx: McpContext) {
           `- líder: ${names.person(raw.leaderId)}`,
           raw.teamMemberIds?.length && `- equipo: ${raw.teamMemberIds.map((member) => `${names.person(member)} (\`${member}\`)`).join(", ")}`,
           raw.clientIds.length && `- clientes: ${raw.clientIds.map((client) => `${inline(names.clients.get(client)?.name ?? client)} (\`${client}\`)`).join(", ")}`,
+          raw.applicationIds?.length && `- aplicaciones: ${raw.applicationIds.map(app => inline(names.applications.get(app)?.name ?? app)).join(", ")}`,
           raw.ticketIds.length && `- tickets: ${raw.ticketIds.map((ticket) => `${inline(names.tickets.get(ticket)?.number ?? ticket)} (\`${ticket}\`)`).join(", ")}`,
           `- permisos: editar ${detail.permissions.canEdit ? "sí" : "no"}, eliminar ${detail.permissions.canDelete ? "sí" : "no"}, gestionar acceso ${detail.permissions.canManageAccess ? "sí" : "no"}, archivos ${detail.permissions.canManageFiles ? "sí" : "no"}`,
         ]),
@@ -342,6 +348,7 @@ export function registerReadTools(server: McpServer, ctx: McpContext) {
         teamMemberIds: raw.teamMemberIds ?? [],
         clientIds: raw.clientIds,
         ticketIds: raw.ticketIds,
+        ...(target.kind === "project" ? {} : { applicationIds: raw.applicationIds ?? [] }),
       });
     },
   });

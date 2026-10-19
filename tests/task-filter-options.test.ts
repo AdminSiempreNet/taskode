@@ -11,6 +11,7 @@ const catalogs = {
   priorities: [option("high", "Alta", 2), option("low", "Baja", 0)],
   taskTypes: [option("type", "Requerimiento")],
   impacts: [option("impact", "Proyecto")],
+  applications: [{ ...option("web", "Web"), isDefault: true }, { ...option("foreign", "Ajena", 0, "other"), isDefault: false }],
   people: [
     { id: "user", name: "Usuario", email: "user@example.com", image: null, projectId: "p" },
     { id: "foreign", name: "Otra persona", email: "other@example.com", image: null, projectId: "other" },
@@ -29,10 +30,11 @@ test("Sin etiqueta ocupa el primer lugar de Etiquetas y las opciones pertenecen 
 
 test("la clasificación agrupa prioridades, tipos e impactos manteniendo el orden del catálogo", () => {
   const options = taskFilterOptions(catalogs, "p").classificationOptions;
-  assert.deepEqual([...new Set(options.map((entry) => entry.group))], ["Prioridad", "Tipo", "Impacto"]);
+  assert.deepEqual([...new Set(options.map((entry) => entry.group))], ["Prioridad", "Tipo", "Impacto", "Aplicaciones"]);
   assert.deepEqual(options.filter((entry) => entry.group === "Prioridad").map((entry) => entry.id), ["priority:low", "priority:high"]);
   assert.ok(options.some((entry) => entry.id === `type:${UNASSIGNED_FILTER}`));
   assert.ok(options.some((entry) => entry.id === `impact:${UNASSIGNED_FILTER}`));
+  assert.deepEqual(options.filter(entry => entry.group === "Aplicaciones").map(entry => entry.id), [`application:${UNASSIGNED_FILTER}`, "application:web"]);
 });
 
 test("agrupar y separar las selecciones conserva IDs coincidentes y los que contienen dos puntos", () => {

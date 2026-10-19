@@ -1,5 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { getTableColumns, sql, and, isNull } from "drizzle-orm";
 import type { AnyPgTable } from "drizzle-orm/pg-core";
 import { z } from "zod";
@@ -14,6 +14,7 @@ import { documentInputSchema } from "../lib/documents";
 import { fileTypes } from "../lib/files";
 import { validTimeZone } from "../lib/project-time";
 import { notificationPreferencesSchema } from "../lib/notifications";
+import { DEFAULT_APPLICATIONS } from "../lib/types";
 import { diagramBytes, diagramInputSchema, diagramSceneSchema, MAX_DIAGRAM_BYTES, type DiagramScene } from "../lib/diagrams";
 
 // The order also defines insertion order. Sessions, verification and migration
@@ -36,6 +37,7 @@ export const backupTables = {
   priorities: schema.priorities,
   task_types: schema.taskTypes,
   impacts: schema.impacts,
+  applications: schema.applications,
   labels: schema.labels,
   tasks: schema.tasks,
   diagrams: schema.diagrams,
@@ -48,6 +50,9 @@ export const backupTables = {
   module_tickets: schema.moduleTickets,
   feature_tickets: schema.featureTickets,
   task_tickets: schema.taskTickets,
+  module_applications: schema.moduleApplications,
+  feature_applications: schema.featureApplications,
+  task_applications: schema.taskApplications,
   task_team_members: schema.taskTeamMembers,
   files: schema.files,
   checklists: schema.checklists,
@@ -61,6 +66,8 @@ export const backupTables = {
 };
 type BackupRow = Record<string, string | number | boolean | string[] | DiagramScene | null>;
 const tableValidators: Record<string, z.ZodType> = {};
+const version12Validators: Record<string, z.ZodType> = {};
+const applicationTables = ["applications", "module_applications", "feature_applications", "task_applications"];
 const version10Validators: Record<string, z.ZodType> = {};
 const version11Validators: Record<string, z.ZodType> = {};
 const version11Tables = ["tickets", "project_clients", "module_clients", "feature_clients", "project_tickets", "module_tickets", "feature_tickets", "task_tickets"];
@@ -102,6 +109,8 @@ for (const [name, table] of Object.entries(backupTables)) {
     fields[key] = column.notNull ? field : field.nullable();
   }
   tableValidators[name] = z.array(z.strictObject({ ...fields }));
+  if (applicationTables.includes(name)) continue;
+  version12Validators[name] = z.array(z.strictObject({ ...fields }));
   if (name === "notifications") {
     fields.projectId = z.string();
     fields.scopeType = z.enum(["project", "module", "feature", "task"]);
@@ -179,7 +188,8 @@ const legacyTableValidators = Object.fromEntries(
 );
 const fileSchema = z
   .union([
-    z.strictObject({ ...backupHeader, version: z.literal(12), tables: z.strictObject(tableValidators) }),
+    z.strictObject({ ...backupHeader, version: z.literal(13), tables: z.strictObject(tableValidators) }),
+    z.strictObject({ ...backupHeader, version: z.literal(12), tables: z.strictObject(version12Validators) }),
     z.strictObject({
       ...backupHeader,
       version: z.literal(11),
@@ -393,18 +403,31 @@ const fileSchema = z
       project_clients: [], module_clients: [], feature_clients: [], project_tickets: [], module_tickets: [], feature_tickets: [],
     } };
   })
-  .transform(input => ({ ...input, version: 12 as const }))
+  .transform(input => {
+    if (input.version >= 13) return input;
+    const tables = input.tables as Record<string, BackupRow[]>;
+    const applications: BackupRow[] = [], taskApplications: BackupRow[] = [];
+    for (const project of tables.projects) {
+      for (const [position, option] of DEFAULT_APPLICATIONS.entries()) {
+        const id = randomUUID();
+        applications.push({ id, projectId: project.id, ...option, position });
+        if (option.isDefault) for (const task of tables.tasks.filter(task => task.projectId === project.id))
+          taskApplications.push({ taskId: task.id, applicationId: id });
+      }
+    }
+    return { ...input, version: 13 as const, tables: { ...tables, applications, task_applications: taskApplications, module_applications: [], feature_applications: [] } };
+  })
   .pipe(
     z.strictObject({
       format: z.literal("taskode-backup"),
       createdAt: z.iso.datetime(),
-      version: z.literal(12),
+      version: z.literal(13),
       tables: z.strictObject(tableValidators),
     }),
   );
 export type ApplicationBackup = {
   format: "taskode-backup";
-  version: 12;
+  version: 13;
   createdAt: string;
   tables: Record<string, BackupRow[]>;
 };
@@ -418,7 +441,7 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
   const parsed = fileSchema.safeParse(input);
   if (!parsed.success)
     invalid(
-      "El archivo no es un respaldo JSON compatible de Taskode (versiones 1–12).",
+      "El archivo no es un respaldo JSON compatible de Taskode (versiones 1–13).",
     );
   const backup = parsed.data as ApplicationBackup;
   const data = backup.tables;
@@ -481,6 +504,11 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
     return indexes.get(name)!.has(JSON.stringify(values));
   };
   const references = [
+    ["applications", "projectId", "projects"],
+    ...(["module", "feature", "task"] as const).flatMap(kind => [
+      [`${kind}_applications`, `${kind}Id`, kind === "feature" ? "features" : `${kind}s`],
+      [`${kind}_applications`, "applicationId", "applications"],
+    ]),
     ["tickets", "clientId", "clients"],
     ...(["project", "module", "feature", "task"] as const).flatMap((kind) =>
       (["client", "ticket"] as const).flatMap((item) => [
@@ -570,7 +598,7 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
     }
   };
   for (const name of Object.keys(backupTables)) {
-    const relation = /^(project|module|feature|task)_(client|ticket)s$/.exec(name);
+    const relation = /^(project|module|feature|task)_(client|ticket|application)s$/.exec(name);
     if (relation) {
       unique(name, [`${relation[1]}Id`, `${relation[2]}Id`]);
       continue;
@@ -633,9 +661,20 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
     "priorities",
     "task_types",
     "impacts",
+    "applications",
     "labels",
   ])
     unique(name, ["projectId", "name"], true);
+  for (const project of data.projects)
+    if (data.applications.filter(app => app.projectId === project.id && app.isDefault).length !== 1)
+      invalid("Cada proyecto debe tener una aplicación predeterminada.");
+  for (const app of data.applications)
+    if (!z.string().trim().min(1).max(60).safeParse(app.name).success || String(app.name).trim() !== app.name || !/^#[0-9a-fA-F]{6}$/.test(String(app.color)) || !Number.isFinite(app.position)) invalid("El respaldo contiene una aplicación inválida.");
+  for (const kind of ["module", "feature", "task"])
+    for (const link of data[`${kind}_applications`]) {
+      const entity = data[kind === "feature" ? "features" : `${kind}s`].find(row => row.id === link[`${kind}Id`])!;
+      if (!has("applications", [link.applicationId, entity.projectId], ["id", "projectId"])) invalid("Una aplicación está asociada a otro proyecto.");
+    }
   const state = data.installation[0];
   if (
     data.installation.length !== 1 ||
@@ -787,7 +826,7 @@ export async function exportApplicationBackup(
   });
   const text = JSON.stringify({
     format: "taskode-backup",
-    version: 12,
+    version: 13,
     createdAt: new Date().toISOString(),
     tables,
   });

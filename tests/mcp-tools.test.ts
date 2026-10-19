@@ -7,6 +7,40 @@ import { call, mcpFixture } from "./mcp-helpers";
 type Structured = Record<string, unknown>;
 const data = (result: { structuredContent?: unknown }) => result.structuredContent as Structured;
 
+test("MCP aplicaciones: catálogo, asociaciones, selección vacía, filtros y eliminación", async () => {
+  const f = await mcpFixture();
+  try {
+    const client = await f.connect((await f.token()).access_token);
+    const projectId = String(data(await call(client, "create_entity", { kind: "project", name: "Apps MCP" })).id);
+    const tree = await call(client, "get_project_tree", { projectId });
+    const apps = data(tree).applications as { id: string; name: string; isDefault: boolean }[];
+    assert.equal(apps.length, 5);
+    const web = apps.find(a => a.isDefault)!, android = apps.find(a => a.name === "Android")!;
+    const featureId = ((data(tree).features as { id: string }[])[0]).id;
+    const taskId = String(data(await call(client, "create_task", { projectId, featureId, title: "Apps" })).taskId);
+    const readTask = async () => data(await call(client, "get_task", { taskId })).task as { applicationIds: string[]; updatedAt: string };
+    assert.deepEqual((await readTask()).applicationIds, [web.id]);
+    assert.equal((await call(client, "upsert_project_option", { catalog: "application", projectId, optionId: web.id, name: "Navegador" })).error, false);
+    assert.equal((await call(client, "update_task", { taskId, applicationIds: [] })).error, false);
+    assert.deepEqual((await readTask()).applicationIds, []);
+    assert.equal(data(await call(client, "search_tasks", { projectId, applicationIds: ["__unassigned__"] })).total, 1);
+    assert.equal((await call(client, "set_links", { entity: { kind: "task", id: taskId }, applicationIds: [android.id] })).error, false);
+    assert.deepEqual((await readTask()).applicationIds, [android.id]);
+    assert.equal((await call(client, "update_task", { taskId, title: "Apps editada" })).error, false);
+    assert.deepEqual((await readTask()).applicationIds, [android.id]);
+    assert.equal(data(await call(client, "search_tasks", { projectId, applicationIds: [web.id, android.id] })).total, 1);
+    assert.equal((await call(client, "set_links", { entity: { kind: "feature", id: featureId }, applicationIds: [web.id], mode: "replace" })).error, false);
+    assert.deepEqual(data(await call(client, "get_entity", { entity: { kind: "feature", id: featureId } })).applicationIds, [web.id]);
+    assert.equal((await call(client, "set_links", { entity: { kind: "project", id: projectId }, applicationIds: [] })).error, true);
+    assert.equal((await call(client, "delete_item", { type: "application", projectId, id: android.id, confirm: "Android" })).error, true);
+    assert.equal((await call(client, "delete_item", { type: "application", projectId, id: web.id, confirm: "Navegador" })).error, true);
+    const linux = await call(client, "upsert_project_option", { catalog: "application", projectId, name: "Linux" });
+    assert.equal(linux.error, false, linux.text);
+    assert.equal((await call(client, "delete_item", { type: "application", projectId, id: String(data(linux).id), confirm: "equivocado" })).error, true);
+    assert.equal((await call(client, "delete_item", { type: "application", projectId, id: String(data(linux).id), confirm: "Linux" })).error, false);
+  } finally { await f.close(); }
+});
+
 test("MCP tareas: crear, buscar, actualizar parcial, mover, checklist, comentar y eliminar con confirmación", async () => {
   const fixture = await mcpFixture();
   try {

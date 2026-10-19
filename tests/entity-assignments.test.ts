@@ -1,3 +1,4 @@
+import { normalizeApplicationIdentity } from "./entity-fixtures";
 import { stripTicketTables } from "./entity-fixtures";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -310,7 +311,7 @@ test("respaldo v6 conserva equipos y v5 conserva líderes y equipo de proyecto s
     const path = join(directory, "backup.json");
     await f.repo.exportBackup(path);
     const json = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(json.version, 12);
+    assert.equal(json.version, 13);
     const before = await f.repo.getWorkspace(f.leader);
     await f.repo.restoreBackup(path);
     assert.deepEqual(await f.repo.getWorkspace(f.leader), before);
@@ -321,7 +322,7 @@ test("respaldo v6 conserva equipos y v5 conserva líderes y equipo de proyecto s
     stripTicketTables(json.tables);
     json.version = 5;
     const normalized = validateApplicationBackup(json);
-    assert.equal(normalized.version, 12);
+    assert.equal(normalized.version, 13);
     assert.equal(normalized.tables.projects[0].leaderId, f.leader.id);
     assert.equal(normalized.tables.project_team_members.length, 2);
     assert.deepEqual(normalized.tables.module_team_members, []);
@@ -366,7 +367,7 @@ test("migración 0006 conserva líderes, miembros y conversaciones existentes", 
       migrationsFolder: migrationsFolder(),
       migrationsSchema: f.repo.store.schemaName,
     });
-    assert.deepEqual(await f.repo.getWorkspace(f.leader), before);
+    assert.deepEqual(normalizeApplicationIdentity(await f.repo.getWorkspace(f.leader)), normalizeApplicationIdentity(before));
     assert.equal(
       (await f.repo.entityComments(f.member, "module", f.moduleId)).comments[0]
         .content,

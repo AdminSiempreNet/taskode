@@ -774,7 +774,7 @@ test("HTTP: clientes globales, geografía y relación opcional con tareas", asyn
     const edited = await send({ type: "client.update", id: clientId, name: "Cliente editado HTTP", cityId: "11001" });
     assert.equal(edited.workspace.clients.find((client) => client.id === clientId).departmentId, "11");
     const backup = await (await fetch(base + "/api/backup")).json();
-    assert.equal(backup.version, 12);
+    assert.equal(backup.version, 13);
     assert.ok(backup.tables.task_clients.some((link) => link.clientId === clientId && link.taskId === taskId));
     await send({ type: "task.clients.update", id: taskId, clientIds: [] });
   } finally {

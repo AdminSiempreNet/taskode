@@ -6,6 +6,7 @@ import type {
   ProjectPriority,
   ProjectTaskType,
   ProjectImpact,
+  ProjectApplication,
 } from "@/lib/types";
 
 export const ProjectCatalog = createContext<{
@@ -13,9 +14,17 @@ export const ProjectCatalog = createContext<{
   priorities: ProjectPriority[];
   taskTypes: ProjectTaskType[];
   impacts: ProjectImpact[];
+  applications: ProjectApplication[];
   labels: ProjectLabel[];
-}>({ priorities: [], taskTypes: [], impacts: [], labels: [] });
+}>({ priorities: [], taskTypes: [], impacts: [], applications: [], labels: [] });
 export const useProjectCatalog = () => useContext(ProjectCatalog);
+export function ApplicationChips({ ids }: { ids: string[] }) {
+  const { applications } = useProjectCatalog();
+  return <>{ids.map(id => {
+    const option = applications.find(item => item.id === id);
+    return option ? <span key={id} className="label-chip colored-chip" style={colorStyle(option.color)} title={`Aplicación: ${option.name}`}><i />{option.name}</span> : null;
+  })}</>;
+}
 export function colorStyle(color = "#64748b"): CSSProperties {
   return { "--chip-color": color } as CSSProperties;
 }

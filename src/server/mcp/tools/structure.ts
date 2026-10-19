@@ -24,12 +24,14 @@ type Raw = {
   teamMemberIds?: string[];
   clientIds: string[];
   ticketIds: string[];
+  applicationIds?: string[];
 };
 const OPTION_COMMAND = {
   status: "status",
   priority: "priority",
   task_type: "taskType",
   impact: "impact",
+  application: "application",
   label: "label",
 } as const;
 
@@ -165,19 +167,20 @@ export function registerStructureTools(server: McpServer, ctx: McpContext) {
 
   defineTool(server, ctx, {
     name: "set_links",
-    title: "Vincular clientes y tickets",
+    title: "Vincular clientes, tickets y aplicaciones",
     description:
-      "Vincula o desvincula clientes y tickets de un proyecto, módulo, feature o tarea (busca sus ids con search_catalog).",
+      "Vincula o desvincula aplicaciones del proyecto (módulos, features y tareas), clientes y tickets de un proyecto, módulo, feature o tarea (busca sus ids con search_catalog).",
     access: "write",
     annotations: IDEMPOTENT,
     input: z.object({
       entity,
       clientIds: ids.optional(),
       ticketIds: ids.optional(),
+      applicationIds: ids.optional().describe("Solo módulos, features y tareas. Usa get_project_tree para consultar el catálogo."),
       mode: z.enum(["replace", "add", "remove"]).default("add"),
     }),
     target: (args) => ({ type: args.entity.kind, id: args.entity.id }),
-    run: async ({ entity: target, clientIds, ticketIds, mode }) => {
+    run: async ({ entity: target, clientIds, ticketIds, applicationIds, mode }) => {
       const { scope, raw } = await current(target.kind, target.id);
       const apply = (existing: string[], next: string[]) =>
         mode === "replace"
@@ -185,7 +188,9 @@ export function registerStructureTools(server: McpServer, ctx: McpContext) {
           : mode === "add"
             ? [...new Set([...existing, ...next])]
             : existing.filter((value) => !next.includes(value));
-      if (!clientIds && !ticketIds) throw new DomainError("Indica clientes o tickets.");
+      if (applicationIds && target.kind === "project") throw new DomainError("Las aplicaciones se asignan a módulos, features y tareas.");
+      if (!clientIds && !ticketIds && !applicationIds) throw new DomainError("Indica clientes, tickets o aplicaciones.");
+      if (applicationIds) await run({ type: "entity.applications.update", scope, applicationIds: apply(raw.applicationIds ?? [], applicationIds) });
       if (clientIds) await run({ type: "entity.clients.update", scope, clientIds: apply(raw.clientIds, clientIds) });
       if (ticketIds) await run({ type: "entity.tickets.update", scope, ticketIds: apply(raw.ticketIds, ticketIds) });
       return "Vínculos actualizados.";
@@ -208,13 +213,13 @@ export function registerStructureTools(server: McpServer, ctx: McpContext) {
 
   defineTool(server, ctx, {
     name: "upsert_project_option",
-    title: "Crear o editar estado, prioridad, tipo, impacto o etiqueta",
+    title: "Crear o editar estado, prioridad, tipo, impacto, aplicación o etiqueta",
     description:
-      "Crea (sin optionId) o modifica (con optionId) una opción del proyecto: estado/columna (isDone indica si cuenta como terminada), prioridad, tipo de tarea, impacto o etiqueta.",
+      "Crea (sin optionId) o modifica (con optionId) una opción del proyecto: estado/columna (isDone indica si cuenta como terminada), prioridad, tipo de tarea, impacto, aplicación o etiqueta.",
     access: "write",
     annotations: WRITE,
     input: z.object({
-      catalog: z.enum(["status", "priority", "task_type", "impact", "label"]),
+      catalog: z.enum(["status", "priority", "task_type", "impact", "application", "label"]),
       projectId: id,
       optionId: id.optional(),
       name: z.string().min(1).max(60).optional(),
@@ -229,6 +234,7 @@ export function registerStructureTools(server: McpServer, ctx: McpContext) {
         priority: workspace.priorities,
         task_type: workspace.taskTypes,
         impact: workspace.impacts,
+        application: workspace.applications,
         label: workspace.labels,
       }[catalog];
       const existing = optionId ? options.find((option) => option.id === optionId) : undefined;
