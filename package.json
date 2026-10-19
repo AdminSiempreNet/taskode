@@ -23,6 +23,7 @@
     "test:http": "node --import tsx --test tests/http-smoke.mjs",
     "test:notifications:browser": "node --import tsx --test tests/notifications-browser.mjs",
     "test:documents:browser": "node --import tsx --test tests/documents-browser.mjs",
+    "test:mentions:browser": "node --import tsx --test tests/mentions-browser.mjs",
     "test:diagrams:browser": "node --import tsx --test tests/diagrams-browser.mjs",
     "test:notifications:live": "node --import tsx --test tests/notifications-realtime-live.mjs",
     "db:generate": "drizzle-kit generate",

@@ -3,6 +3,7 @@
 import Picker from "emoji-picker-react";
 import spanishEmojis from "emoji-picker-react/data/emojis-es";
 import { useTheme } from "next-themes";
+import { useEffect, useRef } from "react";
 
 export default function EmojiPickerPanel({
   onSelect,
@@ -10,9 +11,14 @@ export default function EmojiPickerPanel({
   onSelect: (emoji: string) => void;
 }) {
   const { resolvedTheme } = useTheme();
+  const root = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => root.current?.querySelector("input")?.focus({ preventScroll: true }));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   return (
-    <Picker
+    <div ref={root} style={{ width: "100%", height: "100%" }}><Picker
       className="emoji-picker-catalog"
       aria-label="Catálogo de emojis"
       lang="es"
@@ -21,7 +27,7 @@ export default function EmojiPickerPanel({
       colorScheme={resolvedTheme === "dark" ? "dark" : "light"}
       width="100%"
       height="100%"
-      autoFocusSearch
+      autoFocusSearch={false}
       previewConfig={{ showPreview: false }}
       labels={{
         searchPlaceholder: "Buscar emojis…",
@@ -44,6 +50,6 @@ export default function EmojiPickerPanel({
         skinToneDark: "Tono de piel oscuro",
       }}
       onEmojiClick={({ emoji }) => onSelect(emoji)}
-    />
+    /></div>
   );
 }

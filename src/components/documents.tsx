@@ -530,6 +530,7 @@ function DocumentEditor({
       </div>
       <div className={styles.content}>
         <DescriptionEditor
+          mentionContext={{ scope: document.scope }}
           value={content}
           onChange={setContent}
           editing={editing}

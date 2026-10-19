@@ -4,6 +4,7 @@ import { assertOrigin, httpError, requireActor } from "./access";
 import { repository } from "./index";
 import { DocumentsService } from "./documents";
 import { DomainError } from "./repository";
+import { deliverNotificationEvents } from "./notification-http";
 
 const headers = {
   "Cache-Control": "private, no-store",
@@ -32,7 +33,9 @@ async function route(
 ) {
   try {
     if (!["GET", "HEAD"].includes(request.method)) assertOrigin(request);
-    return Response.json(await action(new DocumentsService(repository())), {
+    const result = await action(new DocumentsService(repository()));
+    if (!["GET", "HEAD"].includes(request.method)) deliverNotificationEvents();
+    return Response.json(result, {
       headers,
     });
   } catch (error) {

@@ -112,6 +112,12 @@ export function EntityDetail({
   const [archived, setArchived] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [mobile, setMobile] = useState(false);
+  useEffect(() => {
+    const reveal = () => { if (/^#comment-[a-f0-9-]{36}$/.test(window.location.hash)) setChatOpen(true); };
+    reveal();
+    window.addEventListener("hashchange", reveal);
+    return () => window.removeEventListener("hashchange", reveal);
+  }, [scope.id, mobile, query.toString()]);
   const [draft, setDraft] = useState("");
   const [documentState, setDocumentState] = useState<DocumentPending>({ pending: false, busy: false });
   const [diagramState, setDiagramState] = useState<DiagramPending>({ pending: false, busy: false });
@@ -503,6 +509,7 @@ export function EntityDetail({
               >
                 <div className="task-description-form">
                   <DescriptionEditor
+                    mentionContext={{ scope }}
                     value={description}
                     onChange={setDescription}
                     editing={editing}

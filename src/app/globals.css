@@ -1958,7 +1958,7 @@ tbody tr:hover {
 .emoji-picker-popover {
   z-index: 60;
   width: min(352px, calc(100vw - 24px));
-  height: min(390px, var(--radix-popover-content-available-height));
+  height: min(390px, calc(100dvh - 24px));
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;

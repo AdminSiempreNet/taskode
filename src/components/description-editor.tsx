@@ -37,6 +37,8 @@ import type { EntityRef } from "@/lib/types";
 import { DiagramReference } from "./diagram-reference";
 import { DiagramReferenceView } from "./diagram-reference-view";
 import { DocumentDiagramPicker } from "./document-diagram-picker";
+import { Mention, MentionSuggestions } from "./mentions";
+import type { MentionContext } from "@/lib/mentions";
 
 export function DescriptionEditor({
   value,
@@ -47,6 +49,7 @@ export function DescriptionEditor({
   uploadImage,
   onUploadingChange,
   diagramScope,
+  mentionContext,
   label = "Descripción de la tarea",
 }: {
   value: string;
@@ -58,7 +61,10 @@ export function DescriptionEditor({
   onUploadingChange?: (count: number) => void;
   label?: string;
   diagramScope?: EntityRef;
+  mentionContext?: MentionContext;
 }) {
+  const mentionRef = useRef(mentionContext);
+  mentionRef.current = mentionContext;
   const lastValue = useRef(value);
   const uploads = useRef({ uploadImage, onUploadingChange });
   uploads.current = { uploadImage, onUploadingChange };
@@ -75,6 +81,7 @@ export function DescriptionEditor({
   const clickPosition = useRef<{ left: number; top: number } | null>(null);
   const editor = useEditor({
     extensions: [
+      Mention.configure({ getContext: () => mentionRef.current }),
       StarterKit.configure({
         heading: { levels: [2, 3] },
         underline: false,
@@ -192,20 +199,21 @@ export function DescriptionEditor({
   }, [editor, editing, disabled]);
   useEffect(() => {
     if (!editing) return;
-    const outside = (event: PointerEvent) => {
+    const outside = (event: MouseEvent) => {
       if (
         root.current &&
         event.target instanceof Node &&
         !(
           event.target instanceof Element &&
-          event.target.closest("[data-image-preview], [data-document-picker]")
+          event.target.closest("[data-image-preview], [data-document-picker], .mention-suggestions, .mention-card")
         ) &&
-        !root.current.contains(event.target)
+        !root.current.contains(event.target) && !event.composedPath().includes(root.current)
       )
         setEditing(false);
     };
-    document.addEventListener("pointerdown", outside);
-    return () => document.removeEventListener("pointerdown", outside);
+    // Finish the clicked action before collapsing the editor changes its layout.
+    document.addEventListener("click", outside);
+    return () => document.removeEventListener("click", outside);
   }, [editing, setEditing]);
   function startEditing(action?: () => void) {
     if (!editor || disabled) return;
@@ -276,7 +284,7 @@ export function DescriptionEditor({
           !(
             event.relatedTarget instanceof Element &&
             event.relatedTarget.closest(
-              "[data-image-preview], [data-document-picker]",
+              "button, [data-image-preview], [data-document-picker], .mention-suggestions, .mention-card",
             )
           ) &&
           !event.currentTarget.contains(event.relatedTarget)
@@ -537,7 +545,7 @@ export function DescriptionEditor({
             onClick={(event) => {
               if (
                 !disabled &&
-                !(event.target as HTMLElement).closest("a, button")
+                !(event.target as HTMLElement).closest("a, button, .mention")
               ) {
                 clickPosition.current = {
                   left: event.clientX,
@@ -548,7 +556,7 @@ export function DescriptionEditor({
             }}
           >
             {value ? (
-              <MarkdownContent diagramScope={diagramScope}>
+              <MarkdownContent diagramScope={diagramScope} mentionContext={mentionContext}>
                 {value}
               </MarkdownContent>
             ) : (
@@ -559,6 +567,7 @@ export function DescriptionEditor({
           </div>
         </>
       )}
+      <MentionSuggestions editor={editor} context={editing ? mentionContext : undefined} />
     </section>
   );
 }

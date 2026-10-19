@@ -66,10 +66,10 @@ export function useOpenNotification(userId: string) {
         );
         if (!response.ok)
           throw Error("Esta notificación ya no está disponible.");
-        const target: { projectId: string; taskId: string } =
+        const target: { projectId: string; taskId: string; url?: string } =
           await response.json();
         await clientFor(userId).read(id);
-        router.push(taskPath(target.projectId, target.taskId));
+        router.push(target.url ?? taskPath(target.projectId, target.taskId));
       } catch (error) {
         toast.error((error as Error).message);
       }
@@ -168,7 +168,7 @@ export function NotificationBell({ userId }: { userId: string }) {
         id: `notification:${item.id}`,
         description: item.taskTitle,
         action: {
-          label: "Ver tarea",
+          label: item.type === "mention" ? "Ver mención" : "Ver tarea",
           onClick: () => {
             void open(item.id);
           },

@@ -326,7 +326,7 @@ test("respaldos v2 conservan clientes y relaciones; v1 Taskode y Brote restauran
     const path = join(directory, "backup.json");
     await repo.exportBackup(path);
     const file = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(file.version, 9);
+    assert.equal(file.version, 10);
     validateApplicationBackup(file);
     for (const mutate of [
       (copy: typeof file) => {

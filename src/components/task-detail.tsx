@@ -219,6 +219,12 @@ export function TaskDetail({
   }, [task?.id, task?.files]);
   const [chatOpen, setChatOpen] = useState(false);
   const [mobileComments, setMobileComments] = useState(false);
+  useEffect(() => {
+    const reveal = () => { if (/^#comment-[a-f0-9-]{36}$/.test(window.location.hash)) setChatOpen(true); };
+    reveal();
+    window.addEventListener("hashchange", reveal);
+    return () => window.removeEventListener("hashchange", reveal);
+  }, [task?.id, mobileComments, searchParams.toString()]);
   const [commentDraft, setCommentDraft] = useState("");
   const conversation = useTaskComments(task, workspace.currentUser);
   useEffect(() => {
@@ -674,6 +680,7 @@ export function TaskDetail({
                   onInvalidCapture={() => setActiveTab("properties")}
                 >
                   <DescriptionEditor
+                    mentionContext={task ? { scope: { kind: "task", id: task.id, projectId: project.id } } : { draft: { kind: "task", projectId: project.id, featureId, leaderId, teamMemberIds } }}
                     value={description}
                     onChange={(value) => {
                       setDescription(value);

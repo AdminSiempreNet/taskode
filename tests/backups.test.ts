@@ -114,7 +114,7 @@ test("respaldo JSON: lista, descarga, restaura con copia previa y elimina; reaju
       (await s.manager.download(backup.id)).toString(),
     ) as ApplicationBackup;
     assert.equal(file.format, "taskode-backup");
-    assert.equal(file.version, 9);
+    assert.equal(file.version, 10);
     assert.equal(file.tables.session, undefined);
     assert.equal(file.tables.verification, undefined);
     assert.deepEqual(await s.manager.list(), [backup]);

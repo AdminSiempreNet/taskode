@@ -43,7 +43,7 @@ test("migración de documentos conserva los adjuntos y sus claves de almacenamie
     // Recreate the previous shape only inside this disposable test schema.
     assert.match(repo.store.schemaName, /^taskode_test_[a-f0-9]{32}$/);
     await repo.store.pool.query(
-      "drop table documents; alter table files alter column purpose set default 'document'",
+      'alter table notifications drop constraint "notifications_documentId_documents_id_fk"; drop table documents; alter table files alter column purpose set default \'document\'',
     );
     await repo.store.pool.query(
       'insert into files (id, "projectId", "scopeType", "uploadedBy", name, "mimeType", size, "storageKey", status, "createdAt") values ($1, $2, \'project\', $3, \'manual.pdf\', \'application/pdf\', 123, $1, \'ready\', $4)',
@@ -52,6 +52,7 @@ test("migración de documentos conserva los adjuntos y sus claves de almacenamie
     await repo.store.pool.query(
       await readFile("drizzle/postgresql/0010_documents.sql", "utf8"),
     );
+    await repo.store.pool.query('alter table notifications add constraint "notifications_documentId_documents_id_fk" foreign key ("documentId") references documents(id) on delete cascade');
     const result = await repo.store.pool.query(
       'select id, "storageKey", purpose, status from files where id = $1',
       [id],
@@ -362,7 +363,7 @@ test("documentos: imágenes protegidas, respaldos v9 y compatibilidad v8; cascad
     const path = join(directory, "backup.json");
     await f.repo.exportBackup(path);
     const backup = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(backup.version, 9);
+    assert.equal(backup.version, 10);
     assert.equal(backup.tables.documents.length, 2);
     const corrupt = structuredClone(backup);
     corrupt.tables.documents[0].projectId = "missing";

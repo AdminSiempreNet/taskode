@@ -141,6 +141,18 @@ export function EntityComments({
       ? [...comments, pending]
       : comments;
   const blocked = busy || attaching || uploading > 0;
+  useEffect(() => {
+    const reveal = () => {
+      const hash = window.location.hash;
+      if (/^#comment-[a-f0-9-]{36}$/.test(hash)) {
+        const target = document.getElementById(hash.slice(1));
+        if (target) { nearBottom.current = false; target.scrollIntoView({ block: "center" }); }
+      }
+    };
+    const frame = requestAnimationFrame(reveal);
+    window.addEventListener("hashchange", reveal);
+    return () => { cancelAnimationFrame(frame); window.removeEventListener("hashchange", reveal); };
+  }, [comments]);
 
   useEffect(() => {
     const additions = comments.filter(
@@ -403,6 +415,7 @@ function ChatMessage({
 
   return (
     <article
+      id={`comment-${comment.id}`}
       className={`${styles.message} ${own ? styles.own : styles.other} ${grouped ? styles.grouped : ""}`}
       style={
         { "--chat-author-color": authorColors[colorIndex] } as CSSProperties
@@ -510,7 +523,7 @@ function ChatMessage({
           </form>
         ) : (
           <div className={styles.messageContent}>
-            <MarkdownContent>{comment.content}</MarkdownContent>
+            <MarkdownContent mentionContext={{ scope }}>{comment.content}</MarkdownContent>
           </div>
         )}
         <div className={styles.messageFooter}>

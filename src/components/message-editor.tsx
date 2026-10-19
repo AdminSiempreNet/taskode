@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { MarkdownYoutube, imagePasteExtension } from "./media-extensions";
 import { uploadFile } from "@/lib/file-client";
 import type { EntityRef } from "@/lib/types";
+import { Mention, MentionSuggestions } from "./mentions";
 export function MessageEditor(props: {
   value: string;
   onChange: (value: string) => void;
@@ -29,6 +30,7 @@ export function MessageEditor(props: {
     content: props.value,
     contentType: "markdown",
     extensions: [
+      Mention.configure({ getContext: () => ({ scope: latest.current.scope ?? { kind: "task", id: latest.current.taskId!, projectId: latest.current.projectId } }) }),
       StarterKit.configure({
         heading: false,
         trailingNode: false,
@@ -118,5 +120,6 @@ export function MessageEditor(props: {
     latest.current.onReady?.(editor);
     return () => latest.current.onReady?.(null);
   }, [editor]);
-  return <EditorContent editor={editor} />;
+  const scope = props.scope ?? (props.taskId ? { kind: "task" as const, id: props.taskId, projectId: props.projectId } : undefined);
+  return <><EditorContent editor={editor} /><MentionSuggestions editor={editor} context={scope ? { scope } : undefined} /></>;
 }

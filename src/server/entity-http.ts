@@ -5,6 +5,7 @@ import { DomainError } from "./repository";
 import { commentsRealtime, ablyConfig } from "./realtime-config";
 import { commentsToken } from "./realtime";
 import { deliverCommentEvents } from "./comment-http";
+import { deliverNotificationEvents } from "./notification-http";
 
 export type EntityContext = { params: Promise<{ kind: string; id: string }> };
 const noStore = { "Cache-Control": "no-store" };
@@ -71,6 +72,7 @@ export async function postComment(request: Request, context: EntityContext) {
       parsed.data,
     );
     deliverCommentEvents();
+    deliverNotificationEvents();
     return Response.json(
       { ...result, realtime: commentsRealtime(id, actor.id, kind) },
       { headers: noStore },

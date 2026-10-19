@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, desc, eq } from "drizzle-orm";
-import { documents } from "./schema";
+import { documents, notifications } from "./schema";
+import { MentionsService } from "./mentions";
 import type { PostgresRepository } from "./postgres";
 import type { Actor, EntityKind, EntityRef, Feature, Task } from "../lib/types";
 import { entityColumns, rowScope, sameEntity } from "../lib/entities";
@@ -124,13 +125,14 @@ export class DocumentsService {
           createdAt: now,
           updatedAt: now,
         });
+      await new MentionsService(this.repo).changed(actor, scope, "", data.content, { documentId: id });
       return this.get(actor, id);
     });
   }
   async save(actor: Actor, id: string, revision: number, value: unknown) {
     const data = input(value);
     return this.repo.store.transaction(async () => {
-      const { scope, permissions } = await this.target(actor, id);
+      const { scope, permissions, row } = await this.target(actor, id);
       if (!permissions.canEdit)
         throw new DomainError("No puedes editar este documento.", 403);
       const result = await this.repo.store.db
@@ -153,6 +155,7 @@ export class DocumentsService {
         scope.projectId,
         scope,
       );
+      await new MentionsService(this.repo).changed(actor, scope, row.content, data.content, { documentId: id });
       return this.get(actor, id);
     });
   }
@@ -161,7 +164,9 @@ export class DocumentsService {
       const { permissions } = await this.target(actor, id);
       if (!permissions.canEdit)
         throw new DomainError("No puedes eliminar este documento.", 403);
+      const recipients = await this.repo.store.db.select({ userId: notifications.recipientId }).from(notifications).where(eq(notifications.documentId, id));
       await this.repo.store.db.delete(documents).where(eq(documents.id, id));
+      await this.repo.notifications.accessChanged(recipients.map(r => r.userId));
     });
   }
   private async lineage(actor: Actor, kind: EntityKind, id: string) {

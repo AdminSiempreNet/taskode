@@ -13,7 +13,9 @@ import {
 import type { PostgresRepository } from "./postgres";
 import * as s from "./schema";
 import { DomainError } from "./repository";
-import type { Actor } from "../lib/types";
+import type { Actor, EntityRef } from "../lib/types";
+import { entityColumns, rowScope } from "../lib/entities";
+import { entityPath } from "../lib/routes";
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   notificationPreferencesSchema,
@@ -49,7 +51,10 @@ export class NotificationsService {
       and (viewer.role = 'admin' or ${this.repo.taskVisibility({ id: userId })}))`;
   }
   private inbox(userId: string) {
-    return and(eq(s.notifications.recipientId, userId), this.access(userId));
+    return and(eq(s.notifications.recipientId, userId), sql`exists (select 1 from "user" viewer where viewer.id = ${userId}
+      and (viewer.role = 'admin' or ${s.projects.leaderId} = ${userId}
+        or exists (select 1 from ${s.projectTeamMembers} pm where pm."projectId" = ${s.projects.id} and pm."userId" = ${userId}))
+      and (${s.notifications.scopeType} <> 'task' or viewer.role = 'admin' or ${this.repo.taskVisibility({ id: userId })}))`);
   }
   async list(
     actor: Actor,
@@ -72,7 +77,12 @@ export class NotificationsService {
           sequence: s.notifications.sequence,
           type: s.notifications.type,
           actorName: s.user.name,
-          taskId: s.tasks.id,
+          taskId: s.notifications.taskId,
+          scopeType: s.notifications.scopeType,
+          moduleId: s.notifications.moduleId,
+          featureId: s.notifications.featureId,
+          commentId: s.notifications.commentId,
+          documentId: s.notifications.documentId,
           projectId: s.projects.id,
           projectName: s.projects.name,
           taskTitle: s.notifications.taskTitle,
@@ -81,8 +91,8 @@ export class NotificationsService {
           readAt: s.notifications.readAt,
         })
         .from(s.notifications)
-        .innerJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
-        .innerJoin(s.projects, eq(s.projects.id, s.tasks.projectId))
+        .leftJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
+        .innerJoin(s.projects, eq(s.projects.id, s.notifications.projectId))
         .leftJoin(s.user, eq(s.user.id, s.notifications.actorId))
         .where(
           and(
@@ -98,11 +108,13 @@ export class NotificationsService {
       const [count] = await this.repo.store.db
         .select({ count: sql<number>`count(*)::integer` })
         .from(s.notifications)
-        .innerJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
-        .innerJoin(s.projects, eq(s.projects.id, s.tasks.projectId))
+        .leftJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
+        .innerJoin(s.projects, eq(s.projects.id, s.notifications.projectId))
         .where(and(this.inbox(actor.id), isNull(s.notifications.readAt)));
       const items: NotificationItem[] = rows.slice(0, limit).map((r) => ({
         ...r,
+        scope: rowScope(r)!,
+        entityTitle: r.taskTitle,
         createdAt: r.createdAt.toISOString(),
         readAt: r.readAt?.toISOString() ?? null,
       }));
@@ -127,20 +139,30 @@ export class NotificationsService {
     const [item] = await this.repo.store.db
       .select({
         taskId: s.notifications.taskId,
-        projectId: s.tasks.projectId,
+        projectId: s.notifications.projectId,
+        scopeType: s.notifications.scopeType,
+        moduleId: s.notifications.moduleId,
+        featureId: s.notifications.featureId,
+        commentId: s.notifications.commentId,
+        documentId: s.notifications.documentId,
         readAt: s.notifications.readAt,
       })
       .from(s.notifications)
-      .innerJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
-      .innerJoin(s.projects, eq(s.projects.id, s.tasks.projectId))
+      .leftJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
+      .innerJoin(s.projects, eq(s.projects.id, s.notifications.projectId))
       .where(and(eq(s.notifications.id, id), this.inbox(actor.id)));
     if (!item)
       throw new DomainError(
         "La notificación no existe o no tienes acceso.",
         404,
       );
+    const scope = rowScope(item)!;
+    const url = new URL(entityPath(scope.projectId, scope.kind, scope.id, "board", item.documentId ? "documents" : "description"), "http://taskode.invalid");
+    if (item.documentId) url.searchParams.set("document", item.documentId);
+    if (item.commentId) url.hash = `comment-${item.commentId}`;
     return {
       id,
+      url: `${url.pathname}${url.search}${url.hash}`,
       taskId: item.taskId,
       projectId: item.projectId,
       readAt: item.readAt?.toISOString() ?? null,
@@ -157,8 +179,8 @@ export class NotificationsService {
       const visible = this.repo.store.db
         .select({ id: s.notifications.id })
         .from(s.notifications)
-        .innerJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
-        .innerJoin(s.projects, eq(s.projects.id, s.tasks.projectId))
+        .leftJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
+        .innerJoin(s.projects, eq(s.projects.id, s.notifications.projectId))
         .where(
           and(
             this.inbox(actor.id),
@@ -233,6 +255,11 @@ export class NotificationsService {
     return { leaderId: task.leaderId, team: team.map((r) => r.userId) };
   }
   async deliveryValid(notificationId: string, now = new Date()) {
+    const [source] = await this.repo.store.db.select().from(s.notifications).where(eq(s.notifications.id, notificationId));
+    if (source?.type === "mention") {
+      try { await this.get({ id: source.recipientId }, notificationId); return true; }
+      catch (error) { if (error instanceof DomainError) return false; throw error; }
+    }
     const [row] = await this.repo.store.db
       .select({
         notification: s.notifications,
@@ -345,6 +372,20 @@ export class NotificationsService {
   async accessChanged(userIds: string[]) {
     for (const userId of new Set(userIds)) await this.invalidate(userId);
   }
+  async mentioned(scope: EntityRef, actor: Actor, userId: string, source: { commentId?: string; documentId?: string }) {
+    const { entity } = await this.repo.requireEntity({ id: userId }, scope.kind, scope.id, scope.projectId);
+    let title = String(entity.title ?? entity.name);
+    if (source.documentId) {
+      const [doc] = await this.repo.store.db.select().from(s.documents).where(eq(s.documents.id, source.documentId));
+      if (!doc) throw new DomainError("El documento no existe.", 404);
+      title = doc.title;
+    }
+    const [item] = await this.repo.store.db.insert(s.notifications).values({
+      id: randomUUID(), recipientId: userId, actorId: actor.id, ...entityColumns(scope),
+      ...source, type: "mention", taskTitle: title, dedupKey: `mention:${randomUUID()}`,
+    }).returning({ id: s.notifications.id });
+    await this.invalidate(userId, item.id);
+  }
   private async create(
     taskId: string,
     userId: string,
@@ -356,7 +397,7 @@ export class NotificationsService {
     expiresAt = new Date(now.getTime() + 86400000),
   ) {
     const [task] = await this.repo.store.db
-      .select({ title: s.tasks.title })
+      .select({ title: s.tasks.title, projectId: s.tasks.projectId })
       .from(s.tasks)
       .innerJoin(s.projects, eq(s.projects.id, s.tasks.projectId))
       .where(and(eq(s.tasks.id, taskId), this.access(userId)));
@@ -369,6 +410,7 @@ export class NotificationsService {
         recipientId: userId,
         actorId,
         taskId,
+        projectId: task.projectId,
         type,
         taskTitle: String(task.title),
         dedupKey,

@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { ImagePreviewProvider } from "@/components/image-preview";
 import "./globals.css";
 import "./notifications.css";
+import "./mentions.css";
 export const metadata: Metadata = {
   title: "Taskode · Proyectos y tareas de desarrollo",
   description:

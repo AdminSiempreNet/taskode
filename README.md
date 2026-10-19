@@ -1,6 +1,8 @@
 # Taskode · Proyectos y tareas de desarrollo
 
-Proyectos, módulos, features y tareas incluyen una pestaña **Diagramas** con Excalidraw: guardado manual en PostgreSQL, imágenes incluidas hasta 3 MB, pantalla completa y enlaces públicos revocables de solo lectura. La [guía de diagramas](docs/diagramas.md) detalla permisos, migración y respaldos versión 8.
+Proyectos, módulos, features y tareas incluyen una pestaña **Diagramas** con Excalidraw: guardado manual en PostgreSQL, imágenes incluidas hasta 3 MB, pantalla completa y enlaces públicos revocables de solo lectura. La [guía de diagramas](docs/diagramas.md) detalla permisos y uso.
+
+Los comentarios, las descripciones y el contenido de documentos admiten menciones: escribe `@` para elegir un usuario con acceso o `#` para elegir un cliente. Las listas de usuarios muestran foto, nombre y correo; el nombre resaltado permite ver su tarjeta al pasar el cursor o enfocarlo con teclado. Una mención nueva de usuario genera una notificación in-app que abre su contenido de origen. Editar el resto del texto no repite avisos; las automenciones no notifican. Mencionar no concede permisos ni modifica los clientes asociados a una tarea. Los títulos y descripciones breves de documentos siguen siendo texto simple.
 
 Gestión de proyectos de software, módulos, features y tareas en español. Del backlog al siguiente deploy. Construida con Next.js, React, TypeScript, shadcn/ui y PostgreSQL mediante Drizzle ORM. Better Auth gestiona el acceso con Google/GitHub y las invitaciones.
 
@@ -186,8 +188,8 @@ La carga exige PostgreSQL local, conserva los proyectos anteriores, se confirma 
 
 El administrador conserva el panel **Respaldo**: permite listar, generar, descargar, eliminar y restaurar desde una copia del servidor o un archivo adjunto.
 
-- Formato: `.taskode-backup.json`, con identificador `taskode-backup`, versión 8, fecha y una lista explícita de tablas. Incluye geografía, clientes, asignaciones, notificaciones y diagramas con sus imágenes.
-- Las copias anteriores Taskode y `.brote-backup.json` de versión 1 siguen disponibles para listar, descargar y restaurar, tanto en archivos locales como en S3. Al restaurarlas se incorpora el catálogo geográfico y se comienza sin clientes ni asociaciones. Las exportaciones nuevas usan exclusivamente Taskode versión 8; también se admiten las versiones 2–7.
+- Formato: `.taskode-backup.json`, con identificador `taskode-backup`, versión 10, fecha y una lista explícita de tablas. Incluye geografía, clientes, asignaciones, notificaciones con sus destinos, documentos y diagramas con sus imágenes.
+- Las copias anteriores Taskode y `.brote-backup.json` de versión 1 siguen disponibles para listar, descargar y restaurar, tanto en archivos locales como en S3. Al restaurarlas se incorpora el catálogo geográfico y se comienza sin clientes ni asociaciones. Las exportaciones nuevas usan exclusivamente Taskode versión 10; también se admiten las versiones 2–9. La restauración conserva las menciones sin volver a generar avisos.
 - Incluye usuarios, cuentas OAuth vinculadas, líderes, equipos, configuración inicial, invitaciones y todos los datos de negocio, incluidas tareas archivadas, comentarios, checklist e historial.
 - Excluye sesiones, verificaciones temporales y metadatos de migraciones. El archivo puede contener información sensible de las cuentas y debe conservarse protegido.
 - La exportación lee un snapshot consistente y la carpeta se configura con `BACKUP_DIR`.
@@ -258,7 +260,7 @@ Las tareas tienen **Líder**, **Equipo** y permisos por tarea, con acceso superi
 
 Los participantes del proyecto pueden consultar los nuevos detalles, descargar documentos y comentar, incluidas imágenes en el chat. Los líderes del elemento y sus superiores gestionan sus usuarios, movimientos y eliminación. Los equipos propios de módulos y features también editan contenido y documentos. Los permisos específicos de las tareas se conservan.
 
-Consulta [permisos, migración y respaldo de archivos](docs/uso-compartido-y-archivos.md) antes de actualizar. Aplica todas las migraciones hasta `0009_diagrams` antes de arrancar la nueva versión. Los JSON nuevos usan la versión 8 y se admiten las versiones 1–7. Las imágenes de diagramas se incluyen en el JSON; los demás archivos físicos se copian y restauran por separado.
+Consulta [permisos, migración y respaldo de archivos](docs/uso-compartido-y-archivos.md) antes de actualizar. Aplica todas las migraciones hasta `0011_mentions` antes de arrancar la nueva versión (`npm run db:migrate`; para desarrollo local, añade `-- --development`). Los JSON nuevos usan la versión 10 y se admiten las versiones 1–9. Las imágenes de diagramas se incluyen en el JSON; los demás archivos físicos se copian y restauran por separado. Ejecuta `npm run test:mentions:browser` después de compilar para verificar sugerencias, tarjetas, avisos y emojis con una base de prueba aislada.
 
 La campana y el [centro de notificaciones y recordatorios](docs/notificaciones.md) incluyen asignaciones, tareas compartidas, preferencias personales, zonas por proyecto y push web opcional por dispositivo. Dokploy ejecuta el programador cada minuto; configura VAPID y `NOTIFICATION_WORKER_SECRET` antes de desplegar.
 

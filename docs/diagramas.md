@@ -30,6 +30,6 @@ npm run db:migrate -- --development
 
 En producción se usa `npm run db:migrate` con la configuración del despliegue. La migración local ya se aplica por separado; no se ejecuta automáticamente desde la interfaz.
 
-Los respaldos nuevos usan la versión **8** e incluyen escenas e imágenes. Se mantiene compatibilidad con versiones 1–7, que se normalizan sin diagramas, y el límite global de respaldo de 100 MB. Los tokens públicos no se exportan y todos los diagramas restaurados quedan privados.
+Los respaldos nuevos usan la versión **10** e incluyen escenas e imágenes. Se mantiene compatibilidad con versiones 1–9; las anteriores a la versión 8 se normalizan sin diagramas. El límite global de respaldo sigue siendo 100 MB. Los tokens públicos no se exportan y todos los diagramas restaurados quedan privados.
 
 Pruebas específicas: `node --import tsx --test tests/diagrams.test.ts` y `npm run test:diagrams:browser`. Las pruebas HTTP generales incluyen guardado, conflictos, origen, tamaño y compartición anónima. Las pruebas de navegador guardan capturas en `test-results/diagrams-*.png`.

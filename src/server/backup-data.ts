@@ -51,6 +51,7 @@ export const backupTables = {
 };
 type BackupRow = Record<string, string | number | boolean | string[] | DiagramScene | null>;
 const tableValidators: Record<string, z.ZodType> = {};
+const version9Validators: Record<string, z.ZodType> = {};
 const version8Validators: Record<string, z.ZodType> = {};
 const version7Validators: Record<string, z.ZodType> = {};
 const version6Validators: Record<string, z.ZodType> = {};
@@ -88,6 +89,12 @@ for (const [name, table] of Object.entries(backupTables)) {
     fields[key] = column.notNull ? field : field.nullable();
   }
   tableValidators[name] = z.array(z.strictObject({ ...fields }));
+  if (name === "notifications") {
+    for (const key of ["projectId", "scopeType", "moduleId", "featureId", "commentId", "documentId"]) delete fields[key];
+    fields.taskId = z.string();
+    fields.type = z.enum(["assigned", "shared", "reminder"]);
+  }
+  version9Validators[name] = z.array(z.strictObject({ ...fields }));
   if (name === "documents") continue;
   version8Validators[name] = z.array(z.strictObject({ ...fields }));
   if (name === "diagrams") continue;
@@ -152,8 +159,13 @@ const fileSchema = z
   .union([
     z.strictObject({
       ...backupHeader,
-      version: z.literal(9),
+      version: z.literal(10),
       tables: z.strictObject(tableValidators),
+    }),
+    z.strictObject({
+      ...backupHeader,
+      version: z.literal(9),
+      tables: z.strictObject(version9Validators),
     }),
     z.strictObject({
       ...backupHeader,
@@ -318,23 +330,34 @@ const fileSchema = z
   .transform((input) => input.version >= 8 ? input : ({
     ...input, version: 8 as const, tables: { ...input.tables, diagrams: [] },
   }))
-  .transform((input): { format: "taskode-backup"; createdAt: string; version: 9; tables: Record<string, unknown> } => {
+  .transform((input) => {
+    if (input.version >= 9) return input;
     const tables = input.tables as Record<string, BackupRow[]>;
     return { ...input, version: 9, tables: { ...tables, documents: tables.documents ?? [],
       files: tables.files.map((file) => ({ ...file, purpose: file.purpose === "document" ? "file" : file.purpose })),
+    } };
+  })
+  .transform((input) => {
+    if (input.version >= 10) return input;
+    const tables = input.tables as Record<string, BackupRow[]>;
+    return { ...input, version: 10 as const, tables: { ...tables,
+      notifications: tables.notifications.map(n => ({ ...n,
+        projectId: tables.tasks.find(t => t.id === n.taskId)?.projectId ?? "",
+        scopeType: "task", moduleId: null, featureId: null, commentId: null, documentId: null,
+      })),
     } };
   })
   .pipe(
     z.strictObject({
       format: z.literal("taskode-backup"),
       createdAt: z.iso.datetime(),
-      version: z.literal(9),
+      version: z.literal(10),
       tables: z.strictObject(tableValidators),
     }),
   );
 export type ApplicationBackup = {
   format: "taskode-backup";
-  version: 9;
+  version: 10;
   createdAt: string;
   tables: Record<string, BackupRow[]>;
 };
@@ -348,7 +371,7 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
   const parsed = fileSchema.safeParse(input);
   if (!parsed.success)
     invalid(
-      "El archivo no es un respaldo JSON compatible de Taskode (versiones 1–9).",
+      "El archivo no es un respaldo JSON compatible de Taskode (versiones 1–10).",
     );
   const backup = parsed.data as ApplicationBackup;
   const data = backup.tables;
@@ -366,7 +389,16 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
     if (!data.user.some((u) => u.id === p.userId) || !notificationPreferencesSchema.safeParse({ offsets: (p.offsets as string[]).map(Number), dateOnlyTime: p.dateOnlyTime }).success) invalid();
   }
   for (const n of data.notifications) {
-    if (!data.user.some((u) => u.id === n.recipientId) || (n.actorId !== null && !data.user.some((u) => u.id === n.actorId)) || !data.tasks.some((t) => t.id === n.taskId)) invalid();
+    if (!data.user.some((u) => u.id === n.recipientId) || (n.actorId !== null && !data.user.some((u) => u.id === n.actorId))) invalid();
+    const target = n.scopeType === "project" ? data.projects.find(p => p.id === n.projectId)
+      : (n.scopeType === "task" ? data.tasks : n.scopeType === "module" ? data.modules : data.features)
+        .find(t => t.id === (n.scopeType === "task" ? n.taskId : n.scopeType === "module" ? n.moduleId : n.featureId) && t.projectId === n.projectId);
+    if (!target || [n.taskId, n.moduleId, n.featureId].filter(v => v !== null).length !== (n.scopeType === "project" ? 0 : 1)) invalid();
+    if (n.commentId !== null && n.documentId !== null) invalid();
+    for (const [key, rows] of [["commentId", data.comments], ["documentId", data.documents]] as const) {
+      if (n[key] !== null && !rows.some(row => row.id === n[key] && row.projectId === n.projectId && row.scopeType === n.scopeType && row.taskId === n.taskId && row.moduleId === n.moduleId && row.featureId === n.featureId)) invalid();
+    }
+    if (n.type !== "mention" && (n.scopeType !== "task" || n.commentId !== null || n.documentId !== null)) invalid();
     if (n.offsetMinutes !== null && ![15, 60, 1440, 4320, 10080].includes(Number(n.offsetMinutes))) invalid();
   }
   if (new Set(data.notifications.map((n) => n.dedupKey)).size !== data.notifications.length) invalid();
@@ -687,7 +719,7 @@ export async function exportApplicationBackup(
   });
   const text = JSON.stringify({
     format: "taskode-backup",
-    version: 9,
+    version: 10,
     createdAt: new Date().toISOString(),
     tables,
   });

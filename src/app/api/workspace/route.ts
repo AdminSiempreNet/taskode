@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     const result = await repository().execute(parsed.data, actor);
-    if (/^(task\.|project\.delete|project\.team\.remove|project\.timezone\.|status\.update|trello\.)/.test(parsed.data.type)) deliverNotificationEvents();
+    if (/^(task\.|project\.|module\.|feature\.|comment\.|status\.update|trello\.)/.test(parsed.data.type)) deliverNotificationEvents();
     if (parsed.data.type.startsWith("comment.")) deliverCommentEvents();
     return NextResponse.json({
       workspace: await repository().getWorkspace(actor),

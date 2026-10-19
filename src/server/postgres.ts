@@ -34,6 +34,7 @@ import { DEFAULT_TASK_TYPES, DEFAULT_IMPACTS } from "../lib/types";
 import { DomainError, type WorkspaceRepository } from "./repository";
 import { entityColumns, rowScope, sameEntity } from "../lib/entities";
 import { NotificationsService } from "./notifications";
+import { MentionsService } from "./mentions";
 
 type Row = Record<string, string | number | boolean | string[] | null>;
 async function sequential<T>(queries: (() => Promise<T>)[]): Promise<T[]> {
@@ -57,7 +58,7 @@ async function each<T>(
 }
 export class PostgresRepository implements WorkspaceRepository {
   // Incrementar al cambiar el contrato o las migraciones de una instancia cacheada.
-  static readonly cacheVersion = 16;
+  static readonly cacheVersion = 17;
   readonly cacheVersion = PostgresRepository.cacheVersion;
   readonly store: DatabaseStore;
   readonly notifications: NotificationsService;
@@ -1402,10 +1403,37 @@ export class PostgresRepository implements WorkspaceRepository {
   }
   async execute(command: Command, actor: Actor): Promise<CommandResult> {
     return this.transaction(async () => {
+      let descriptionBefore = "";
+      const descriptionCommand = /^(project|module|feature|task)\.(create|update)$/.test(command.type);
+      if (descriptionCommand && command.type.endsWith("update") && "id" in command) {
+        const kind = command.type.split(".")[0] as EntityKind;
+        descriptionBefore = String((await this.requireEntity(actor, kind, command.id)).entity.description ?? "");
+      }
       const previous = command.type === "task.assignment.update" ? await this.notifications.assignment(command.id) : null;
-      const removedRecipients = command.type === "task.delete" || command.type === "project.delete" ? await this.store.db.select({ userId: schema.notifications.recipientId }).from(schema.notifications)
-        .innerJoin(schema.tasks, eq(schema.tasks.id, schema.notifications.taskId)).where(command.type === "task.delete" ? eq(schema.tasks.id, command.id) : eq(schema.tasks.projectId, command.id)) : [];
+      const changesAccess = /^(project|module|feature|task)\.(delete|assignment\.update|team\.remove|leader\.update)$/.test(command.type)
+        || /^(task|feature)\.update$/.test(command.type) || command.type === "comment.delete";
+      let changedProject: string | null = null;
+      if (changesAccess) {
+        if ("projectId" in command) changedProject = command.projectId;
+        else if ("id" in command) {
+          const kind = command.type.split(".")[0];
+          if (kind === "project") changedProject = command.id;
+          else {
+            const table = { module: "modules", feature: "features", task: "tasks", comment: "comments" }[kind];
+            if (table) changedProject = String((await this.get(table, command.id)).projectId);
+          }
+        }
+      }
+      const removedRecipients = changedProject ? await this.store.db.selectDistinct({ userId: schema.notifications.recipientId })
+        .from(schema.notifications).where(eq(schema.notifications.projectId, changedProject)) : [];
       const result = await this.executeCommand(command, actor);
+      if (descriptionCommand && "description" in command) {
+        const kind = command.type.split(".")[0] as EntityKind;
+        const id = result.createdId ?? ("id" in command ? command.id : "");
+        const entity = await this.get({ project: "projects", module: "modules", feature: "features", task: "tasks" }[kind], id);
+        const scope = { kind, id, projectId: String(kind === "project" ? id : entity.projectId) };
+        await new MentionsService(this).changed(actor, scope, descriptionBefore, command.description);
+      }
       if (removedRecipients.length) await this.notifications.accessChanged(removedRecipients.map((r) => r.userId));
       if (command.type === "project.team.remove") await this.notifications.accessChanged([command.userId]);
       if (command.type === "task.assignment.update" || command.type === "task.create") {
@@ -2233,6 +2261,7 @@ export class PostgresRepository implements WorkspaceRepository {
               scope.projectId,
               scope,
             );
+            await new MentionsService(this).changed(actor, scope, "", c.content, { commentId: id });
             return { createdId: id };
           }
           case "comment.update": {
@@ -2248,6 +2277,7 @@ export class PostgresRepository implements WorkspaceRepository {
               content: c.content,
               updatedAt: new Date().toISOString(),
             });
+            await new MentionsService(this).changed(actor, scope, String(comment.content), c.content, { commentId: c.id });
             break;
           }
           case "comment.delete":

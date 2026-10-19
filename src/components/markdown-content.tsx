@@ -9,17 +9,23 @@ import type { EntityRef } from "@/lib/types";
 import { parseDiagramReference } from "@/lib/documents";
 import { DocumentDiagramPreview } from "./diagram-preview-loader";
 import { useImagePreview } from "./image-preview";
+import { parseMention, type MentionContext } from "@/lib/mentions";
+import { MentionDisplay } from "./mentions";
 
 export const MarkdownContent = memo(function MarkdownContent({
   children,
   compact = false,
   diagramScope,
+  mentionContext,
 }: {
   children: string;
   compact?: boolean;
   diagramScope?: EntityRef;
+  mentionContext?: MentionContext;
 }) {
   const openImage = useImagePreview();
+  const mentionKey = JSON.stringify(mentionContext);
+  const stableMentionContext = useMemo(() => mentionContext, [mentionKey]);
   const components = useMemo<Components>(
     () => ({
       p: ({ children }) => {
@@ -49,14 +55,17 @@ export const MarkdownContent = memo(function MarkdownContent({
           <p>{children}</p>
         );
       },
-      a: ({ href, children }) =>
-        compact ? (
+      a: ({ href, children }) => {
+        const reference = parseMention(href);
+        if (reference) return <MentionDisplay reference={reference} label={Children.toArray(children).join("")} context={stableMentionContext} compact={compact} />;
+        return compact ? (
           <span>{children}</span>
         ) : (
           <a href={href} target="_blank" rel="noopener noreferrer">
             {children}
           </a>
-        ),
+        );
+      },
       img: ({ src, alt, title }) =>
         compact ? (
           <span>{alt}</span>
@@ -100,7 +109,7 @@ export const MarkdownContent = memo(function MarkdownContent({
           </a>
         ),
     }),
-    [compact, openImage, diagramScope],
+    [compact, openImage, diagramScope, stableMentionContext],
   );
   return (
     <div className={compact ? "rich-text rich-text-compact" : "rich-text"}>

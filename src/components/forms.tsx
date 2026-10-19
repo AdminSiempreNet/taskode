@@ -17,6 +17,7 @@ import type { UserSummary } from "@/lib/types";
 import { TaskPeopleFields } from "./task-people";
 import { uploadFile } from "@/lib/file-client";
 import { DescriptionEditor } from "./description-editor";
+import type { MentionContext } from "@/lib/mentions";
 import { EmojiPicker } from "./emoji-picker";
 import type { TaskDefaults } from "./task-detail";
 import {
@@ -32,7 +33,6 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -494,6 +494,7 @@ function TaskCreateForm({
         <div className="task-create-description">
           <span className="task-create-description-label">Descripción</span>
           <DescriptionEditor
+            mentionContext={{ draft: { kind: "task", projectId: project.id, featureId, leaderId, teamMemberIds } }}
             value={description}
             onChange={setDescription}
             editing={descriptionEditing}
@@ -692,6 +693,30 @@ function TaskCreateForm({
     </form>
   );
 }
+function MentionDescriptionField({ value, context, disabled, label }: {
+  value?: string;
+  context: MentionContext;
+  disabled: boolean;
+  label: string;
+}) {
+  const [content, setContent] = useState(value ?? "");
+  const [editing, setEditing] = useState(false);
+  return (
+    <div className="field mention-description-field">
+      <Label>{label}</Label>
+      <input type="hidden" name="description" value={content} />
+      <DescriptionEditor
+        value={content}
+        onChange={setContent}
+        editing={editing}
+        setEditing={setEditing}
+        disabled={disabled}
+        label={label}
+        mentionContext={context}
+      />
+    </div>
+  );
+}
 function ProjectForm({
   project,
   projects,
@@ -749,16 +774,8 @@ function ProjectForm({
           autoFocus
         />
       </Field>
-      <Field label="Descripción" htmlFor="project-description">
-        <Textarea
-          id="project-description"
-          name="description"
-          maxLength={30000}
-          defaultValue={project?.description}
-          placeholder="¿Qué quieres conseguir?"
-          rows={3}
-        />
-      </Field>
+      <MentionDescriptionField value={project?.description} disabled={busy} label="Descripción del proyecto"
+        context={project ? { scope: { kind: "project", id: project.id, projectId: project.id } } : { draft: { kind: "project" } }} />
       <div className="field">
         <Label>Color del proyecto</Label>
         <Colors value={color} onChange={setColor} disabled={busy} />
@@ -863,15 +880,8 @@ function FeatureForm({
             autoFocus
           />
         </Field>
-        <Field label="Descripción" htmlFor="feature-description">
-          <Textarea
-            id="feature-description"
-            name="description"
-            defaultValue={feature?.description}
-            placeholder="El objetivo de esta parte del proyecto"
-            maxLength={30000}
-          />
-        </Field>
+        <MentionDescriptionField value={feature?.description} disabled={busy || feature?.canManage === false} label="Descripción de la feature"
+          context={feature ? { scope: { kind: "feature", id: feature.id, projectId } } : { draft: { kind: "feature", projectId } }} />
         <Field label="Módulo" htmlFor="feature-module">
           <select
             id="feature-module"
@@ -1041,15 +1051,8 @@ function ModuleForm({
             autoFocus
           />
         </Field>
-        <Field label="Descripción" htmlFor="module-description">
-          <Textarea
-            id="module-description"
-            name="description"
-            defaultValue={module?.description}
-            placeholder="Qué reúne este módulo del proyecto"
-            maxLength={30000}
-          />
-        </Field>
+        <MentionDescriptionField value={module?.description} disabled={busy || module?.canManage === false} label="Descripción del módulo"
+          context={module ? { scope: { kind: "module", id: module.id, projectId } } : { draft: { kind: "module", projectId } }} />
         {module && (
           <div className="module-order">
             <span>

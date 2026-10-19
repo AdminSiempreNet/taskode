@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { EntityRef } from "./types";
 
 export const REMINDER_OFFSETS = [15, 60, 1440, 4320, 10080] as const;
 export const notificationPreferencesSchema = z.object({
@@ -24,9 +25,13 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
 export interface NotificationItem {
   id: string;
   sequence?: number;
-  type: "assigned" | "shared" | "reminder";
+  type: "assigned" | "shared" | "reminder" | "mention";
   actorName: string | null;
-  taskId: string;
+  taskId: string | null;
+  scope?: EntityRef;
+  entityTitle?: string;
+  commentId?: string | null;
+  documentId?: string | null;
   projectId: string;
   projectName: string;
   taskTitle: string;
@@ -42,6 +47,8 @@ export interface NotificationsSnapshot {
   realtime: { enabled: boolean; channel: string | null };
 }
 export function notificationText(item: NotificationItem) {
+  if (item.type === "mention")
+    return `${item.actorName ?? "Alguien"} te mencionó en ${item.commentId ? "un comentario" : item.documentId ? "un documento" : "una descripción"}`;
   if (item.type === "assigned")
     return `${item.actorName ?? "Alguien"} te asignó una tarea`;
   if (item.type === "shared")
