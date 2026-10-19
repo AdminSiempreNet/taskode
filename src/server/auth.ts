@@ -2,15 +2,35 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { betterAuth, type BetterAuthOptions } from "better-auth";
 import type { DBAdapter } from "@better-auth/core/db/adapter";
 import { APIError, getOAuthState } from "better-auth/api";
+import { jwt } from "better-auth/plugins";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
+import { mcp } from "@better-auth/mcp";
+import { cimd } from "@better-auth/cimd";
+import { fetchClientMetadataResource } from "@better-auth/cimd/node";
+import type { ClientMetadataResourceFetch } from "@better-auth/oauth-provider";
 import { eq } from "drizzle-orm";
 import { repository } from "./index";
 import type { PostgresRepository } from "./postgres";
 import { InvitationService } from "./invitations";
 import { isDomainError } from "./repository";
 import * as schema from "./schema";
+import {
+  ACCESS_TOKEN_SECONDS,
+  ADMIN_ACCESS_TOKEN_SECONDS,
+  MCP_SCOPES,
+  OAUTH_SCOPES,
+  REFRESH_TOKEN_SECONDS,
+  mcpUrls,
+} from "./mcp/config";
 
 type Admission = { verifiedEmail?: string; invitation?: string };
+type OAuthAdmissionState = {
+  invitation?: string;
+  serverContext?: { query?: string };
+};
+export interface AuthDependencies {
+  fetchClientMetadataResource?: ClientMetadataResourceFetch;
+}
 export function providersConfigured() {
   return {
     google: Boolean(
@@ -38,7 +58,9 @@ export function invitationService(repo = repository()) {
 export function createProjectAuth(
   repo: PostgresRepository,
   config: Record<string, string | undefined> = process.env,
+  dependencies: AuthDependencies = {},
 ) {
+  const urls = mcpUrls(config.BETTER_AUTH_URL || "http://localhost:5010");
   const context = new AsyncLocalStorage<Admission>();
   const invites = new InvitationService(
     repo,
@@ -146,6 +168,32 @@ export function createProjectAuth(
     secret: config.BETTER_AUTH_SECRET,
     database: adapter,
     trustedOrigins: [config.BETTER_AUTH_URL || "http://localhost:5010"],
+    // The jwt plugin's session-token endpoint is not part of the MCP flow.
+    disabledPaths: ["/token"],
+    plugins: [
+      jwt({ disableSettingJwtHeader: true, jwt: { issuer: urls.issuer } }),
+      mcp({
+        resource: urls.resource,
+        loginPage: "/login",
+        consentPage: "/oauth/consent",
+        scopes: OAUTH_SCOPES,
+        grantTypes: ["authorization_code", "refresh_token"],
+        allowDynamicClientRegistration: true,
+        allowUnauthenticatedClientRegistration: true,
+        // Claude Code and Cursor register loopback callbacks without application_type.
+        clientRegistrationDefaultApplicationType: "infer",
+        accessTokenExpiresIn: ACCESS_TOKEN_SECONDS,
+        refreshTokenExpiresIn: REFRESH_TOKEN_SECONDS,
+        scopeExpirations: { [MCP_SCOPES.admin]: `${ADMIN_ACCESS_TOKEN_SECONDS}s` },
+        // Session-backed client management stays with the administrator.
+        clientPrivileges: ({ user }) => user?.role === "admin",
+      }),
+      cimd({
+        fetchClientMetadataResource:
+          dependencies.fetchClientMetadataResource ?? fetchClientMetadataResource,
+        metadataProfile: "mcp-2026-07-28",
+      }),
+    ],
     emailAndPassword: { enabled: false },
     socialProviders: {
       ...(config.GOOGLE_CLIENT_ID && config.GOOGLE_CLIENT_SECRET
@@ -243,7 +291,14 @@ export function createProjectAuth(
       user: {
         create: {
           before: async () => {
-            const state = await getOAuthState<{ invitation?: string }>();
+            const state = await getOAuthState<OAuthAdmissionState>();
+            // Connecting an MCP client never creates accounts, even with a valid invitation.
+            if (state?.serverContext?.query)
+              throw new APIError("FORBIDDEN", {
+                code: "OAUTH_SIGNUP_FORBIDDEN",
+                message:
+                  "Crea primero tu cuenta desde Taskode y vuelve a conectar la aplicación.",
+              });
             const current = context.getStore();
             if (current) current.invitation = state?.invitation;
           },

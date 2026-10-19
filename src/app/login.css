@@ -349,3 +349,96 @@
     margin-top: 24px;
   }
 }
+.oauth-client-badge {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid #cfe3d8;
+  border-radius: 10px;
+  background: #f1f8f4;
+  color: #285c43;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: left;
+}
+.oauth-client-badge > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.oauth-client-badge.oauth-client-unverified {
+  border-color: #f0dcb4;
+  background: #fdf7ea;
+  color: #7a5414;
+}
+.oauth-consent-shell {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+}
+.auth-card.oauth-consent {
+  width: 100%;
+  max-width: 480px;
+  text-align: left;
+}
+.oauth-consent h1 {
+  font-size: 22px;
+}
+.oauth-scopes {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0;
+  padding: 0;
+  list-style: none;
+}
+.oauth-scopes li > span,
+.oauth-scopes label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.oauth-scopes label {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+}
+.oauth-scopes label > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.oauth-scopes label input {
+  margin-top: 3px;
+}
+.oauth-scopes strong {
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 600;
+}
+.oauth-scopes .oauth-scope-disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+.oauth-consent-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.dark .oauth-client-badge {
+  border-color: #2d4a3b;
+  background: #15241d;
+  color: #9fd8b9;
+}
+.dark .oauth-client-badge.oauth-client-unverified {
+  border-color: #4d3d1d;
+  background: #241d10;
+  color: #e9c98a;
+}

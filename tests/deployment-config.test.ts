@@ -39,6 +39,10 @@ test("Vercel: la configuración de producción se valida sin conectarse y rechaz
   assert.equal(check({ NOTIFICATION_WORKER_SECRET: "" }).status, 1);
   assert.equal(check({ RESEND_API_KEY: "" }).status, 1);
   assert.equal(check({ RESEND_FROM_EMAIL: "" }).status, 1);
+  assert.equal(check({ MCP_ENABLED: "false", MCP_ALLOWED_ORIGINS: "https://inspector.example.com" }).status, 0);
+  assert.equal(check({ MCP_ENABLED: "quizá" }).status, 1);
+  assert.equal(check({ MCP_ALLOWED_ORIGINS: "http://localhost:6274" }).status, 1);
+  assert.equal(check({ MCP_ALLOWED_ORIGINS: "https://example.com/ruta" }).status, 1);
 });
 
 test("PostgreSQL: valida TLS, CA y tamaño del pool sin permitir que la URL reemplace TLS", () => {

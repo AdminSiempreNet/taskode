@@ -128,6 +128,204 @@ export const verification = pgTable(
   },
   (t) => [index("verification_identifier").on(t.identifier)],
 );
+// OAuth 2.1 authorization server for MCP clients (Better Auth jwt + oauth-provider plugins).
+// Export keys must match Better Auth model names and properties its field names.
+const instant = () =>
+  timestamp({ withTimezone: true, precision: 3, mode: "date" });
+export const jwks = pgTable("jwks", {
+  id: text().primaryKey(),
+  publicKey: text().notNull(),
+  privateKey: text().notNull(),
+  createdAt: instant().notNull(),
+  expiresAt: instant(),
+  alg: text(),
+  crv: text(),
+});
+export const oauthClient = pgTable(
+  "oauth_client",
+  {
+    id: text().primaryKey(),
+    clientId: text().notNull().unique(),
+    clientSecret: text(),
+    clientDiscoveryId: text(),
+    disabled: boolean().default(false),
+    skipConsent: boolean(),
+    enableEndSession: boolean(),
+    subjectType: text(),
+    scopes: text().array(),
+    clientCredentialsScopes: text().array().default(sql`'{}'::text[]`),
+    userId: text().references(() => user.id, { onDelete: "cascade" }),
+    createdAt: instant(),
+    updatedAt: instant(),
+    name: text(),
+    uri: text(),
+    icon: text(),
+    contacts: text().array(),
+    tos: text(),
+    policy: text(),
+    softwareId: text(),
+    softwareVersion: text(),
+    softwareStatement: text(),
+    redirectUris: text().array().notNull(),
+    postLogoutRedirectUris: text().array(),
+    backchannelLogoutUri: text(),
+    backchannelLogoutSessionRequired: boolean(),
+    tokenEndpointAuthMethod: text(),
+    applicationType: text(),
+    jwks: text(),
+    jwksUri: text(),
+    grantTypes: text().array(),
+    responseTypes: text().array(),
+    requirePKCE: boolean(),
+    dpopBoundAccessTokens: boolean().default(false),
+    referenceId: text(),
+    metadata: jsonb(),
+  },
+  (t) => [index("oauth_client_user").on(t.userId)],
+);
+export const oauthResource = pgTable("oauth_resource", {
+  id: text().primaryKey(),
+  identifier: text().notNull().unique(),
+  name: text().notNull(),
+  accessTokenTtl: integer(),
+  refreshTokenTtl: integer(),
+  signingAlgorithm: text(),
+  signingKeyId: text(),
+  allowedScopes: text().array(),
+  customClaims: jsonb(),
+  dpopBoundAccessTokensRequired: boolean().default(false),
+  disabled: boolean().default(false),
+  createdAt: instant(),
+  updatedAt: instant(),
+  policyVersion: integer().default(1),
+  metadata: jsonb(),
+});
+export const oauthClientResource = pgTable(
+  "oauth_client_resource",
+  {
+    id: text().primaryKey(),
+    clientId: text()
+      .notNull()
+      .references(() => oauthClient.clientId, { onDelete: "cascade" }),
+    resourceId: text()
+      .notNull()
+      .references(() => oauthResource.identifier, { onDelete: "cascade" }),
+    metadata: jsonb(),
+    createdAt: instant(),
+  },
+  (t) => [
+    uniqueIndex("oauth_client_resource_pair").on(t.clientId, t.resourceId),
+    index("oauth_client_resource_resource").on(t.resourceId),
+  ],
+);
+export const oauthRefreshToken = pgTable(
+  "oauth_refresh_token",
+  {
+    id: text().primaryKey(),
+    token: text().notNull().unique(),
+    clientId: text()
+      .notNull()
+      .references(() => oauthClient.clientId, { onDelete: "cascade" }),
+    sessionId: text().references(() => session.id, { onDelete: "set null" }),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    referenceId: text(),
+    authorizationCodeId: text(),
+    resources: text().array(),
+    requestedUserInfoClaims: text().array(),
+    expiresAt: instant().notNull(),
+    createdAt: instant().notNull(),
+    revoked: instant(),
+    rotatedAt: instant(),
+    rotationReplayResponse: text(),
+    rotationReplayExpiresAt: instant(),
+    authTime: instant(),
+    confirmation: jsonb(),
+    scopes: text().array().notNull(),
+  },
+  (t) => [
+    index("oauth_refresh_token_client").on(t.clientId),
+    index("oauth_refresh_token_session").on(t.sessionId),
+    index("oauth_refresh_token_user").on(t.userId),
+    index("oauth_refresh_token_code").on(t.authorizationCodeId),
+  ],
+);
+export const oauthAccessToken = pgTable(
+  "oauth_access_token",
+  {
+    id: text().primaryKey(),
+    token: text().notNull().unique(),
+    clientId: text()
+      .notNull()
+      .references(() => oauthClient.clientId, { onDelete: "cascade" }),
+    sessionId: text().references(() => session.id, { onDelete: "set null" }),
+    userId: text().references(() => user.id, { onDelete: "cascade" }),
+    referenceId: text(),
+    authorizationCodeId: text(),
+    resources: text().array(),
+    requestedUserInfoClaims: text().array(),
+    refreshId: text().references(() => oauthRefreshToken.id, {
+      onDelete: "cascade",
+    }),
+    expiresAt: instant().notNull(),
+    createdAt: instant().notNull(),
+    revoked: instant(),
+    confirmation: jsonb(),
+    scopes: text().array().notNull(),
+  },
+  (t) => [
+    index("oauth_access_token_client").on(t.clientId),
+    index("oauth_access_token_session").on(t.sessionId),
+    index("oauth_access_token_user").on(t.userId),
+    index("oauth_access_token_code").on(t.authorizationCodeId),
+    index("oauth_access_token_refresh").on(t.refreshId),
+  ],
+);
+export const oauthConsent = pgTable(
+  "oauth_consent",
+  {
+    id: text().primaryKey(),
+    clientId: text()
+      .notNull()
+      .references(() => oauthClient.clientId, { onDelete: "cascade" }),
+    userId: text().references(() => user.id, { onDelete: "cascade" }),
+    referenceId: text(),
+    resources: text().array(),
+    requestedUserInfoClaims: text().array(),
+    scopes: text().array().notNull(),
+    createdAt: instant().notNull(),
+    updatedAt: instant().notNull(),
+  },
+  (t) => [
+    index("oauth_consent_client").on(t.clientId),
+    index("oauth_consent_user_client").on(t.userId, t.clientId),
+  ],
+);
+export const oauthClientAssertion = pgTable("oauth_client_assertion", {
+  id: text().primaryKey(),
+  expiresAt: instant().notNull(),
+});
+// Audit of MCP tool calls: who, through which client, on what. Never stores content.
+export const mcpActivity = pgTable(
+  "mcp_activity",
+  {
+    id: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    clientId: text().notNull(),
+    tool: text().notNull(),
+    targetType: text(),
+    targetId: text(),
+    outcome: text({ enum: ["ok", "error", "denied"] }).notNull(),
+    createdAt: instant().notNull().defaultNow(),
+  },
+  (t) => [
+    index("mcp_activity_user").on(t.userId, t.createdAt),
+    index("mcp_activity_client").on(t.clientId, t.createdAt),
+  ],
+);
 export const installation = pgTable(
   "installation",
   {

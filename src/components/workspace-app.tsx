@@ -87,6 +87,7 @@ import {
   UNASSIGNED_FILTER,
   matchesTaskFilters,
 } from "@/lib/task-filters";
+import { taskMatchesText } from "@/lib/task-search";
 import {
   filterGroupValues,
   groupedFilterIds,
@@ -413,10 +414,7 @@ export function WorkspaceApp({
         labelNames: selectedLabelNames,
         includeUnlabeled: selectedLabelIds.includes(UNASSIGNED_FILTER),
       }) &&
-      (!search ||
-        `${t.title} ${t.description} ${workspace?.tickets.filter((ticket) => t.ticketIds.includes(ticket.id)).map((ticket) => ticket.number).join(" ")} ${t.labels.join(" ")}`
-          .toLocaleLowerCase("es")
-          .includes(search.toLocaleLowerCase("es"))),
+      taskMatchesText(t, workspace?.tickets ?? [], search),
   );
   const selectedFeature = features.find((f) => f.id === featureId);
   const openTask = (t: Task) => router.push(taskPath(projectId, t.id, view));

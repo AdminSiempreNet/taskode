@@ -99,6 +99,13 @@
       "when": 1792377514135,
       "tag": "0013_users_invitations",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792384100520,
+      "tag": "0014_oauth_mcp",
+      "breakpoints": true
     }
   ]
 }

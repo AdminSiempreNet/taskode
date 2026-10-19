@@ -13,6 +13,7 @@ import {
   workerAuthorized,
 } from "./notification-delivery";
 import { pushSubscriptions, tasks } from "./schema";
+import { pruneOAuthData } from "./oauth-maintenance";
 
 export const notificationHeaders = { "Cache-Control": "private, no-store" };
 export function deliverNotificationEvents() {
@@ -221,6 +222,11 @@ export async function processNotifications(request: Request) {
       undefined,
       { budgetMs: Math.max(1000, 45000 - (Date.now() - started)) },
     );
+    // The worker runs every minute; OAuth cleanup only needs a quarter-hourly pass.
+    if (!afterTask && new Date().getUTCMinutes() % 15 === 0)
+      await pruneOAuthData(repository()).catch(() =>
+        console.warn("No se pudo limpiar los datos OAuth vencidos."),
+      );
     console.info("Procesamiento de notificaciones", {
       at: new Date().toISOString(),
       reminders,

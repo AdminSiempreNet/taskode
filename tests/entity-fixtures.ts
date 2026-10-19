@@ -95,7 +95,15 @@ export function stripTicketTables(tables: Record<string, Record<string, unknown>
   for (const name of ticketTables) delete tables[name];
 }
 
+// 0014: OAuth/MCP tables are additive and independent of earlier migrations.
+export async function removeOAuthSchema(repo: PostgresRepository) {
+  if (!/^taskode_test_[a-f0-9]{32}$/.test(repo.store.schemaName)) throw new Error("Esquema de prueba inválido.");
+  await repo.store.pool.query(
+    "drop table if exists oauth_access_token, oauth_refresh_token, oauth_consent, oauth_client_resource, oauth_client, oauth_resource, oauth_client_assertion, jwks, mcp_activity",
+  );
+}
 export async function removeTicketSchema(repo: PostgresRepository) {
   if (!/^taskode_test_[a-f0-9]{32}$/.test(repo.store.schemaName)) throw new Error("Esquema de prueba inválido.");
+  await removeOAuthSchema(repo);
   await repo.store.pool.query(`drop table project_clients, module_clients, feature_clients, project_tickets, module_tickets, feature_tickets, task_tickets, tickets; alter table tasks add column "ticketNumber" text`);
 }

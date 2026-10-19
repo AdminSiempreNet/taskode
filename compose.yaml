@@ -47,6 +47,10 @@ services:
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
       ABLY_API_KEY: ${ABLY_API_KEY:-}
       ABLY_CHANNEL_NAMESPACE: ${ABLY_CHANNEL_NAMESPACE:-taskode-development}
+      MCP_ENABLED: ${MCP_ENABLED:-true}
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
+      # The MCP endpoint verifies tokens against its own JWKS without leaving the container.
+      MCP_JWKS_URL: ${MCP_JWKS_URL:-http://127.0.0.1:5010/api/auth/jwks}
     depends_on:
       postgres:
         condition: service_healthy

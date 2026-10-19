@@ -829,6 +829,15 @@ export async function restoreApplicationBackup(
       "notification_deliveries",
       "push_subscriptions",
       "task_reminders",
+      // OAuth grants belong to the replaced users: connected apps authorize again.
+      // Signing keys (jwks) and protected resources (oauth_resource) are kept.
+      "oauth_access_token",
+      "oauth_refresh_token",
+      "oauth_consent",
+      "oauth_client_resource",
+      "oauth_client",
+      "oauth_client_assertion",
+      "mcp_activity",
     ];
     await store.db.execute(
       sql`truncate table ${sql.join(

@@ -11,6 +11,8 @@ import type {
 // UI and HTTP contracts remain independent of the database implementation.
 export interface WorkspaceReadOptions {
   includeCatalogs?: boolean;
+  // Restricts the read to these projects (still subject to the actor's access).
+  projectIds?: string[];
 }
 export interface WorkspaceRepository {
   getWorkspace(actor: Actor, options?: WorkspaceReadOptions): Promise<Workspace>;

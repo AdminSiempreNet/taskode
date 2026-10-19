@@ -44,7 +44,7 @@ El programador no recibe credenciales de base de datos, no solapa llamadas y rec
 
 Aplicar en este orden:
 
-1. Ejecutar `npm run db:migrate` para aplicar todas las migraciones hasta `0013_users_invitations`, con las instancias anteriores detenidas durante el cambio de versión de esquema. El orden de llegada y el límite de lectura usan una secuencia de base de datos para conservar los avisos nuevos incluso entre instancias con relojes diferentes.
+1. Ejecutar `npm run db:migrate` para aplicar todas las migraciones hasta `0014_oauth_mcp`, con las instancias anteriores detenidas durante el cambio de versión de esquema. El orden de llegada y el límite de lectura usan una secuencia de base de datos para conservar los avisos nuevos incluso entre instancias con relojes diferentes.
 2. Configurar las variables VAPID, RESEND_API_KEY, RESEND_FROM_EMAIL y el secreto en Vercel; desplegar la aplicación. `npm run check:production` las valida sin conectarse a servicios.
 3. Configurar el mismo secreto y la URL en Dokploy; actualizar el Compose conservando el nombre y volumen de PostgreSQL existentes.
 4. Revisar el estado de `notifications` y los logs con fecha, recordatorios generados, entregas, fallos y pendientes. Un fallo se reintenta sin perder la notificación persistida. Los recordatorios push caducan al vencer la tarea; las otras entregas caducan en 24 horas.

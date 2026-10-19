@@ -34,6 +34,18 @@ try {
   if ((process.env.NOTIFICATION_WORKER_SECRET || "").length < 32) throw new Error("Configura NOTIFICATION_WORKER_SECRET con al menos 32 caracteres.");
   if (process.env.ABLY_CHANNEL_NAMESPACE !== "taskode-production")
     throw new Error("Configura ABLY_CHANNEL_NAMESPACE=taskode-production.");
+  if (!["", "true", "false"].includes(process.env.MCP_ENABLED ?? ""))
+    throw new Error("MCP_ENABLED solo admite true o false.");
+  for (const origin of (process.env.MCP_ALLOWED_ORIGINS || "").split(",").map((value) => value.trim()).filter(Boolean)) {
+    let parsed: URL;
+    try {
+      parsed = new URL(origin);
+    } catch {
+      throw new Error("MCP_ALLOWED_ORIGINS debe contener orígenes https separados por comas.");
+    }
+    if (parsed.protocol !== "https:" || parsed.origin !== origin.replace(/\/$/, ""))
+      throw new Error("MCP_ALLOWED_ORIGINS debe contener orígenes https separados por comas.");
+  }
   console.log("Configuración de producción válida. No se ha conectado ni desplegado ningún servicio.");
 } catch (error) {
   // Never log environment values or connection URLs.

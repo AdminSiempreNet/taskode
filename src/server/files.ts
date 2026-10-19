@@ -291,6 +291,24 @@ export class FileManager {
       });
     });
   }
+  // Bytes for server-side consumers (MCP), with the same access checks as content().
+  async read(actor: Actor, id: string, maxBytes: number) {
+    return this.repo.store.snapshot(async () => {
+      const file = await this.get(id);
+      await this.access(actor, file);
+      if (file.status !== "ready")
+        throw new DomainError("El archivo no existe o no tienes acceso.", 404);
+      const meta = {
+        id: file.id,
+        name: file.name,
+        mimeType: file.mimeType,
+        size: file.size,
+        createdAt: file.createdAt,
+      };
+      if (file.size > maxBytes) return { ...meta, bytes: null };
+      return { ...meta, bytes: await this.storage.read(id) };
+    });
+  }
   async remove(actor: Actor, id: string) {
     await this.repo.store.transaction(async () => {
       const file = await this.get(id);

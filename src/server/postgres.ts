@@ -60,7 +60,7 @@ async function each<T>(
 }
 export class PostgresRepository implements WorkspaceRepository {
   // Incrementar al cambiar el contrato o las migraciones de una instancia cacheada.
-  static readonly cacheVersion = 20;
+  static readonly cacheVersion = 21;
   readonly cacheVersion = PostgresRepository.cacheVersion;
   readonly store: DatabaseStore;
   readonly notifications: NotificationsService;
@@ -958,7 +958,9 @@ export class PostgresRepository implements WorkspaceRepository {
     return false;
   }
   getWorkspace(actor: Actor, options: WorkspaceReadOptions = {}): Promise<Workspace> {
-    return this.store.snapshot(() => this.readWorkspace(actor, options.includeCatalogs !== false));
+    return this.store.snapshot(() =>
+      this.readWorkspace(actor, options.includeCatalogs !== false, options.projectIds),
+    );
   }
   getGeography(actor: Actor): Promise<Geography> {
     return this.store.snapshot(async () => {
@@ -973,7 +975,11 @@ export class PostgresRepository implements WorkspaceRepository {
       };
     });
   }
-  private async readWorkspace(actor: Actor, includeCatalogs: boolean): Promise<Workspace> {
+  private async readWorkspace(
+    actor: Actor,
+    includeCatalogs: boolean,
+    projectIds?: string[],
+  ): Promise<Workspace> {
     const currentUser = await this.currentUser(actor);
     const memberships = await this.store.db
       .select()
@@ -981,9 +987,10 @@ export class PostgresRepository implements WorkspaceRepository {
       .where(eq(schema.projectTeamMembers.userId, actor.id));
     const projects = (await this.all("projects")).filter(
       (p) =>
-        currentUser.role === "admin" ||
-        p.leaderId === actor.id ||
-        memberships.some((m) => m.projectId === p.id),
+        (!projectIds || projectIds.includes(String(p.id))) &&
+        (currentUser.role === "admin" ||
+          p.leaderId === actor.id ||
+          memberships.some((m) => m.projectId === p.id)),
     );
     const ids = projects.map((p) => String(p.id));
     const rows = async (
