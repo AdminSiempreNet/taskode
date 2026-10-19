@@ -96,7 +96,7 @@ export function FeatureTaskList({
           action={<Button type="button" variant="outline" onClick={clearFilters}>Limpiar filtros</Button>}
         />
       ) : (
-        <ListView tasks={filtered} features={workspace.features.filter((feature) => feature.id === featureId)} statuses={statuses} open={open} add={add} archived={archived} />
+        <ListView tasks={filtered} features={workspace.features.filter((feature) => feature.id === featureId)} statuses={statuses} open={open} add={add} archived={archived} hideGroupHeader />
       )}
     </div>
   );

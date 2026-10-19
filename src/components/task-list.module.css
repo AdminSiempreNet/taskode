@@ -16,7 +16,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 13px 18px;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--border);
   border-radius: 10px 10px 0 0;
   background: var(--muted);
@@ -51,16 +51,32 @@
 
 .row {
   min-width: 0;
-  padding: 18px;
+  padding: 10px 14px;
   cursor: pointer;
 }
 
-.row + .row {
-  border-top: 1px solid var(--border);
+.row:first-child {
+  border-radius: 10px 10px 0 0;
 }
 
 .row:last-child {
   border-radius: 0 0 10px 10px;
+}
+
+.row:only-child {
+  border-radius: 10px;
+}
+
+.groupHeader + .rows > .row:first-child {
+  border-radius: 0;
+}
+
+.groupHeader + .rows > .row:last-child {
+  border-radius: 0 0 10px 10px;
+}
+
+.row + .row {
+  border-top: 1px solid var(--border);
 }
 
 .row:hover,
@@ -71,7 +87,7 @@
 .heading {
   display: flex;
   align-items: flex-start;
-  gap: 16px;
+  gap: 12px;
 }
 
 .title {
@@ -80,7 +96,6 @@
   align-items: flex-start;
   gap: 10px;
   min-width: 0;
-  min-height: 28px;
   padding: 0;
   border: 0;
   border-radius: 4px;
@@ -88,7 +103,7 @@
   color: var(--foreground);
   font-size: 14px;
   font-weight: 550;
-  line-height: 1.6;
+  line-height: 1.5;
   text-align: left;
 }
 
@@ -110,7 +125,7 @@
 .status {
   flex: 0 0 auto;
   max-width: 40%;
-  padding-top: 3px;
+  padding-top: 1px;
 }
 
 .status :global(.status-pill) {
@@ -125,19 +140,34 @@
   flex-shrink: 0;
 }
 
+/* Segunda línea: responsable y etiquetas a la izquierda, propiedades a la derecha. */
+.meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  min-width: 0;
+  margin: 4px 0 0 24px;
+}
+
+.meta:empty {
+  display: none;
+}
+
 .context {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px 12px;
+  gap: 4px 10px;
   min-width: 0;
-  margin: 4px 0 0 27px;
 }
 
 .context :global(.task-people-summary) {
   min-width: 0;
   max-width: 100%;
   margin-top: 0;
+  font-size: 12px;
 }
 
 .context :global(.task-people-summary) > span {
@@ -148,7 +178,7 @@
 .labels {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
   min-width: 0;
   max-width: 100%;
 }
@@ -157,109 +187,114 @@
   font-size: 11px;
 }
 
-.details {
+.properties {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 16px 28px;
-  margin: 16px 0 0 27px;
-}
-
-.properties,
-.schedule {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
+  gap: 4px 8px;
   min-width: 0;
   max-width: 100%;
-  margin: 0;
+  margin: 0 0 0 auto;
 }
 
-.properties > div,
-.schedule > div {
-  display: grid;
-  align-content: start;
-  gap: 5px;
+.properties > div {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
   min-width: 0;
   max-width: 100%;
 }
 
-.details dt {
-  color: var(--muted-foreground);
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.details dd {
+.properties dd {
   min-width: 0;
   margin: 0;
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.5;
 }
 
 .properties :global(.label-chip),
 .properties :global(.priority) {
   max-width: 100%;
-  padding: 3px 7px;
+  padding: 2px 7px;
   font-size: 12px;
   line-height: 1.5;
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
-.schedule time {
+.applications {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.date {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.date dt {
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.date dd {
+  color: var(--foreground);
+}
+
+.date time {
   display: inline-block;
 }
 
-.unset {
-  color: var(--muted-foreground);
-}
-
-.schedule .overdue dt,
-.schedule .overdue dd {
+.date.overdue,
+.date.overdue dd {
   color: var(--destructive);
 }
 
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Contenedores estrechos (por ejemplo el tab Tareas de una feature): las propiedades pasan a la izquierda. */
 @container task-list (max-width: 700px) {
-  .details {
-    flex-direction: column;
-    gap: 14px;
+  .meta {
+    justify-content: flex-start;
   }
 
-  .schedule {
-    width: 100%;
-    padding-top: 12px;
-    border-top: 1px dashed var(--border);
+  .properties {
+    margin-left: 0;
   }
 }
 
 @container task-list (max-width: 420px) {
   .groupHeader {
-    padding: 12px;
+    padding: 8px 12px;
   }
 
   .row {
-    padding: 14px 12px;
+    padding: 10px 12px;
   }
 
   .heading {
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
   }
 
   .status {
     max-width: 100%;
     padding-top: 0;
-    margin-left: 27px;
+    margin-left: 24px;
   }
 
-  .details {
+  .meta {
     margin-left: 0;
-  }
-
-  .properties,
-  .schedule {
-    column-gap: 18px;
   }
 }
