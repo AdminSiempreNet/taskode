@@ -39,6 +39,8 @@ async function fixture() {
       { type: "project.team.add", projectId, userId: person.id },
       actor,
     );
+  // This fixture isolates task notifications; access events have their own suite.
+  await repo.store.db.delete(s.notifications).where(eq(s.notifications.scopeType, "account"));
   const w = await repo.getWorkspace(actor);
   const create = () =>
     repo.execute(
@@ -326,11 +328,11 @@ test("respaldos v8 conservan preferencias e historial, sin suscripciones ni trab
     const path = join(dir, "backup.json");
     await f.repo.exportBackup(path);
     const backup = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(backup.version, 11);
+    assert.equal(backup.version, 12);
     assert.equal(backup.tables.projects[0].timeZone, "America/Bogota");
     assert.equal(backup.tables.notifications.length, 2);
     assert.equal(backup.tables.push_subscriptions, undefined);
-    assert.equal(validateApplicationBackup(backup).version, 11);
+    assert.equal(validateApplicationBackup(backup).version, 12);
     await f.repo.restoreBackup(path);
     assert.deepEqual(await f.repo.notifications.preferences(f.leader), {
       offsets: [4320],
@@ -494,7 +496,7 @@ test("dos trabajadores no entregan el mismo trabajo y la retirada de acceso desc
     );
     const result = await flushNotificationDeliveries(f.repo, {
       invalidate: async (user, _id, notification) => {
-        if (notification) assert.notEqual(user, f.member.id);
+        if (notification && user === f.member.id) assert.equal((await f.repo.notifications.list(f.member)).items.find(n => n.id === notification)?.type, "project_access_removed");
       },
       push: async () => {},
     });
@@ -538,7 +540,7 @@ test("respaldo v6 recibe zona inicial y tablas vacías; acciones propias no gene
     delete v6.tables.notification_preferences;
     for (const project of v6.tables.projects) delete project.timeZone;
     const normalized = validateApplicationBackup(v6);
-    assert.equal(normalized.version, 11);
+    assert.equal(normalized.version, 12);
     assert.equal(normalized.tables.projects[0].timeZone, "America/Bogota");
     assert.deepEqual(normalized.tables.notifications, []);
   } finally {

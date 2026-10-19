@@ -11,7 +11,7 @@ export default async function Login({
   searchParams: Promise<{ error?: string; returnTo?: string }>;
 }) {
   const query = await searchParams;
-  const returnTo = query.returnTo && /^\/notifications(?:\?open=[a-f0-9-]{36})?$/.test(query.returnTo) ? query.returnTo : "/dashboard";
+  const returnTo = query.returnTo && /^(?:\/notifications(?:\?open=[a-f0-9-]{36})?|\/users(?:\?user=[a-zA-Z0-9_-]{1,200})?)$/.test(query.returnTo) ? query.returnTo : "/dashboard";
   if (await getActor()) redirect(returnTo);
   const state = await repository().store.state();
   return (

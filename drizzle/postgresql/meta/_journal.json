@@ -92,6 +92,13 @@
       "when": 1792369239167,
       "tag": "0012_clients_tickets",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792377514135,
+      "tag": "0013_users_invitations",
+      "breakpoints": true
     }
   ]
 }

@@ -78,7 +78,7 @@ import { Dashboard, ProjectsDirectory } from "./dashboard";
 import type { DashboardScope } from "@/lib/dashboard";
 import { AccountMenu, ProfileModal } from "./account-menu";
 import { NotificationBell, NotificationsPage } from "./notifications";
-import { UsersModal } from "./invitation-manager";
+import { UsersManager } from "./users-manager";
 import { ProjectPeopleModal } from "./project-people";
 import { useProjectFilter } from "./status-filter";
 import { TaskFilterControls } from "./task-filter-controls";
@@ -125,7 +125,7 @@ export function WorkspaceApp({
   taskId?: string;
   taskDefaults?: TaskDefaults;
   initialTaskCreation?: TaskDefaults;
-  menuSection?: "dashboard" | "clients" | "tickets" | "projects" | "notifications";
+  menuSection?: "dashboard" | "clients" | "tickets" | "projects" | "notifications" | "users";
   notificationOpenId?: string;
   entityRoute?: { kind: Exclude<EntityKind, "task">; id: string };
   initialEntityDetail?: EntityDetailSnapshot;
@@ -173,7 +173,6 @@ export function WorkspaceApp({
   const [loadError, setLoadError] = useState("");
   const [backupOpen, setBackupOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [usersOpen, setUsersOpen] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const selectProject = useCallback(
     (id: string) => {
@@ -225,11 +224,10 @@ export function WorkspaceApp({
       settingsOpen ||
       backupOpen ||
       profileOpen ||
-      usersOpen ||
       peopleOpen
     )
       setMobileSidebarOpen(false);
-  }, [modal, settingsOpen, backupOpen, profileOpen, usersOpen, peopleOpen]);
+  }, [modal, settingsOpen, backupOpen, profileOpen, peopleOpen]);
   function toggleSidebar() {
     const collapsed = !sidebarCollapsed;
     setSidebarCollapsed(collapsed);
@@ -520,7 +518,7 @@ export function WorkspaceApp({
                   onImport={() => setModal({ type: "import" })}
                   onSettings={() => setSettingsOpen(true)}
                   onBackup={() => setBackupOpen(true)}
-                  onUsers={() => setUsersOpen(true)}
+                  onUsers={() => router.push(`/users${projectId ? `?tab=invitations&projectId=${encodeURIComponent(projectId)}` : ""}`)}
                 />
               </div>
             )
@@ -686,6 +684,7 @@ export function WorkspaceApp({
                 <Link href="/tickets" className="nav-item" aria-current={menuSection === "tickets" ? "page" : undefined} onClick={() => setMobileSidebarOpen(false)}>
                   <TicketIcon size={17} />Tickets
                 </Link>
+                {workspace?.currentUser.role === "admin" && <Link href="/users" className="nav-item" aria-current={menuSection === "users" ? "page" : undefined} onClick={() => setMobileSidebarOpen(false)}><Users size={17} />Usuarios e invitaciones</Link>}
               </nav>
             ) : null}
           </div>
@@ -714,7 +713,7 @@ export function WorkspaceApp({
                 <span>Preparando tu espacio…</span>
               </div>
             ) : menuMode ? (
-              menuSection === "notifications" ? <NotificationsPage userId={workspace.currentUser.id} openId={notificationOpenId} /> : menuSection === "clients" ? (
+              menuSection === "users" ? <UsersManager projects={workspace.projects} refreshWorkspace={load} /> : menuSection === "notifications" ? <NotificationsPage userId={workspace.currentUser.id} openId={notificationOpenId} /> : menuSection === "clients" ? (
                 <ClientsManager
                   clients={workspace.clients ?? []}
                   initialPage={initialClientsPage}
@@ -1138,13 +1137,6 @@ export function WorkspaceApp({
           <ProfileModal
             user={workspace.currentUser}
             close={() => setProfileOpen(false)}
-          />
-        )}
-        {usersOpen && workspace?.currentUser.role === "admin" && (
-          <UsersModal
-            projects={workspace.projects}
-            projectId={projectId}
-            close={() => setUsersOpen(false)}
           />
         )}
         {peopleOpen && project && workspace && canManageProject && (

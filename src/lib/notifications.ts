@@ -25,14 +25,14 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
 export interface NotificationItem {
   id: string;
   sequence?: number;
-  type: "assigned" | "shared" | "reminder" | "mention";
+  type: "assigned" | "shared" | "reminder" | "mention" | "project_access_granted" | "project_access_removed" | "invitation_accepted";
   actorName: string | null;
   taskId: string | null;
   scope?: EntityRef;
   entityTitle?: string;
   commentId?: string | null;
   documentId?: string | null;
-  projectId: string;
+  projectId: string | null;
   projectName: string;
   taskTitle: string;
   offsetMinutes: number | null;
@@ -47,6 +47,9 @@ export interface NotificationsSnapshot {
   realtime: { enabled: boolean; channel: string | null };
 }
 export function notificationText(item: NotificationItem) {
+  if (item.type === "project_access_granted") return `${item.actorName ?? "Un administrador"} te dio acceso a un proyecto`;
+  if (item.type === "project_access_removed") return `${item.actorName ?? "Un administrador"} retiró tu acceso a un proyecto`;
+  if (item.type === "invitation_accepted") return `${item.actorName ?? "Una persona"} aceptó tu invitación`;
   if (item.type === "mention")
     return `${item.actorName ?? "Alguien"} te mencionó en ${item.commentId ? "un comentario" : item.documentId ? "un documento" : "una descripción"}`;
   if (item.type === "assigned")

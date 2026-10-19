@@ -195,11 +195,10 @@ test("permisos: proyectos privados, participación, administración global y tra
   }
 });
 
-test("invitaciones: envío fallido conserva enlace, correo verificado, caducidad, revocación y consumo único", async () => {
+test("invitaciones: correo en cola conserva enlace, correo verificado, caducidad, revocación y consumo único", async () => {
   const repo = await createRepository();
   try {
-    const member = await addUser(repo, "invited"),
-      other = await addUser(repo, "other");
+    const other = await addUser(repo, "other");
     const { createdId: p } = await repo.execute(
       { type: "project.create", ...fields },
       actor,
@@ -208,9 +207,6 @@ test("invitaciones: envío fallido conserva enlace, correo verificado, caducidad
       repo,
       authConfig.BETTER_AUTH_SECRET,
       authConfig.BETTER_AUTH_URL,
-      async () => {
-        throw new Error("Resend no disponible");
-      },
     );
     await assert.rejects(service.create({ email: "x@example.com" }, other), {
       status: 403,
@@ -218,10 +214,11 @@ test("invitaciones: envío fallido conserva enlace, correo verificado, caducidad
     const result = await service.create(
         { email: " invited@example.com ", projectIds: [p] },
         actor,
-      ),
-      token = new URL(result.invitation.url).pathname.split("/").pop()!;
-    assert.match(result.deliveryError!, /Resend/);
-    assert.equal(result.invitation.deliveryStatus, "failed");
+      );
+    assert.equal(result.kind, "invitation");
+    const member = await addUser(repo, "invited");
+    const token = new URL(result.invitation.url).pathname.split("/").pop()!;
+    assert.equal(result.invitation.deliveryStatus, "pending");
     assert.equal((await service.list(actor))[0].url, result.invitation.url);
     await assert.rejects(service.verify(token, "other@example.com"), {
       status: 403,
@@ -233,11 +230,13 @@ test("invitaciones: envío fallido conserva enlace, correo verificado, caducidad
     assert.equal((await repo.getWorkspace(member)).projects.length, 1);
     await assert.rejects(service.verify(token));
     assert.equal((await repo.store.db.select().from(projectTeamMembers)).length, 1);
-    const next = await service.create({ email: "other@example.com" }, actor),
-      nextToken = new URL(next.invitation.url).pathname.split("/").pop()!;
+    const next = await service.create({ email: "new@example.com" }, actor);
+    assert.equal(next.kind, "invitation");
+    const nextToken = new URL(next.invitation.url).pathname.split("/").pop()!;
     await service.revoke(next.invitation.id, actor);
     await assert.rejects(service.verify(nextToken));
     const resent = await service.resend(next.invitation.id, actor);
+    assert.equal(resent.kind, "invitation");
     assert.notEqual(resent.invitation.url, next.invitation.url);
     const [expired] = await repo.store.db
       .update(invitations)

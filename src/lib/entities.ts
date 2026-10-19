@@ -25,7 +25,7 @@ export function rowScope(row: {
   featureId: unknown;
 }): EntityRef | null {
   const kind = row.scopeType as EntityKind | null;
-  if (!kind) return null;
+  if (!kind || !["project", "module", "feature", "task"].includes(kind)) return null;
   const id =
     kind === "project"
       ? row.projectId

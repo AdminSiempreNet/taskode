@@ -9,7 +9,7 @@ export async function GET(request: Request) {
       actor = await requireActor(request),
       projectId = new URL(request.url).searchParams.get("projectId");
     if (projectId) await repo.requireProject(actor, projectId, true);
-    else await repo.requireAdmin(actor);
+    else return Response.json({ users: await repo.users.list(actor), teamMemberIds: [], members: [] }, { headers: { "Cache-Control": "private, no-store" } });
     const users = await repo.store.db
       .select({
         id: user.id,

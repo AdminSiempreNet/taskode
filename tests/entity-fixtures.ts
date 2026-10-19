@@ -85,6 +85,8 @@ export async function removeAssignmentSchema(repo: PostgresRepository) {
 export const ticketTables = ["tickets", "project_clients", "module_clients", "feature_clients", "project_tickets", "module_tickets", "feature_tickets", "task_tickets"];
 
 export function stripTicketTables(tables: Record<string, Record<string, unknown>[]>) {
+  // Account/access notifications were introduced after all historical fixtures.
+  if (tables.notifications) tables.notifications = tables.notifications.filter(n => n.scopeType !== "account");
   if (!tables.tickets) return;
   for (const task of tables.tasks) {
     const link = tables.task_tickets.find((link) => link.taskId === task.id);

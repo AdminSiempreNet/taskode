@@ -719,22 +719,22 @@ export const notifications = pgTable("notifications", {
   sequence: bigint({ mode: "number" }).generatedByDefaultAsIdentity().notNull(),
   recipientId: text().notNull().references(() => user.id, { onDelete: "cascade" }),
   actorId: text().references(() => user.id, { onDelete: "set null" }),
-  projectId: text().notNull().references(() => projects.id, { onDelete: "cascade" }),
-  scopeType: text({ enum: ["project", "module", "feature", "task"] }).notNull().default("task"),
+  projectId: text().references(() => projects.id, { onDelete: "cascade" }),
+  scopeType: text({ enum: ["project", "module", "feature", "task", "account"] }).notNull().default("task"),
   taskId: text().references(() => tasks.id, { onDelete: "cascade" }),
   moduleId: text().references(() => modules.id, { onDelete: "cascade" }),
   featureId: text().references(() => features.id, { onDelete: "cascade" }),
   commentId: text().references(() => comments.id, { onDelete: "cascade" }),
   documentId: text().references(() => documents.id, { onDelete: "cascade" }),
-  type: text({ enum: ["assigned", "shared", "reminder", "mention"] }).notNull(),
+  type: text({ enum: ["assigned", "shared", "reminder", "mention", "project_access_granted", "project_access_removed", "invitation_accepted"] }).notNull(),
   // Retain the portable legacy column name; mentions use the source title.
   taskTitle: text().notNull(),
   offsetMinutes: integer(),
   dedupKey: text().notNull(),
   createdAt: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
   readAt: timestamp({ withTimezone: true, mode: "date" }),
-}, (t) => [check("notification_scope_target", sql`(${t.scopeType} = 'project' and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 0) or (${t.scopeType} = 'task' and ${t.taskId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'module' and ${t.moduleId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'feature' and ${t.featureId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1)`),
-  check("notification_source", sql`num_nonnulls(${t.commentId}, ${t.documentId}) <= 1 and (${t.type} = 'mention' or (${t.scopeType} = 'task' and num_nonnulls(${t.commentId}, ${t.documentId}) = 0))`),
+}, (t) => [check("notification_scope_target", sql`(${t.scopeType} = 'account' and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 0) or (${t.projectId} is not null and ((${t.scopeType} = 'project' and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 0) or (${t.scopeType} = 'task' and ${t.taskId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'module' and ${t.moduleId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'feature' and ${t.featureId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1)))`),
+  check("notification_source", sql`num_nonnulls(${t.commentId}, ${t.documentId}) <= 1 and ((${t.scopeType} = 'account' and ${t.type} in ('project_access_granted', 'project_access_removed', 'invitation_accepted') and num_nonnulls(${t.commentId}, ${t.documentId}) = 0 and ${t.offsetMinutes} is null and (${t.type} = 'invitation_accepted' or ${t.projectId} is not null)) or (${t.scopeType} <> 'account' and (${t.type} = 'mention' or (${t.type} in ('assigned', 'shared', 'reminder') and ${t.scopeType} = 'task' and num_nonnulls(${t.commentId}, ${t.documentId}) = 0))))`),
   index("notification_project").on(t.projectId),
   uniqueIndex("notification_dedup").on(t.dedupKey),
   index("notification_inbox").on(t.recipientId, t.createdAt, t.id),
@@ -774,15 +774,17 @@ export const taskReminders = pgTable("task_reminders", {
 // One row per transport/device, so successful recipients are not sent again.
 export const notificationDeliveries = pgTable("notification_deliveries", {
   id: text().primaryKey(),
-  recipientId: text().notNull().references(() => user.id, { onDelete: "cascade" }),
+  recipientId: text().references(() => user.id, { onDelete: "cascade" }),
   notificationId: text().references(() => notifications.id, { onDelete: "cascade" }),
   subscriptionId: text().references(() => pushSubscriptions.id, { onDelete: "cascade" }),
-  transport: text({ enum: ["ably", "push"] }).notNull(),
+  invitationId: text().references(() => invitations.id, { onDelete: "cascade" }),
+  transport: text({ enum: ["ably", "push", "email"] }).notNull(),
   attempts: integer().notNull().default(0),
   availableAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   expiresAt: timestamp({ withTimezone: true }).notNull(),
   leaseUntil: timestamp({ withTimezone: true }),
-}, (t) => [index("notification_delivery_pending").on(t.availableAt)]);
+}, (t) => [index("notification_delivery_pending").on(t.availableAt),
+  check("notification_delivery_target", sql`(${t.invitationId} is not null and ${t.transport} = 'email' and num_nonnulls(${t.recipientId}, ${t.notificationId}, ${t.subscriptionId}) = 0) or (${t.invitationId} is null and ${t.recipientId} is not null and (${t.transport} = 'ably' or (${t.notificationId} is not null and (${t.transport} = 'email' or (${t.transport} = 'push' and ${t.subscriptionId} is not null)))))`)]);
 
 export const domainTables = {
   project_team_members: projectTeamMembers,

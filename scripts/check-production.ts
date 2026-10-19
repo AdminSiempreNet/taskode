@@ -30,6 +30,7 @@ try {
   s3BackupConfig();
   if (!ablyConfig()) throw new Error("Configura ABLY_API_KEY para los comentarios en tiempo real.");
   if (!pushConfig()) throw new Error("Configura las claves VAPID para las notificaciones push.");
+  if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) throw new Error("Configura RESEND_API_KEY y RESEND_FROM_EMAIL para las invitaciones y avisos de acceso.");
   if ((process.env.NOTIFICATION_WORKER_SECRET || "").length < 32) throw new Error("Configura NOTIFICATION_WORKER_SECRET con al menos 32 caracteres.");
   if (process.env.ABLY_CHANNEL_NAMESPACE !== "taskode-production")
     throw new Error("Configura ABLY_CHANNEL_NAMESPACE=taskode-production.");

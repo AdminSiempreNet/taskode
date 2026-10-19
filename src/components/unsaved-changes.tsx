@@ -82,7 +82,7 @@ export function useUnsavedChanges(
       const url = new URL(anchor.href, window.location.href);
       if (
         url.origin !== window.location.origin ||
-        url.pathname === window.location.pathname
+        (url.pathname === window.location.pathname && url.search === window.location.search)
       )
         return;
       event.preventDefault();
@@ -101,7 +101,7 @@ export function useUnsavedChanges(
         traversal.navigationType !== "traverse" ||
         !traversal.cancelable ||
         !traversal.destination.sameDocument ||
-        new URL(traversal.destination.url).pathname === window.location.pathname
+        (new URL(traversal.destination.url).pathname === window.location.pathname && new URL(traversal.destination.url).search === window.location.search)
       )
         return;
       if (allowedTraversal.current === traversal.destination.key) {

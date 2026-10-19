@@ -302,7 +302,7 @@ test("diagramas: respaldo v8 portable, v7 compatible y restauración privada", a
     const path = join(directory, "backup.json");
     await f.repo.exportBackup(path);
     const backup = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(backup.version, 11);
+    assert.equal(backup.version, 12);
     assert.equal(backup.tables.diagrams[0].publicToken, null);
     assert.equal(backup.tables.diagrams[0].scene.files.png.dataURL, png);
     const corrupted = structuredClone(backup);

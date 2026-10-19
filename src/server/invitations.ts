@@ -1,10 +1,6 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { and, eq, isNull, gt } from "drizzle-orm";
-import { createElement } from "react";
-import { render, toPlainText } from "react-email";
-import { Resend } from "resend";
+import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
+import { and, eq, isNull, gt, sql } from "drizzle-orm";
 import { z } from "zod";
-import InvitationEmail from "../emails/invitation";
 import type { Actor } from "../lib/types";
 import type { PostgresRepository } from "./postgres";
 import * as s from "./schema";
@@ -14,36 +10,14 @@ const fields = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email()),
   projectIds: z.array(z.string().min(1)).max(100).default([]),
 });
-export type Mailer = (data: {
-  to: string;
-  url: string;
-  inviter: string;
-}) => Promise<void>;
-export async function sendInvitationEmail(data: {
-  to: string;
-  url: string;
-  inviter: string;
-}) {
-  if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL)
-    throw new Error(
-      "Configura RESEND_API_KEY y RESEND_FROM_EMAIL para enviar correos.",
-    );
-  const html = await render(createElement(InvitationEmail, data));
-  const result = await new Resend(process.env.RESEND_API_KEY).emails.send({
-    from: process.env.RESEND_FROM_EMAIL,
-    to: data.to,
-    subject: "Te han invitado a Taskode",
-    text: toPlainText(html),
-    html,
-  });
-  if (result.error) throw new Error(result.error.message);
-}
+export type InvitationResult =
+  | { kind: "invitation"; invitation: typeof s.invitations.$inferSelect & { url: string }; deliveryError: null }
+  | { kind: "assigned"; userId: string; addedProjectIds: string[] };
 export class InvitationService {
   constructor(
     private repo: PostgresRepository,
     private secret: string,
     private baseURL: string,
-    private mailer: Mailer = sendInvitationEmail,
   ) {}
   private signature(id: string, expiresAt: number, brand = "taskode") {
     return createHmac("sha256", this.secret)
@@ -123,11 +97,15 @@ export class InvitationService {
       .select()
       .from(s.invitationProjects)
       .where(eq(s.invitationProjects.invitationId, row.id));
-    for (const p of projects)
-      await this.repo.store.db
-        .insert(s.projectTeamMembers)
-        .values({ projectId: p.projectId, userId })
-        .onConflictDoNothing();
+    for (const p of projects) {
+      const access = await this.repo.notifications.projectAccess(p.projectId);
+      if (!access?.userIds.includes(userId)) await this.repo.execute({ type: "project.team.add", projectId: p.projectId, userId }, { id: row.createdBy });
+    }
+    const accepted = await this.repo.currentUser({ id: userId });
+    await this.repo.notifications.accountEvent({
+      recipientId: row.createdBy, actorId: userId, type: "invitation_accepted",
+      title: accepted.email, dedupKey: `invitation-accepted:${row.id}`,
+    });
   }
   async list(actor: Actor) {
     await this.repo.requireAdmin(actor);
@@ -145,7 +123,7 @@ export class InvitationService {
         url: this.url(row),
       }));
   }
-  async create(input: unknown, actor: Actor) {
+  async create(input: unknown, actor: Actor): Promise<InvitationResult> {
     const admin = await this.repo.requireAdmin(actor),
       parsed = fields.safeParse(input);
     if (!parsed.success)
@@ -153,9 +131,11 @@ export class InvitationService {
         "Escribe un correo válido y selecciona los proyectos.",
       );
     const { email, projectIds } = parsed.data;
-    const row = await this.repo.store.transaction(async () => {
+    return this.repo.store.transaction(async () => {
       for (const id of projectIds)
         await this.repo.requireProject(actor, id, true);
+      const [existing] = await this.repo.store.db.select().from(s.user).where(sql`lower(${s.user.email}) = ${email}`);
+      if (existing) return { kind: "assigned" as const, ...await this.repo.users.assign(actor, existing.id, projectIds) };
       const now = Date.now();
       await this.repo.store.db
         .update(s.invitations)
@@ -181,31 +161,11 @@ export class InvitationService {
         await this.repo.store.db
           .insert(s.invitationProjects)
           .values({ invitationId: row.id, projectId });
-      return row;
+      await this.repo.store.db.insert(s.notificationDeliveries).values({
+        id: randomUUID(), invitationId: row.id, transport: "email", expiresAt: new Date(row.expiresAt),
+      });
+      return { kind: "invitation" as const, invitation: { ...row, url: this.url(row) }, deliveryError: null };
     });
-    return this.deliver(row, admin.name);
-  }
-  private async deliver(
-    row: typeof s.invitations.$inferSelect,
-    inviter: string,
-  ) {
-    let error: string | null = null;
-    try {
-      await this.mailer({ to: row.email, url: this.url(row), inviter });
-    } catch (e) {
-      error = e instanceof Error ? e.message : "No se pudo enviar el correo.";
-    }
-    const deliveryStatus = error ? "failed" : "sent";
-    await this.repo.store.transaction(async () => {
-      await this.repo.store.db
-        .update(s.invitations)
-        .set({ deliveryStatus })
-        .where(eq(s.invitations.id, row.id));
-    });
-    return {
-      invitation: { ...row, deliveryStatus, url: this.url(row) },
-      deliveryError: error,
-    };
   }
   async revoke(id: string, actor: Actor) {
     await this.repo.requireAdmin(actor);
@@ -218,21 +178,25 @@ export class InvitationService {
   }
   async resend(id: string, actor: Actor) {
     await this.repo.requireAdmin(actor);
-    const row = (
-      await this.repo.store.db
+    return this.repo.store.transaction(async () => {
+      const row = (
+        await this.repo.store.db
+          .select()
+          .from(s.invitations)
+          .where(eq(s.invitations.id, id))
+      )[0];
+      if (!row || row.acceptedAt)
+        throw new DomainError("La invitación no se puede reenviar.");
+      const [existing] = await this.repo.store.db.select({ id: s.user.id }).from(s.user).where(sql`lower(${s.user.email}) = ${row.email.toLowerCase()}`);
+      if (existing) throw new DomainError("Esta persona ya está registrada. Gestiona sus proyectos desde Usuarios.", 409);
+      const projects = await this.repo.store.db
         .select()
-        .from(s.invitations)
-        .where(eq(s.invitations.id, id))
-    )[0];
-    if (!row || row.acceptedAt)
-      throw new DomainError("La invitación no se puede reenviar.");
-    const projects = await this.repo.store.db
-      .select()
-      .from(s.invitationProjects)
-      .where(eq(s.invitationProjects.invitationId, id));
-    return this.create(
-      { email: row.email, projectIds: projects.map((p) => p.projectId) },
-      actor,
-    );
+        .from(s.invitationProjects)
+        .where(eq(s.invitationProjects.invitationId, id));
+      return this.create(
+        { email: row.email, projectIds: projects.map((p) => p.projectId) },
+        actor,
+      );
+    });
   }
 }

@@ -774,7 +774,7 @@ test("HTTP: clientes globales, geografía y relación opcional con tareas", asyn
     const edited = await send({ type: "client.update", id: clientId, name: "Cliente editado HTTP", cityId: "11001" });
     assert.equal(edited.workspace.clients.find((client) => client.id === clientId).departmentId, "11");
     const backup = await (await fetch(base + "/api/backup")).json();
-    assert.equal(backup.version, 11);
+    assert.equal(backup.version, 12);
     assert.ok(backup.tables.task_clients.some((link) => link.clientId === clientId && link.taskId === taskId));
     await send({ type: "task.clients.update", id: taskId, clientIds: [] });
   } finally {
@@ -1087,13 +1087,14 @@ test("HTTP: notificaciones, lectura y PWA funcionan entre dos usuarios", async (
     const cookie = (await serializeSignedCookie("better-auth.session_token", token, authConfig.BETTER_AUTH_SECRET, { path: "/" })).split(";")[0];
     const asMember = (path, init = {}) => globalThis.fetch(base + path, { ...init, headers: { Cookie: cookie, ...init.headers } });
     const snapshot = await (await asMember("/api/notifications")).json();
-    assert.equal(snapshot.unreadCount, 1);
+    assert.equal(snapshot.unreadCount, 2);
+    assert.ok(snapshot.items.some(item => item.type === "project_access_granted"));
     const item = snapshot.items[0]; assert.equal(item.taskId, taskId);
     assert.equal((await fetch(base + `/api/notifications/${item.id}`)).status, 404);
     const page = await asMember("/notifications"); assert.equal(page.status, 200, page.status >= 500 ? fixture.logs() : undefined); assert.match(await page.text(), /Notificaciones/);
     const read = await asMember(`/api/notifications/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Origin: base }, body: JSON.stringify({ read: true }) });
     assert.equal(read.status, 200, await read.text());
-    assert.equal((await (await asMember("/api/notifications")).json()).unreadCount, 0);
+    assert.equal((await (await asMember("/api/notifications")).json()).unreadCount, 1);
     await asMember(`/api/notifications/${item.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ read: false }) });
     assert.equal((await asMember("/api/notifications/read-all", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ through: snapshot.through }) })).status, 200);
     const manifest = await (await globalThis.fetch(base + "/manifest.webmanifest")).json();

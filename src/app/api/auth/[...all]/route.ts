@@ -1,4 +1,5 @@
 import { authConfigured, getAuth } from "@/server/auth";
+import { deliverNotificationEvents } from "@/server/notification-http";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 async function handler(request: Request) {
@@ -10,6 +11,8 @@ async function handler(request: Request) {
       },
       { status: 503 },
     );
-  return getAuth().handle(request);
+  const response = await getAuth().handle(request);
+  deliverNotificationEvents();
+  return response;
 }
 export { handler as GET, handler as POST };

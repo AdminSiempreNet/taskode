@@ -15,7 +15,7 @@ import * as s from "./schema";
 import { DomainError } from "./repository";
 import type { Actor, EntityRef } from "../lib/types";
 import { entityColumns, rowScope } from "../lib/entities";
-import { entityPath } from "../lib/routes";
+import { entityPath, projectPath } from "../lib/routes";
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   notificationPreferencesSchema,
@@ -52,9 +52,9 @@ export class NotificationsService {
   }
   private inbox(userId: string) {
     return and(eq(s.notifications.recipientId, userId), sql`exists (select 1 from "user" viewer where viewer.id = ${userId}
-      and (viewer.role = 'admin' or ${s.projects.leaderId} = ${userId}
+      and (${s.notifications.scopeType} = 'account' or ((viewer.role = 'admin' or ${s.projects.leaderId} = ${userId}
         or exists (select 1 from ${s.projectTeamMembers} pm where pm."projectId" = ${s.projects.id} and pm."userId" = ${userId}))
-      and (${s.notifications.scopeType} <> 'task' or viewer.role = 'admin' or ${this.repo.taskVisibility({ id: userId })}))`);
+      and (${s.notifications.scopeType} <> 'task' or viewer.role = 'admin' or ${this.repo.taskVisibility({ id: userId })}))))`);
   }
   async list(
     actor: Actor,
@@ -83,8 +83,8 @@ export class NotificationsService {
           featureId: s.notifications.featureId,
           commentId: s.notifications.commentId,
           documentId: s.notifications.documentId,
-          projectId: s.projects.id,
-          projectName: s.projects.name,
+          projectId: s.notifications.projectId,
+          projectName: sql<string>`coalesce(${s.projects.name}, '')`,
           taskTitle: s.notifications.taskTitle,
           offsetMinutes: s.notifications.offsetMinutes,
           createdAt: s.notifications.createdAt,
@@ -92,7 +92,7 @@ export class NotificationsService {
         })
         .from(s.notifications)
         .leftJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
-        .innerJoin(s.projects, eq(s.projects.id, s.notifications.projectId))
+        .leftJoin(s.projects, eq(s.projects.id, s.notifications.projectId))
         .leftJoin(s.user, eq(s.user.id, s.notifications.actorId))
         .where(
           and(
@@ -109,11 +109,11 @@ export class NotificationsService {
         .select({ count: sql<number>`count(*)::integer` })
         .from(s.notifications)
         .leftJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
-        .innerJoin(s.projects, eq(s.projects.id, s.notifications.projectId))
+        .leftJoin(s.projects, eq(s.projects.id, s.notifications.projectId))
         .where(and(this.inbox(actor.id), isNull(s.notifications.readAt)));
       const items: NotificationItem[] = rows.slice(0, limit).map((r) => ({
         ...r,
-        scope: rowScope(r)!,
+        scope: rowScope(r) ?? undefined,
         entityTitle: r.taskTitle,
         createdAt: r.createdAt.toISOString(),
         readAt: r.readAt?.toISOString() ?? null,
@@ -138,6 +138,8 @@ export class NotificationsService {
     await this.repo.store.ready;
     const [item] = await this.repo.store.db
       .select({
+        type: s.notifications.type,
+        actorId: s.notifications.actorId,
         taskId: s.notifications.taskId,
         projectId: s.notifications.projectId,
         scopeType: s.notifications.scopeType,
@@ -149,13 +151,24 @@ export class NotificationsService {
       })
       .from(s.notifications)
       .leftJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
-      .innerJoin(s.projects, eq(s.projects.id, s.notifications.projectId))
+      .leftJoin(s.projects, eq(s.projects.id, s.notifications.projectId))
       .where(and(eq(s.notifications.id, id), this.inbox(actor.id)));
     if (!item)
       throw new DomainError(
         "La notificación no existe o no tienes acceso.",
         404,
       );
+    if (item.scopeType === "account") {
+      let url = "/projects";
+      if (item.type === "invitation_accepted") {
+        const user = await this.repo.currentUser(actor);
+        if (user.role === "admin") url = `/users${item.actorId ? `?user=${encodeURIComponent(item.actorId)}` : ""}`;
+      } else if (item.type === "project_access_granted" && item.projectId) {
+        try { await this.repo.requireProject(actor, item.projectId); url = projectPath(item.projectId); }
+        catch (error) { if (!(error instanceof DomainError)) throw error; }
+      }
+      return { id, url, projectId: item.projectId, taskId: null, readAt: item.readAt?.toISOString() ?? null };
+    }
     const scope = rowScope(item)!;
     const url = new URL(entityPath(scope.projectId, scope.kind, scope.id, "board", item.documentId ? "documents" : "description"), "http://taskode.invalid");
     if (item.documentId) url.searchParams.set("document", item.documentId);
@@ -180,7 +193,7 @@ export class NotificationsService {
         .select({ id: s.notifications.id })
         .from(s.notifications)
         .leftJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
-        .innerJoin(s.projects, eq(s.projects.id, s.notifications.projectId))
+        .leftJoin(s.projects, eq(s.projects.id, s.notifications.projectId))
         .where(
           and(
             this.inbox(actor.id),
@@ -256,6 +269,15 @@ export class NotificationsService {
   }
   async deliveryValid(notificationId: string, now = new Date()) {
     const [source] = await this.repo.store.db.select().from(s.notifications).where(eq(s.notifications.id, notificationId));
+    if (source?.scopeType === "account") {
+      if (source.type === "project_access_removed") return true;
+      if (source.type === "invitation_accepted") {
+        try { await this.repo.requireAdmin({ id: source.recipientId }); return true; }
+        catch (error) { if (error instanceof DomainError) return false; throw error; }
+      }
+      try { await this.repo.requireProject({ id: source.recipientId }, source.projectId!); return true; }
+      catch (error) { if (error instanceof DomainError) return false; throw error; }
+    }
     if (source?.type === "mention") {
       try { await this.get({ id: source.recipientId }, notificationId); return true; }
       catch (error) { if (error instanceof DomainError) return false; throw error; }
@@ -372,6 +394,41 @@ export class NotificationsService {
   async accessChanged(userIds: string[]) {
     for (const userId of new Set(userIds)) await this.invalidate(userId);
   }
+  async projectAccess(projectId: string) {
+    const [project] = await this.repo.store.db.select().from(s.projects).where(eq(s.projects.id, projectId));
+    if (!project) return null;
+    const users = await this.repo.store.db.select({ id: s.user.id }).from(s.user)
+      .where(and(sql`${s.user.role} <> 'admin'`, sql`(${s.user.id} = ${project.leaderId} or exists (select 1 from ${s.projectTeamMembers} pm where pm."projectId" = ${projectId} and pm."userId" = ${s.user.id}))`));
+    return { name: project.name, userIds: users.map(u => u.id) };
+  }
+  async projectAccessChanged(projectId: string, before: { name: string; userIds: string[] } | null, actor: Actor) {
+    const next = await this.projectAccess(projectId);
+    if (!next) return;
+    const previous = new Set(before?.userIds ?? []), current = new Set(next.userIds);
+    for (const userId of new Set([...previous, ...current])) {
+      if (previous.has(userId) === current.has(userId)) continue;
+      const [user] = await this.repo.store.db.select({ email: s.user.email }).from(s.user).where(eq(s.user.id, userId));
+      if (user) await this.repo.users.revokePending(user.email);
+      if (userId !== actor.id) await this.accountEvent({
+        recipientId: userId, actorId: actor.id, projectId,
+        type: current.has(userId) ? "project_access_granted" : "project_access_removed",
+        title: next.name, dedupKey: `access:${randomUUID()}`,
+      });
+    }
+  }
+  async accountEvent(input: {
+    recipientId: string; actorId: string; projectId?: string;
+    type: "project_access_granted" | "project_access_removed" | "invitation_accepted";
+    title: string; dedupKey: string;
+  }) {
+    const [item] = await this.repo.store.db.insert(s.notifications).values({
+      id: randomUUID(), recipientId: input.recipientId, actorId: input.actorId,
+      projectId: input.projectId ?? null, scopeType: "account", type: input.type,
+      taskTitle: input.title, dedupKey: input.dedupKey,
+    }).onConflictDoNothing({ target: s.notifications.dedupKey }).returning();
+    if (!item) return;
+    await this.enqueue(item.id, input.recipientId, new Date(), new Date(Date.now() + 86400000), true);
+  }
   async mentioned(scope: EntityRef, actor: Actor, userId: string, source: { commentId?: string; documentId?: string }) {
     const { entity } = await this.repo.requireEntity({ id: userId }, scope.kind, scope.id, scope.projectId);
     let title = String(entity.title ?? entity.name);
@@ -420,7 +477,12 @@ export class NotificationsService {
       .onConflictDoNothing({ target: s.notifications.dedupKey })
       .returning();
     if (!item) return false;
-    await this.invalidate(userId, item.id, expiresAt, now);
+    await this.enqueue(item.id, userId, now, expiresAt);
+    return true;
+  }
+  private async enqueue(notificationId: string, userId: string, now: Date, expiresAt: Date, email = false) {
+    await this.invalidate(userId, notificationId, expiresAt, now);
+    if (email) await this.repo.store.db.insert(s.notificationDeliveries).values({ id: randomUUID(), recipientId: userId, notificationId, transport: "email", expiresAt, availableAt: now });
     const subscriptions = await this.repo.store.db
       .select({ id: s.pushSubscriptions.id })
       .from(s.pushSubscriptions)
@@ -435,13 +497,12 @@ export class NotificationsService {
       await this.repo.store.db.insert(s.notificationDeliveries).values({
         id: randomUUID(),
         recipientId: userId,
-        notificationId: item.id,
+        notificationId,
         subscriptionId: sub.id,
         transport: "push",
         expiresAt,
         availableAt: now,
       });
-    return true;
   }
   // Reconciliation preserves already-scheduled due jobs, but never backfills a
   // newly enabled threshold. A unique durable key survives retries/restores.

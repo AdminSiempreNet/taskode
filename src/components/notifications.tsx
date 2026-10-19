@@ -21,7 +21,6 @@ import {
   type NotificationItem,
   type NotificationsSnapshot,
 } from "@/lib/notifications";
-import { taskPath } from "@/lib/routes";
 import { useWorkspaceRouter } from "./unsaved-changes";
 import { Button } from "./ui/button";
 import { Popover } from "radix-ui";
@@ -66,10 +65,10 @@ export function useOpenNotification(userId: string) {
         );
         if (!response.ok)
           throw Error("Esta notificación ya no está disponible.");
-        const target: { projectId: string; taskId: string; url?: string } =
+        const target: { projectId: string | null; taskId: string | null; url: string } =
           await response.json();
         await clientFor(userId).read(id);
-        router.push(target.url ?? taskPath(target.projectId, target.taskId));
+        router.push(target.url);
       } catch (error) {
         toast.error((error as Error).message);
       }
@@ -112,7 +111,7 @@ function NotificationRow({
         <span>{notificationText(item)}</span>
         <strong>{item.taskTitle}</strong>
         <small>
-          {item.projectName} ·{" "}
+          {item.projectName && item.projectName !== item.taskTitle ? `${item.projectName} · ` : ""}
           <time
             dateTime={item.createdAt}
             title={new Date(item.createdAt).toLocaleString("es-CO")}
@@ -168,7 +167,7 @@ export function NotificationBell({ userId }: { userId: string }) {
         id: `notification:${item.id}`,
         description: item.taskTitle,
         action: {
-          label: item.type === "mention" ? "Ver mención" : "Ver tarea",
+          label: item.type === "invitation_accepted" || item.type.startsWith("project_access_") ? "Abrir" : item.type === "mention" ? "Ver mención" : "Ver tarea",
           onClick: () => {
             void open(item.id);
           },

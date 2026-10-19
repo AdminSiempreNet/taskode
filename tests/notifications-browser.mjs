@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chromium, firefox, webkit } from "playwright";
 import { startHttpFixture } from "./http-fixture.ts";
 import { actor, addUser, authConfig } from "./helpers.ts";
-import { session } from "../src/server/schema.ts";
+import { session, notifications } from "../src/server/schema.ts";
 import { randomUUID } from "node:crypto";
 import { serializeSignedCookie } from "better-call";
 import webpush from "web-push";
@@ -29,6 +29,7 @@ before(async () => {
     { type: "project.team.add", projectId, userId: user.id },
     actor,
   );
+  await fixture.repo.store.db.delete(notifications);
   const w = await fixture.repo.getWorkspace(actor);
   for (let i = 0; i < 35; i++)
     await fixture.repo.execute(

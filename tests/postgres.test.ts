@@ -254,7 +254,6 @@ test("dos instancias consumen una invitación una sola vez y otorgan participaci
     schema: repo.store.schemaName,
   });
   try {
-    await addUser(repo, "member");
     const projectId = (
       await repo.execute(
         {
@@ -271,18 +270,18 @@ test("dos instancias consumen una invitación una sola vez y otorgan participaci
       repo,
       authConfig.BETTER_AUTH_SECRET,
       authConfig.BETTER_AUTH_URL,
-      async () => {},
     );
     const other = new InvitationService(
       peer,
       authConfig.BETTER_AUTH_SECRET,
       authConfig.BETTER_AUTH_URL,
-      async () => {},
     );
     const created = await service.create(
       { email: "member@example.com", projectIds: [projectId] },
       actor,
     );
+    assert.equal(created.kind, "invitation");
+    await addUser(repo, "member");
     const token = new URL(created.invitation.url).pathname.split("/").at(-1)!;
     const results = await Promise.allSettled([
       service.consume(token, "member", "member@example.com"),

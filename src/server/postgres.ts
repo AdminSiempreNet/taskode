@@ -34,6 +34,7 @@ import { DEFAULT_TASK_TYPES, DEFAULT_IMPACTS } from "../lib/types";
 import { DomainError, type WorkspaceRepository, type WorkspaceReadOptions } from "./repository";
 import { entityColumns, rowScope, sameEntity } from "../lib/entities";
 import { NotificationsService } from "./notifications";
+import { UsersService } from "./users";
 import { MentionsService } from "./mentions";
 import { ticketInputSchema } from "../lib/tickets";
 
@@ -59,14 +60,16 @@ async function each<T>(
 }
 export class PostgresRepository implements WorkspaceRepository {
   // Incrementar al cambiar el contrato o las migraciones de una instancia cacheada.
-  static readonly cacheVersion = 19;
+  static readonly cacheVersion = 20;
   readonly cacheVersion = PostgresRepository.cacheVersion;
   readonly store: DatabaseStore;
   readonly notifications: NotificationsService;
+  readonly users: UsersService;
   private actorContext = new AsyncLocalStorage<Actor>();
   constructor(connectionString: string, options: DatabaseOptions = {}) {
     this.store = new DatabaseStore(connectionString, options);
     this.notifications = new NotificationsService(this);
+    this.users = new UsersService(this);
   }
   private table(name: string): AnyPgTable {
     const table = schema.domainTables[name as keyof typeof schema.domainTables];
@@ -1450,6 +1453,9 @@ export class PostgresRepository implements WorkspaceRepository {
     if (Object.hasOwn(command, "ticketNumber"))
       throw new DomainError("Los tickets ahora se gestionan desde su pestaña. Recarga la página para continuar.", 409);
     return this.transaction(async () => {
+      const accessProjectId = command.type === "project.team.add" || command.type === "project.team.remove" ? command.projectId
+        : command.type === "project.assignment.update" || command.type === "project.leader.update" ? command.id : null;
+      const accessBefore = accessProjectId ? await this.notifications.projectAccess(accessProjectId) : null;
       let descriptionBefore = "";
       const descriptionCommand = /^(project|module|feature|task)\.(create|update)$/.test(command.type);
       if (descriptionCommand && command.type.endsWith("update") && "id" in command) {
@@ -1474,6 +1480,7 @@ export class PostgresRepository implements WorkspaceRepository {
       const removedRecipients = changedProject ? await this.store.db.selectDistinct({ userId: schema.notifications.recipientId })
         .from(schema.notifications).where(eq(schema.notifications.projectId, changedProject)) : [];
       const result = await this.executeCommand(command, actor);
+      if (accessProjectId) await this.notifications.projectAccessChanged(accessProjectId, accessBefore, actor);
       if (descriptionCommand && "description" in command) {
         const kind = command.type.split(".")[0] as EntityKind;
         const id = result.createdId ?? ("id" in command ? command.id : "");
@@ -1490,7 +1497,7 @@ export class PostgresRepository implements WorkspaceRepository {
       if (command.type === "task.create") await this.notifications.reconcile([result.createdId!]);
       else if (["task.update", "task.assignment.update", "task.archive", "task.move"].includes(command.type) && "id" in command)
         await this.notifications.reconcile([command.id]);
-      else if (["status.update", "project.timezone.update", "project.team.remove", "trello.import"].includes(command.type))
+      else if (["status.update", "project.timezone.update", "project.team.remove", "project.assignment.update", "trello.import"].includes(command.type))
         await this.notifications.reconcile();
       return result;
     });

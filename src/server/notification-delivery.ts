@@ -7,6 +7,9 @@ import type { PostgresRepository } from "./postgres";
 import * as s from "./schema";
 import { ablyConfig, notificationsChannel } from "./realtime-config";
 import { DomainError, isDomainError } from "./repository";
+import { InvitationService } from "./invitations";
+import { invitationEmail, accessEmail, sendNotificationEmail, type NotificationEmailMessage } from "./notification-email";
+import { notificationText } from "../lib/notifications";
 
 export function pushConfig(
   env: Record<string, string | undefined> = process.env,
@@ -71,6 +74,7 @@ export async function notificationToken(userId: string) {
 type Delivery = typeof s.notificationDeliveries.$inferSelect;
 type Subscription = typeof s.pushSubscriptions.$inferSelect;
 export type NotificationTransports = {
+  email?: (message: NotificationEmailMessage, idempotencyKey: string) => Promise<void>;
   invalidate(
     userId: string,
     eventId: string,
@@ -94,6 +98,7 @@ export function notificationTransports(): NotificationTransports {
     : null;
   const vapid = pushConfig();
   return {
+    email: sendNotificationEmail,
     async invalidate(userId, eventId, notificationId) {
       if (!client || !config) throw Error("realtime-unconfigured");
       await client.channels
@@ -172,6 +177,21 @@ export async function flushNotificationDeliveries(
           result.discarded++;
         };
         try {
+          if (job.invitationId) {
+            const [row] = await repo.store.db.select({ invitation: s.invitations, inviter: s.user.name }).from(s.invitations)
+              .innerJoin(s.user, eq(s.user.id, s.invitations.createdBy)).where(eq(s.invitations.id, job.invitationId));
+            if (!row || row.invitation.acceptedAt || row.invitation.revokedAt || row.invitation.expiresAt <= now.getTime()) { await discard(); return; }
+            if (!send.email) throw new Error("email-unconfigured");
+            const service = new InvitationService(repo, process.env.BETTER_AUTH_SECRET || "", process.env.BETTER_AUTH_URL || "http://localhost:5010");
+            await send.email(await invitationEmail({ to: row.invitation.email, url: service.url(row.invitation), inviter: row.inviter }), `taskode-delivery:${job.id}`);
+            await repo.store.transaction(async () => {
+              await repo.store.db.update(s.invitations).set({ deliveryStatus: "sent" }).where(and(eq(s.invitations.id, job.invitationId!), sql`exists (select 1 from ${s.notificationDeliveries} d where d.id = ${job.id} and d."leaseUntil" = ${leaseUntil.toISOString()}::timestamptz)`));
+              await repo.store.db.delete(s.notificationDeliveries).where(match);
+            });
+            result.sent++;
+            return;
+          }
+          if (!job.recipientId) { await discard(); return; }
           if (job.notificationId) {
             try {
               await repo.notifications.get(
@@ -194,7 +214,16 @@ export async function flushNotificationDeliveries(
           }
           if (job.transport === "ably")
             await send.invalidate(job.recipientId, job.id, job.notificationId);
-          else {
+          else if (job.transport === "email") {
+            if (!send.email || !job.notificationId) throw new Error("email-unconfigured");
+            const [row] = await repo.store.db.select({ notification: s.notifications, email: s.user.email }).from(s.notifications)
+              .innerJoin(s.user, eq(s.user.id, s.notifications.recipientId)).where(eq(s.notifications.id, job.notificationId));
+            if (!row) { await discard(); return; }
+            const [actor] = row.notification.actorId ? await repo.store.db.select({ name: s.user.name }).from(s.user).where(eq(s.user.id, row.notification.actorId)) : [];
+            const target = await repo.notifications.get({ id: job.recipientId }, job.notificationId);
+            const message = notificationText({ ...row.notification, actorName: actor?.name ?? null, projectName: "", createdAt: row.notification.createdAt.toISOString(), readAt: null });
+            await send.email(await accessEmail({ to: row.email, message, title: row.notification.taskTitle, url: new URL(target.url, process.env.BETTER_AUTH_URL || "http://localhost:5010").toString() }), `taskode-delivery:${job.id}`);
+          } else {
             if (!job.subscriptionId || !job.notificationId) {
               await discard();
               return;
@@ -247,6 +276,7 @@ export async function flushNotificationDeliveries(
         } catch {
           result.failed++;
           await repo.store.transaction(async () => {
+            if (job.invitationId) await repo.store.db.update(s.invitations).set({ deliveryStatus: "failed" }).where(and(eq(s.invitations.id, job.invitationId), sql`exists (select 1 from ${s.notificationDeliveries} d where d.id = ${job.id} and d."leaseUntil" = ${leaseUntil.toISOString()}::timestamptz)`));
             await repo.store.db
               .update(s.notificationDeliveries)
               .set({

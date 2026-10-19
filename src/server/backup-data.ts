@@ -62,6 +62,7 @@ export const backupTables = {
 type BackupRow = Record<string, string | number | boolean | string[] | DiagramScene | null>;
 const tableValidators: Record<string, z.ZodType> = {};
 const version10Validators: Record<string, z.ZodType> = {};
+const version11Validators: Record<string, z.ZodType> = {};
 const version11Tables = ["tickets", "project_clients", "module_clients", "feature_clients", "project_tickets", "module_tickets", "feature_tickets", "task_tickets"];
 const version9Validators: Record<string, z.ZodType> = {};
 const version8Validators: Record<string, z.ZodType> = {};
@@ -101,6 +102,12 @@ for (const [name, table] of Object.entries(backupTables)) {
     fields[key] = column.notNull ? field : field.nullable();
   }
   tableValidators[name] = z.array(z.strictObject({ ...fields }));
+  if (name === "notifications") {
+    fields.projectId = z.string();
+    fields.scopeType = z.enum(["project", "module", "feature", "task"]);
+    fields.type = z.enum(["assigned", "shared", "reminder", "mention"]);
+  }
+  version11Validators[name] = z.array(z.strictObject({ ...fields }));
   if (version11Tables.includes(name)) continue;
   if (name === "tasks") fields.ticketNumber = z.string().nullable();
   version10Validators[name] = z.array(z.strictObject({ ...fields }));
@@ -172,10 +179,11 @@ const legacyTableValidators = Object.fromEntries(
 );
 const fileSchema = z
   .union([
+    z.strictObject({ ...backupHeader, version: z.literal(12), tables: z.strictObject(tableValidators) }),
     z.strictObject({
       ...backupHeader,
       version: z.literal(11),
-      tables: z.strictObject(tableValidators),
+      tables: z.strictObject(version11Validators),
     }),
     z.strictObject({
       ...backupHeader,
@@ -385,17 +393,18 @@ const fileSchema = z
       project_clients: [], module_clients: [], feature_clients: [], project_tickets: [], module_tickets: [], feature_tickets: [],
     } };
   })
+  .transform(input => ({ ...input, version: 12 as const }))
   .pipe(
     z.strictObject({
       format: z.literal("taskode-backup"),
       createdAt: z.iso.datetime(),
-      version: z.literal(11),
+      version: z.literal(12),
       tables: z.strictObject(tableValidators),
     }),
   );
 export type ApplicationBackup = {
   format: "taskode-backup";
-  version: 11;
+  version: 12;
   createdAt: string;
   tables: Record<string, BackupRow[]>;
 };
@@ -409,7 +418,7 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
   const parsed = fileSchema.safeParse(input);
   if (!parsed.success)
     invalid(
-      "El archivo no es un respaldo JSON compatible de Taskode (versiones 1–11).",
+      "El archivo no es un respaldo JSON compatible de Taskode (versiones 1–12).",
     );
   const backup = parsed.data as ApplicationBackup;
   const data = backup.tables;
@@ -431,6 +440,13 @@ export function validateApplicationBackup(input: unknown): ApplicationBackup {
   }
   for (const n of data.notifications) {
     if (!data.user.some((u) => u.id === n.recipientId) || (n.actorId !== null && !data.user.some((u) => u.id === n.actorId))) invalid();
+    if (n.scopeType === "account") {
+      if (!["project_access_granted", "project_access_removed", "invitation_accepted"].includes(String(n.type)) || [n.taskId, n.moduleId, n.featureId, n.commentId, n.documentId, n.offsetMinutes].some(v => v !== null)) invalid();
+      if (n.projectId !== null && !data.projects.some(p => p.id === n.projectId)) invalid();
+      if (n.type !== "invitation_accepted" && n.projectId === null) invalid();
+      continue;
+    }
+    if (!["assigned", "shared", "reminder", "mention"].includes(String(n.type))) invalid();
     const target = n.scopeType === "project" ? data.projects.find(p => p.id === n.projectId)
       : (n.scopeType === "task" ? data.tasks : n.scopeType === "module" ? data.modules : data.features)
         .find(t => t.id === (n.scopeType === "task" ? n.taskId : n.scopeType === "module" ? n.moduleId : n.featureId) && t.projectId === n.projectId);
@@ -771,7 +787,7 @@ export async function exportApplicationBackup(
   });
   const text = JSON.stringify({
     format: "taskode-backup",
-    version: 11,
+    version: 12,
     createdAt: new Date().toISOString(),
     tables,
   });

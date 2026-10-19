@@ -72,6 +72,8 @@ async function fixture() {
       { type: "project.team.add", projectId, userId: user.id },
       actor,
     );
+  // Mentions tests start after onboarding/access notices have been consumed.
+  await repo.store.db.delete(s.notifications).where(eq(s.notifications.scopeType, "account"));
   const moduleId = (
     await repo.execute(
       { type: "module.create", projectId, name: "Módulo", description: "" },
@@ -469,7 +471,7 @@ test("respaldo v11 conserva menciones y normaliza avisos v9 sin generar entregas
     const path = join(directory, "backup.json");
     await f.repo.exportBackup(path);
     const backup = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(validateApplicationBackup(backup).version, 11);
+    assert.equal(validateApplicationBackup(backup).version, 12);
     const legacy = structuredClone(backup);
     stripTicketTables(legacy.tables);
     legacy.version = 9;

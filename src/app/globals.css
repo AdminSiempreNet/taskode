@@ -524,7 +524,11 @@ a:focus-visible {
   font-size: 11px;
 }
 .application-menu {
-  padding: 4px 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 12px 12px;
+  overflow-y: auto;
 }
 .application-menu .nav-item[aria-current="page"] {
   background: var(--accent);
@@ -868,19 +872,30 @@ a:focus-visible {
 .nav-item {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
   width: 100%;
-  padding: 6px 9px;
-  gap: 8px;
-  border-radius: 6px;
+  min-height: 44px;
+  padding: 10px 12px;
+  gap: 12px;
+  border-radius: 8px;
   background: none;
   border: 0;
   color: var(--muted-foreground);
   text-align: left;
-  font-size: 12px;
+  font-size: 13px;
+  line-height: 20px;
   margin-bottom: 0;
 }
 .nav-item:hover {
-  background: var(--muted);
+  background: var(--accent);
+  color: var(--foreground);
+}
+.nav-item:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.nav-item > svg {
+  flex-shrink: 0;
 }
 .nav-item > svg:last-child:not(:first-child) {
   margin-left: auto;

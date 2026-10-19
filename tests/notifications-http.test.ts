@@ -46,6 +46,7 @@ test("API de avisos exige sesión, valida preferencias y aísla el canal persona
       { type: "project.team.add", projectId, userId: other.id },
       actor,
     );
+    await repo.store.db.delete((await import("../src/server/schema")).notifications);
     const w = await repo.getWorkspace(actor);
     await repo.execute(
       {
