@@ -429,7 +429,7 @@ test("respaldo actual conserva los niveles y v4 normaliza comentarios y archivos
     const path = join(directory, "v5.json");
     await f.repo.exportBackup(path);
     const backup = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(backup.version, 12);
+    assert.equal(backup.version, 13);
     validateApplicationBackup(backup);
     for (const mutation of [
       (copy: typeof backup) => {
@@ -460,7 +460,7 @@ test("respaldo actual conserva los niveles y v4 normaliza comentarios y archivos
       (comment: { taskId: string | null }) => comment.taskId !== null,
     );
     stripEntityColumns(legacy.tables);
-    assert.equal(validateApplicationBackup(legacy).version, 12);
+    assert.equal(validateApplicationBackup(legacy).version, 13);
     const legacyPath = join(directory, "v4.json");
     await writeFile(legacyPath, JSON.stringify(legacy));
     await f.repo.restoreBackup(legacyPath);

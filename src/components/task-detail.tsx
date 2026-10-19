@@ -44,6 +44,7 @@ import {
 import { Field, type Confirmation, type Mutate } from "./forms";
 import { useProjectCatalog } from "./project-catalog";
 import { CatalogCombobox } from "./catalog-combobox";
+import { ApplicationPicker } from "./application-picker";
 import { ClientPicker } from "./client-picker";
 import { TicketPicker } from "./tickets";
 import { InlineTaskTitle, TaskLabelPicker } from "./task-heading";
@@ -144,7 +145,7 @@ export function TaskDetail({
   const searchParams = useSearchParams();
   const view = getProjectView(searchParams.get("view"));
   const returnTo = safeReturnTo(project.id, searchParams.get("returnTo"));
-  const { priorities, taskTypes, impacts } = useProjectCatalog();
+  const { priorities, taskTypes, impacts, applications } = useProjectCatalog();
   const features = workspace.features.filter(
     (feature) => feature.projectId === project.id,
   );
@@ -179,10 +180,11 @@ export function TaskDetail({
         : ""),
   );
   const [impactId, setImpactId] = useState(task?.impactId ?? "");
+  const [applicationIds, setApplicationIds] = useState(() => task?.applicationIds ?? applications.filter(option => option.isDefault).map(option => option.id));
   const [clientIds, setClientIds] = useState(task?.clientIds ?? []);
   const [ticketIds, setTicketIds] = useState(task?.ticketIds ?? []);
   useEffect(() => {
-    if (task) { setClientIds(task.clientIds); setTicketIds(task.ticketIds); }
+    if (task) { setClientIds(task.clientIds); setTicketIds(task.ticketIds); setApplicationIds(task.applicationIds); }
   }, [task]);
   const [dueDate, setDueDate] = useState(
     task?.dueDate ?? defaults.dueDate ?? "",
@@ -330,6 +332,16 @@ export function TaskDetail({
       assignmentSaving.current = false;
     }
   }
+  async function saveApplications(values: string[]) {
+    if (busy || assignmentSaving.current || !canEdit) return;
+    const previous = applicationIds;
+    setApplicationIds(values);
+    if (!task) { setDirty(true); return; }
+    assignmentSaving.current = true;
+    try {
+      if (!(await mutate({ type: "entity.applications.update", scope: { kind: "task", id: task.id, projectId: project.id }, applicationIds: values }))) setApplicationIds(previous);
+    } finally { assignmentSaving.current = false; }
+  }
   async function saveTickets(values: string[], addedClientId?: string | null) {
     if (busy || assignmentSaving.current || !canEdit) return;
     const previous = ticketIds;
@@ -367,7 +379,7 @@ export function TaskDetail({
     }
     const result = await mutate({
       type: task ? "task.update" : "task.create",
-      ...(!task ? { leaderId, teamMemberIds, clientIds, ticketIds } : {}),
+      ...(!task ? { leaderId, teamMemberIds, clientIds, ticketIds, applicationIds } : {}),
       id: task?.id,
       projectId: project.id,
       title: title.trim(),
@@ -825,6 +837,9 @@ export function TaskDetail({
                         </Field>
                       ),
                     )}
+                    <Field label="Aplicaciones" htmlFor="task-applications">
+                      <ApplicationPicker id="task-applications" options={applications} values={applicationIds} onChange={values => void saveApplications(values)} disabled={busy || !canEdit} />
+                    </Field>
                     <div className="task-schedule-group">
                       <span>Inicio</span>
                       <div>

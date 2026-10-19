@@ -46,6 +46,7 @@ export function FeatureTaskList({
     priorityIds: filterGroupValues(classificationIds, "priority"),
     typeIds: filterGroupValues(classificationIds, "type"),
     impactIds: filterGroupValues(classificationIds, "impact"),
+    applicationIds: filterGroupValues(classificationIds, "application"),
   };
   const available = tasks.filter((task) => task.archived === archived);
   const filtered = available.filter((task) => matchesTaskFilters(task, filters));

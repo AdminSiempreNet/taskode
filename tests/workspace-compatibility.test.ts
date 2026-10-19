@@ -8,7 +8,7 @@ import { WorkspaceApp } from "../src/components/workspace-app";
 import type { Workspace, Project } from "../src/lib/types";
 
 function legacyWorkspace() {
-  const legacy: Omit<Workspace, "taskTypes" | "impacts" | "clients" | "tickets" | "projects"> & {
+  const legacy: Omit<Workspace, "taskTypes" | "impacts" | "applications" | "clients" | "tickets" | "projects"> & {
     projects: Omit<Project, "clientIds" | "ticketIds">[];
   } = {
     currentUser: {
@@ -75,7 +75,7 @@ test("el proyecto renderiza snapshots anteriores sin los catálogos de tipos e i
   assert.match(html, /Proyecto anterior/);
   assert.match(html, /aria-label="Usuarios"/);
   assert.match(html, /aria-label="Estados y etiquetas"/);
-  assert.match(html, /aria-label="Prioridad, tipo e impacto"/);
+  assert.match(html, /aria-label="Clasificación"/);
   assert.equal((html.match(/role="combobox"/g) ?? []).length, 3);
 });
 

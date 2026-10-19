@@ -45,6 +45,7 @@ type Section =
   | "priorities"
   | "taskTypes"
   | "impacts"
+  | "applications"
   | "labels"
   | "appearance"
   | "notifications"
@@ -54,15 +55,18 @@ const catalogKinds = {
   priorities: "priority",
   taskTypes: "taskType",
   impacts: "impact",
+  applications: "application",
   labels: "label",
 } as const;
 const catalogNouns = {
   priority: { singular: "prioridad", article: "la", fresh: "Nueva prioridad" },
   taskType: { singular: "tipo", article: "el", fresh: "Nuevo tipo" },
   impact: { singular: "impacto", article: "el", fresh: "Nuevo impacto" },
+  application: { singular: "aplicación", article: "la", fresh: "Nueva aplicación" },
   label: { singular: "etiqueta", article: "la", fresh: "Nueva etiqueta" },
 } as const;
 const sections = {
+  applications: { title: "Aplicaciones", description: "Administra las aplicaciones de este proyecto. Web es la selección inicial de las nuevas tareas y puede quitarse de ellas.", icon: Monitor },
   notifications: { title: "Notificaciones", description: "Tus recordatorios y los avisos de este dispositivo.", icon: Settings2 },
   timezone: { title: "Zona horaria", description: "Define la hora de referencia del proyecto.", icon: Settings2 },
   general: {
@@ -170,6 +174,7 @@ export function SettingsModal({
               "priorities",
               "taskTypes",
               "impacts",
+              "applications",
               "labels",
               "timezone",
             ] as const
@@ -237,6 +242,7 @@ export function SettingsModal({
                 <p className="info-note">
                   {section === "labels"
                     ? "Las etiquetas se comparten dentro de este proyecto. Al renombrar una etiqueta se actualizan sus tareas; al eliminarla se retira de ellas."
+                    : section === "applications" ? "Las selecciones de módulos, features y tareas son independientes. La aplicación predeterminada no se puede eliminar. Quita las asociaciones de una aplicación antes de eliminarla."
                     : "Los cambios de nombre y color se reflejan en todas las tareas. Para eliminar una opción, cambia o quita antes su asignación en las tareas que la usan, incluidas las archivadas."}
                 </p>
                 <div
@@ -371,8 +377,8 @@ function OptionRow({
   busy,
   confirm,
 }: {
-  option?: ProjectPriority | ProjectLabel;
-  kind: "priority" | "taskType" | "impact" | "label";
+  option?: (ProjectPriority | ProjectLabel) & { isDefault?: boolean };
+  kind: "priority" | "taskType" | "impact" | "label" | "application";
   projectId: string;
   mutate: Mutate;
   busy: boolean;
@@ -447,7 +453,8 @@ function OptionRow({
             <Plus />
           </Button>
         )}
-        {option && (
+        {option?.isDefault && <span className="field-hint">Predeterminada</span>}
+        {option && !option.isDefault && (
           <Button
             type="button"
             variant="ghost"
@@ -461,6 +468,7 @@ function OptionRow({
                 description:
                   kind === "label"
                     ? "Se quitará de todas las tareas de este proyecto."
+                    : kind === "application" ? "Quita primero sus asociaciones en módulos, features y tareas, incluidas las archivadas."
                     : "Solo se puede eliminar si ninguna tarea utiliza esta opción, incluidas las archivadas.",
                 action: () =>
                   mutate({ type: `${kind}.delete`, projectId, id: option.id }),

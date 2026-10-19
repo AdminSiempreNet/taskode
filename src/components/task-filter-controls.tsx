@@ -72,7 +72,7 @@ export function TaskFilterControls({
         summary={userIds.length === 1 && userIds[0] === MINE_FILTER ? "Mías" : undefined}
       />
       <FilterCombobox id={`${idPrefix}-state-filter`} label="Estados y etiquetas" options={options.stateOptions} values={stateIds} change={changeState} />
-      <FilterCombobox id={`${idPrefix}-classification-filter`} label="Prioridad, tipo e impacto" options={options.classificationOptions} values={classificationIds} change={changeClassification} />
+      <FilterCombobox id={`${idPrefix}-classification-filter`} label="Clasificación" options={options.classificationOptions} values={classificationIds} change={changeClassification} />
     </div>
   );
 }

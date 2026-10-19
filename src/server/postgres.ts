@@ -30,7 +30,7 @@ import type {
   EntityDetailSnapshot,
 } from "../lib/types";
 import { normalizeClientText } from "../lib/clients";
-import { DEFAULT_TASK_TYPES, DEFAULT_IMPACTS } from "../lib/types";
+import { DEFAULT_TASK_TYPES, DEFAULT_IMPACTS, DEFAULT_APPLICATIONS } from "../lib/types";
 import { DomainError, type WorkspaceRepository, type WorkspaceReadOptions } from "./repository";
 import { entityColumns, rowScope, sameEntity } from "../lib/entities";
 import { NotificationsService } from "./notifications";
@@ -60,7 +60,7 @@ async function each<T>(
 }
 export class PostgresRepository implements WorkspaceRepository {
   // Incrementar al cambiar el contrato o las migraciones de una instancia cacheada.
-  static readonly cacheVersion = 21;
+  static readonly cacheVersion = 22;
   readonly cacheVersion = PostgresRepository.cacheVersion;
   readonly store: DatabaseStore;
   readonly notifications: NotificationsService;
@@ -156,7 +156,21 @@ export class PostgresRepository implements WorkspaceRepository {
     const links = async (item: "client" | "ticket") =>
       (await this.find(`${kind}_${item}s`, { [`${kind}Id`]: id }))
         .map((row) => String(row[`${item}Id`])).sort();
-    return { clientIds: await links("client"), ticketIds: await links("ticket") };
+    return { clientIds: await links("client"), ticketIds: await links("ticket"),
+      ...(kind === "project" ? {} : { applicationIds: (await this.find(`${kind}_applications`, { [`${kind}Id`]: id })).map(row => String(row.applicationId)).sort() }) };
+  }
+  private async setApplications(kind: Exclude<EntityKind, "project">, id: string, projectId: string, values?: string[]) {
+    const ids = values === undefined
+      ? (await this.find("applications", { projectId, isDefault: true })).map(row => String(row.id))
+      : [...new Set(values)];
+    if (values === undefined && ids.length !== 1) throw new DomainError("El proyecto no tiene una aplicación predeterminada válida.", 409);
+    const valid = ids.length ? await this.store.db.select({ id: schema.applications.id }).from(schema.applications)
+      .where(and(eq(schema.applications.projectId, projectId), inArray(schema.applications.id, ids))) : [];
+    if (valid.length !== ids.length) throw new DomainError("Las aplicaciones deben existir y pertenecer al proyecto.");
+    const table = `${kind}_applications`, key = `${kind}Id`;
+    await this.remove(table, { [key]: id });
+    for (const applicationId of ids) await this.insert(table, { [key]: id, applicationId });
+    if (kind === "task") await this.update("tasks", id, { updatedAt: new Date().toISOString() });
   }
   private async addTicketClient(kind: EntityKind, id: string, clientId: string | null) {
     if (!clientId) return;
@@ -648,7 +662,7 @@ export class PostgresRepository implements WorkspaceRepository {
   private async authorize(command: Command, actor: Actor) {
     await this.currentUser(actor);
     const c = command;
-    if (c.type === "entity.clients.update" || c.type === "entity.tickets.update" || (c.type === "ticket.create" && c.scope)) {
+    if (c.type === "entity.applications.update" || c.type === "entity.clients.update" || c.type === "entity.tickets.update" || (c.type === "ticket.create" && c.scope)) {
       const scope = c.scope!;
       const { permissions } = await this.requireEntity(actor, scope.kind, scope.id, scope.projectId);
       if (!permissions.canEdit) throw new DomainError("No tienes permiso para editar este elemento.", 403);
@@ -792,7 +806,7 @@ export class PostgresRepository implements WorkspaceRepository {
       projectId = String(table === "projects" ? row.id : row.projectId);
     }
     const manage =
-      /^(project\.|status\.|priority\.|taskType\.|impact\.|label\.|trello\.)/.test(
+      /^(project\.|status\.|priority\.|taskType\.|impact\.|application\.|label\.|trello\.)/.test(
         c.type,
       );
     await this.requireProject(actor, projectId, manage);
@@ -1013,6 +1027,7 @@ export class PostgresRepository implements WorkspaceRepository {
       priorities,
       taskTypes,
       impacts,
+      applications,
       labels,
       tasks,
     ] = await sequential([
@@ -1022,6 +1037,7 @@ export class PostgresRepository implements WorkspaceRepository {
       () => rows("priorities"),
       () => rows("task_types"),
       () => rows("impacts"),
+      () => rows("applications"),
       () => rows("labels"),
       () =>
         this.store.db
@@ -1074,6 +1090,15 @@ export class PostgresRepository implements WorkspaceRepository {
       f.leaderId === actor.id ||
       (!module &&
         modules.some((m) => m.id === f.moduleId && m.leaderId === actor.id));
+    const applicationLinks = new Map<string, string[]>();
+    for (const [kind, entities] of [["module", modules], ["feature", features], ["task", tasks]] as const) {
+      for (const link of await rows(`${kind}_applications`, `${kind}Id`, entities.map(entity => String(entity.id)))) {
+        const key = `${kind}:${link[`${kind}Id`]}`;
+        const value = applicationLinks.get(key) ?? [];
+        value.push(String(link.applicationId));
+        applicationLinks.set(key, value);
+      }
+    }
     const relations = new Map<string, { clientIds: string[]; ticketIds: string[] }>();
     for (const [kind, entities] of [["project", projects], ["module", modules], ["feature", features], ["task", tasks]] as const) {
       const visibleIds = entities.map((entity) => String(entity.id));
@@ -1087,7 +1112,8 @@ export class PostgresRepository implements WorkspaceRepository {
     }
     const entityLinks = (kind: EntityKind, id: unknown) => {
       const value = relations.get(`${kind}:${id}`) ?? { clientIds: [], ticketIds: [] };
-      return { clientIds: value.clientIds.sort(), ticketIds: value.ticketIds.sort() };
+      return { clientIds: value.clientIds.sort(), ticketIds: value.ticketIds.sort(),
+        ...(kind === "project" ? {} : { applicationIds: (applicationLinks.get(`${kind}:${id}`) ?? []).sort() }) };
     };
     const tickets = includeCatalogs ? await this.find("tickets") : [];
     const clients = includeCatalogs ? await this.store.db
@@ -1167,6 +1193,7 @@ export class PostgresRepository implements WorkspaceRepository {
       priorities: sort(priorities),
       taskTypes: sort(taskTypes),
       impacts: sort(impacts),
+      applications: sort(applications),
       labels: sort(labels),
       tickets: tickets.sort((a, b) => String(a.number).localeCompare(String(b.number), "es", { numeric: true }) || String(a.id).localeCompare(String(b.id))),
       clients: clients.sort(
@@ -1301,7 +1328,7 @@ export class PostgresRepository implements WorkspaceRepository {
     ];
   }
   private async optionNamed(
-    table: "labels" | "priorities" | "task_types" | "impacts",
+    table: "labels" | "priorities" | "task_types" | "impacts" | "applications",
     projectId: string,
     name: string,
   ) {
@@ -1359,6 +1386,7 @@ export class PostgresRepository implements WorkspaceRepository {
       { kind: "project", id, projectId: id },
     );
     await this.defaultPriorities(id);
+    await each([...DEFAULT_APPLICATIONS], (option, position) => this.insert("applications", { id: randomUUID(), projectId: id, ...option, position }));
     for (const [table, options] of [
       ["task_types", DEFAULT_TASK_TYPES],
       ["impacts", DEFAULT_IMPACTS],
@@ -1568,6 +1596,9 @@ export class PostgresRepository implements WorkspaceRepository {
         if (await this.accessCommand(command)) return {};
         const c = command;
         switch (c.type) {
+          case "entity.applications.update":
+            await this.setApplications(c.scope.kind, c.scope.id, c.scope.projectId, c.applicationIds);
+            break;
           case "entity.clients.update":
           case "entity.tickets.update":
             await this.setEntityLinks(c.scope.kind, c.scope.id, c.type === "entity.clients.update" ? "client" : "ticket", c.type === "entity.clients.update" ? c.clientIds : c.ticketIds);
@@ -2040,6 +2071,7 @@ export class PostgresRepository implements WorkspaceRepository {
               });
               for (const clientId of clientIds ?? [])
                 await this.insert("task_clients", { taskId: id, clientId });
+              await this.setApplications("task", id, p, c.applicationIds);
               await this.setEntityLinks("task", id, "ticket", c.ticketIds ?? []);
               await this.setTaskAssignment(
                 id,
@@ -2056,6 +2088,7 @@ export class PostgresRepository implements WorkspaceRepository {
               fields.updatedAt,
             );
             await this.update("tasks", c.id, fields);
+            if (c.applicationIds !== undefined) await this.setApplications("task", c.id, p, c.applicationIds);
             await this.bindContentFiles(c.description, actor, p, c.id);
             if (clientIds !== undefined) {
               await this.remove("task_clients", { taskId: c.id });
@@ -2144,9 +2177,11 @@ export class PostgresRepository implements WorkspaceRepository {
           case "taskType.update":
           case "impact.create":
           case "impact.update":
+          case "application.create":
+          case "application.update":
           case "label.create":
           case "label.update": {
-            const table = c.type.startsWith("priority")
+            const table = c.type.startsWith("application") ? "applications" : c.type.startsWith("priority")
               ? "priorities"
               : c.type.startsWith("taskType")
                 ? "task_types"
@@ -2201,9 +2236,10 @@ export class PostgresRepository implements WorkspaceRepository {
           case "priority.delete":
           case "taskType.delete":
           case "impact.delete":
+          case "application.delete":
           case "label.delete": {
             const table =
-              c.type === "priority.delete"
+              c.type === "application.delete" ? "applications" : c.type === "priority.delete"
                 ? "priorities"
                 : c.type === "taskType.delete"
                   ? "task_types"
@@ -2221,6 +2257,12 @@ export class PostgresRepository implements WorkspaceRepository {
             )[0];
             if (!option)
               throw new DomainError("La opción no pertenece al proyecto.", 404);
+            if (table === "applications") {
+              if (option.isDefault) throw new DomainError("La aplicación predeterminada no se puede eliminar.", 409);
+              for (const kind of ["module", "feature", "task"])
+                if ((await this.find(`${kind}_applications`, { applicationId: c.id })).length)
+                  throw new DomainError("Quita la aplicación de los elementos que la usan, incluidas las tareas archivadas, antes de eliminarla.", 409);
+            }
             if (table === "task_types" || table === "impacts") {
               const field = table === "task_types" ? "typeId" : "impactId";
               if (
@@ -2260,7 +2302,7 @@ export class PostgresRepository implements WorkspaceRepository {
                 throw new DomainError(
                   "Cambia la prioridad de las tareas que la usan, incluidas las archivadas, antes de eliminarla.",
                 );
-            } else
+            } else if (table === "labels")
               await this.replaceLabel(c.projectId, String(option.name), null);
             await this.remove(table, { id: c.id, projectId: c.projectId });
             break;
@@ -2455,8 +2497,9 @@ export class PostgresRepository implements WorkspaceRepository {
         board.name,
         "Tareas importadas desde Trello.",
       );
+      const taskId = randomUUID();
       await this.insert("tasks", {
-        id: randomUUID(),
+        id: taskId,
         createdById: this.actorContext.getStore()!.id,
         leaderId: this.actorContext.getStore()!.id,
         projectId,
@@ -2483,6 +2526,7 @@ export class PostgresRepository implements WorkspaceRepository {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
+      await this.setApplications("task", taskId, projectId);
       imported++;
     }
     return { imported, skipped, projectId };

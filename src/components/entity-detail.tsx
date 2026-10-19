@@ -54,6 +54,7 @@ import { DescriptionEditor } from "./description-editor";
 import { EmojiPicker } from "./emoji-picker";
 import { EntityAssignmentControl } from "./project-people";
 import { ClientPicker } from "./client-picker";
+import { ApplicationPicker } from "./application-picker";
 import { TicketPicker } from "./tickets";
 import { DetailTabs, type DetailSection } from "./detail-tabs";
 import { EntityDiagrams, type DiagramPending } from "./diagrams";
@@ -104,6 +105,9 @@ export function EntityDetail({
         ? modules.find((m) => m.id === scope.id)
         : features.find((f) => f.id === scope.id);
   const [name, setName] = useState(entity?.name ?? "General");
+  const selectedApplications = entity && "applicationIds" in entity ? entity.applicationIds : [];
+  const [applicationIds, setApplicationIds] = useState(selectedApplications);
+  useEffect(() => { setApplicationIds(entity && "applicationIds" in entity ? entity.applicationIds : []); }, [entity]);
   const [description, setDescription] = useState(entity?.description ?? "");
   const [icon, setIcon] = useState(project.icon);
   const [color, setColor] = useState(project.color);
@@ -548,6 +552,17 @@ export function EntityDetail({
                     className="form-stack scope-fields"
                     disabled={!canEdit || busy}
                   >
+                    {scope.kind !== "project" && (
+                      <Field label="Aplicaciones" htmlFor="entity-applications">
+                        <ApplicationPicker id="entity-applications" options={workspace.applications.filter(option => option.projectId === project.id)} values={applicationIds} disabled={!canEdit || busy}
+                          onChange={async values => {
+                            if (!canEdit || busy) return;
+                            const previous = applicationIds;
+                            setApplicationIds(values);
+                            if (!(await mutate({ type: "entity.applications.update", scope, applicationIds: values }))) setApplicationIds(previous);
+                          }} />
+                      </Field>
+                    )}
                     {scope.kind === "project" ? (
                       <>
                         <Field label="Icono" htmlFor="entity-icon">

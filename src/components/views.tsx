@@ -40,6 +40,7 @@ import type { Feature, Status, Task } from "@/lib/types";
 import {
   LabelChip,
   TaskCategoryChip,
+  ApplicationChips,
   colorStyle,
   useProjectCatalog,
 } from "./project-catalog";
@@ -96,6 +97,7 @@ function CardContent({
           <Priority priority={task.priority} />
           <TaskCategoryChip kind="type" id={task.typeId} />
           <TaskCategoryChip kind="impact" id={task.impactId} />
+          <ApplicationChips ids={task.applicationIds ?? []} />
         </div>
         {relations.length > 0 && (
           <div className="card-relations">
@@ -776,6 +778,7 @@ export function ListView({
                           </dd>
                         </div>
                       </dl>
+                      {(task.applicationIds ?? []).length > 0 && <div className="application-chips"><ApplicationChips ids={task.applicationIds} /></div>}
                       <dl className={styles.schedule} title={taskScheduleLabel(task)}>
                         {task.startDate && (
                           <div>

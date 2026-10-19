@@ -44,7 +44,11 @@ destino en el proceso o ejecutar en un checkout sin `.env.local`.
 ## Preparación de una versión
 
 1. Incluir en Git el código, todos los SQL de `drizzle/postgresql` y sus metadatos.
-   No editar migraciones ya aplicadas. La versión actual llega a `0014_oauth_mcp`.
+   No editar migraciones ya aplicadas. La versión actual llega a `0015_applications`.
+   Esta migración incluye el backfill: crea Web, Android, iOS, Windows y macOS
+   por proyecto y asigna Web a todas las tareas existentes, incluidas las archivadas.
+   Los módulos y features quedan sin aplicaciones. No necesita un script ni semillas
+   adicionales; el SQL y el backfill se aplican juntos en la transacción de Drizzle.
 2. Ejecutar `npm test`, `npm run typecheck`, `npm run build`, `npm run test:http`
    y `npm run test:mcp:http`. Las pruebas de datos usan `TEST_DATABASE_URL`,
    con esquemas desechables, nunca la base de producción.
@@ -72,7 +76,7 @@ Vercel ejecuta `npm run build:vercel` en este orden:
 
 1. Validar variables de Production.
 2. Compilar Next.js.
-3. Ejecutar las migraciones pendientes mediante `npm run db:migrate`.
+3. Ejecutar las migraciones pendientes y sus backfills SQL mediante `npm run db:migrate`.
 4. Publicar el resultado si todos los pasos terminaron correctamente.
 
 Así una compilación fallida no cambia el esquema. La migración toma un bloqueo

@@ -17,11 +17,12 @@ export function matchesTaskFilters(
   task: Pick<
     Task,
     "statusId" | "typeId" | "impactId" | "leaderId" | "teamMemberIds"
-  > & Partial<Pick<Task, "priority" | "labels">>,
+  > & Partial<Pick<Task, "priority" | "labels" | "applicationIds">>,
   filters: {
     statusIds: string[];
     typeIds: string[];
     impactIds: string[];
+    applicationIds?: string[];
     userIds?: string[];
     currentUserId?: string;
     priorityIds?: string[];
@@ -42,6 +43,8 @@ export function matchesTaskFilters(
       filters.typeIds.includes(task.typeId ?? UNASSIGNED_FILTER)) &&
     (!filters.impactIds.length ||
       filters.impactIds.includes(task.impactId ?? UNASSIGNED_FILTER)) &&
+    (!filters.applicationIds?.length ||
+      filters.applicationIds.some(id => id === UNASSIGNED_FILTER ? !task.applicationIds?.length : task.applicationIds?.includes(id))) &&
     (!filters.priorityIds?.length ||
       (!!task.priority && filters.priorityIds.includes(task.priority))) &&
     ((!filters.labelNames?.length && !filters.includeUnlabeled) ||

@@ -41,6 +41,7 @@ export function registerTaskTools(server: McpServer, ctx: McpContext) {
       labels: z.array(z.string().min(1).max(60)).max(20).default([]),
       leaderId: id.optional().describe("Responsable principal (por defecto tú)."),
       teamMemberIds: ids.optional(),
+      applicationIds: ids.optional().describe("Aplicaciones del proyecto; omisión al crear asigna la predeterminada; [] deja sin aplicación."),
       clientIds: ids.optional(),
       ticketIds: ids.optional(),
       checklist: z
@@ -101,6 +102,7 @@ export function registerTaskTools(server: McpServer, ctx: McpContext) {
       labels: z.array(z.string().min(1).max(60)).max(20).optional().describe("Reemplaza todas las etiquetas."),
       addLabels: z.array(z.string().min(1).max(60)).max(20).optional(),
       removeLabels: z.array(z.string().min(1).max(60)).max(20).optional(),
+      applicationIds: ids.optional().describe("Aplicaciones del proyecto; omisión al crear asigna la predeterminada; [] deja sin aplicación."),
       clientIds: ids.optional().describe("Reemplaza los clientes vinculados."),
       expectedUpdatedAt: z.string().optional().describe("updatedAt leído con get_task; si cambió, no se guarda."),
     }),
@@ -134,6 +136,7 @@ export function registerTaskTools(server: McpServer, ctx: McpContext) {
           dueTime: patch.dueTime === undefined ? task.dueTime : patch.dueTime,
           labels,
           clientIds: patch.clientIds ?? task.clientIds,
+          applicationIds: patch.applicationIds,
         });
       }
       const fresh = await loadTask(ctx, taskId);

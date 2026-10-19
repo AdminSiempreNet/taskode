@@ -1,3 +1,4 @@
+import { normalizeApplicationIdentity } from "./entity-fixtures";
 import { stripTicketTables } from "./entity-fixtures";
 import { removeEntitySchema, stripEntityColumns } from "./entity-fixtures";
 import { test } from "node:test";
@@ -339,7 +340,7 @@ test("solo administrador configura el límite; respaldos v4 y v3 conservan líde
     const path = join(directory, "v4.json");
     await f.repo.exportBackup(path);
     const backup = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(backup.version, 12);
+    assert.equal(backup.version, 13);
     assert.equal(backup.tables.tasks[0].leaderId, f.leader.id);
     assert.equal(backup.tables.tasks[0].assigneeId, undefined);
     assert.deepEqual(backup.tables.task_team_members, [
@@ -371,12 +372,12 @@ test("solo administrador configura el límite; respaldos v4 y v3 conservan líde
       version3.tables.task_collaborators = version3.tables.task_team_members;
       delete version3.tables.task_team_members;
       const normalized = validateApplicationBackup(version3);
-      assert.equal(normalized.version, 12);
-      assert.deepEqual(normalized.tables, { ...backup.tables, notifications: [], notification_preferences: [] });
+      assert.equal(normalized.version, 13);
+      assert.deepEqual(normalizeApplicationIdentity(normalized.tables), normalizeApplicationIdentity({ ...backup.tables, notifications: [], notification_preferences: [] }));
       const path = join(directory, `${format}-v3.json`);
       await writeFile(path, JSON.stringify(version3));
       await f.repo.restoreBackup(path);
-      assert.deepEqual(await f.repo.getWorkspace(f.leader), before);
+      assert.deepEqual(normalizeApplicationIdentity(await f.repo.getWorkspace(f.leader)), normalizeApplicationIdentity(before));
       const invalidTeam = structuredClone(version3);
       invalidTeam.tables.task_collaborators[0].userId = "unknown";
       assert.throws(() => validateApplicationBackup(invalidTeam));
@@ -463,8 +464,8 @@ test("migración de líder y equipo renombra tablas, columnas y restricciones si
     await migrate(drizzle(repo.store.pool), options);
     await migrate(drizzle(repo.store.pool), options);
     assert.deepEqual(
-      await Promise.all(users.map((user) => repo.getWorkspace(user))),
-      before,
+      normalizeApplicationIdentity(await Promise.all(users.map((user) => repo.getWorkspace(user)))),
+      normalizeApplicationIdentity(before),
     );
     const tables = await repo.store.pool.query(
       "select table_name from information_schema.tables where table_schema = $1 and table_name in ('task_team_members', 'task_collaborators')",

@@ -13,6 +13,7 @@ export interface TaskSearch {
   priorityIds?: string[];
   typeIds?: string[];
   impactIds?: string[];
+  applicationIds?: string[];
   labels?: string[];
   clientId?: string;
   ticketId?: string;
@@ -54,6 +55,7 @@ export function searchTasks(workspace: Workspace, filters: TaskSearch, userId: s
         statusIds: filters.statusIds ?? [],
         typeIds: filters.typeIds ?? [],
         impactIds: filters.impactIds ?? [],
+        applicationIds: filters.applicationIds ?? [],
         priorityIds: filters.priorityIds ?? [],
         labelNames: filters.labels ?? [],
         userIds: assignee && assignee !== UNASSIGNED_FILTER ? [assignee] : [],

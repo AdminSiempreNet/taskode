@@ -1977,3 +1977,8 @@
   flex: 1;
   min-width: 0;
 }
+
+.application-chips { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+
+.task-properties-grid > .field:has(#task-applications),
+.task-properties-grid > .field:has(#create-task-applications) { grid-column: 1 / -1; }

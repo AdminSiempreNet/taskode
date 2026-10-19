@@ -1,3 +1,4 @@
+import { stripApplicationTables } from "./entity-fixtures";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { eq } from "drizzle-orm";
@@ -203,12 +204,12 @@ test("aceptación sin proyectos avisa una vez al administrador; respaldo v12 con
     await flushNotificationDeliveries(repo, { invalidate: async () => { calls.push("ably"); }, push: async () => {}, email: async mail => { assert.equal(mail.to, "test-admin@example.com"); calls.push("email"); } });
     assert.deepEqual(calls.sort(), ["ably", "email"]);
     const path = join(dir, "backup.json"); await repo.exportBackup(path);
-    const backup = JSON.parse(await readFile(path, "utf8")); assert.equal(validateApplicationBackup(backup).version, 12);
+    const backup = JSON.parse(await readFile(path, "utf8")); assert.equal(validateApplicationBackup(backup).version, 13);
     await repo.restoreBackup(path);
     assert.equal((await repo.notifications.list(actor)).items[0].type, "invitation_accepted");
     assert.equal((await repo.store.db.select().from(s.notificationDeliveries)).length, 0);
-    const legacy = structuredClone(backup); legacy.version = 11; legacy.tables.notifications = [];
-    assert.equal(validateApplicationBackup(legacy).version, 12);
+    const legacy = structuredClone(backup); legacy.version = 11; stripApplicationTables(legacy.tables); legacy.tables.notifications = [];
+    assert.equal(validateApplicationBackup(legacy).version, 13);
   } finally { await repo.close(); await rm(dir, { recursive: true, force: true }); }
 });
 

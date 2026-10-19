@@ -364,7 +364,7 @@ test("documentos: imágenes protegidas, respaldos v9 y compatibilidad v8; cascad
     const path = join(directory, "backup.json");
     await f.repo.exportBackup(path);
     const backup = JSON.parse(await readFile(path, "utf8"));
-    assert.equal(backup.version, 12);
+    assert.equal(backup.version, 13);
     assert.equal(backup.tables.documents.length, 2);
     const corrupt = structuredClone(backup);
     corrupt.tables.documents[0].projectId = "missing";

@@ -10,6 +10,12 @@ export interface ProjectPriority {
 export interface ProjectLabel extends ProjectPriority {}
 export interface ProjectTaskType extends ProjectPriority {}
 export interface ProjectImpact extends ProjectPriority {}
+export interface ProjectApplication extends ProjectPriority {
+  isDefault: boolean;
+}
+export interface ApplicationSelection {
+  applicationIds: string[];
+}
 export interface ChecklistItem {
   id: string;
   title: string;
@@ -112,7 +118,7 @@ export interface Project extends EntityAssignment, EntityRelations {
   color: string;
   createdAt: string;
 }
-export interface ProjectModule extends EntityAssignment, EntityRelations {
+export interface ProjectModule extends EntityAssignment, EntityRelations, ApplicationSelection {
   id: string;
   projectId: string;
   name: string;
@@ -121,7 +127,7 @@ export interface ProjectModule extends EntityAssignment, EntityRelations {
   leaderId?: string;
   canManage?: boolean;
 }
-export interface Feature extends EntityAssignment, EntityRelations {
+export interface Feature extends EntityAssignment, EntityRelations, ApplicationSelection {
   id: string;
   projectId: string;
   moduleId: string | null;
@@ -141,7 +147,7 @@ export interface Status {
   position: number;
   isDone: boolean;
 }
-export interface Task extends EntityRelations {
+export interface Task extends EntityRelations, ApplicationSelection {
   id: string;
   projectId: string;
   featureId: string;
@@ -182,6 +188,7 @@ export interface Workspace {
   priorities: ProjectPriority[];
   taskTypes: ProjectTaskType[];
   impacts: ProjectImpact[];
+  applications: ProjectApplication[];
   labels: ProjectLabel[];
   clients: Client[];
   tickets: Ticket[];
@@ -255,6 +262,13 @@ export const DEFAULT_IMPACTS = [
   { name: "✨ Feature", color: "#0d9488" },
   { name: "🧩 Modulo", color: "#8b5cf6" },
   { name: "🚀 Proyecto", color: "#ef4444" },
+] as const;
+export const DEFAULT_APPLICATIONS = [
+  { name: "Web", color: "#3b82f6", isDefault: true },
+  { name: "Android", color: "#16a34a", isDefault: false },
+  { name: "iOS", color: "#64748b", isDefault: false },
+  { name: "Windows", color: "#0284c7", isDefault: false },
+  { name: "macOS", color: "#8b5cf6", isDefault: false },
 ] as const;
 export const COLORS = [
   "#059669",
