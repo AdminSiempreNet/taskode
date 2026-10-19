@@ -1978,7 +1978,36 @@
   min-width: 0;
 }
 
-.application-chips { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+.application-picker {
+  container: application-picker / inline-size;
+  min-width: 0;
+}
+.application-picker-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  align-items: start;
+}
+.application-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  align-items: center;
+  align-content: center;
+  min-width: 0;
+  min-height: 36px;
+}
+.application-chips > .label-chip {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+@container application-picker (max-width: 420px) {
+  .application-picker-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 
 .task-properties-grid > .field:has(#task-applications),
 .task-properties-grid > .field:has(#create-task-applications) { grid-column: 1 / -1; }
