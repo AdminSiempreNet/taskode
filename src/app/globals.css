@@ -1461,7 +1461,7 @@ a:focus-visible {
 .list-view {
   display: flex;
   flex-direction: column;
-  gap: 23px;
+  gap: 16px;
 }
 .feature-table {
   border: 1px solid var(--border);

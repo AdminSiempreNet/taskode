@@ -675,6 +675,7 @@ export function ListView({
   open,
   add,
   archived,
+  hideGroupHeader = false,
 }: {
   tasks: Task[];
   features: Feature[];
@@ -682,6 +683,8 @@ export function ListView({
   open: (t: Task) => void;
   add: () => void;
   archived: boolean;
+  /** Oculta el encabezado del grupo cuando el contexto ya identifica la feature. */
+  hideGroupHeader?: boolean;
 }) {
   const { timeZone } = useProjectCatalog();
   if (!tasks.length)
@@ -713,13 +716,15 @@ export function ListView({
         if (!rows.length) return null;
         return (
           <section key={f.id} className={styles.group} aria-label={f.name}>
-            <header className={styles.groupHeader}>
-              <Layers3 size={16} aria-hidden="true" />
-              <h2>{f.name}</h2>
-              <span className={styles.count}>
-                {rows.length} {rows.length === 1 ? "tarea" : "tareas"}
-              </span>
-            </header>
+            {!hideGroupHeader && (
+              <header className={styles.groupHeader}>
+                <Layers3 size={16} aria-hidden="true" />
+                <h2>{f.name}</h2>
+                <span className={styles.count}>
+                  {rows.length} {rows.length === 1 ? "tarea" : "tareas"}
+                </span>
+              </header>
+            )}
             <ul className={styles.rows} aria-label={`Tareas de ${f.name}`}>
               {rows.map((task) => {
                 const status = statuses.find((s) => s.id === task.statusId);
@@ -747,41 +752,42 @@ export function ListView({
                         <StatusPill status={status} />
                       </div>
                     </div>
-                    {(task.leader || task.labels.length > 0) && (
-                      <div className={styles.context}>
-                        <TaskPeopleSummary leader={task.leader} teamMembers={task.teamMembers} />
-                        {task.labels.length > 0 && (
-                          <div className={styles.labels} aria-label="Etiquetas">
-                            {task.labels.map((label) => <LabelChip name={label} key={label} />)}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    <div className={styles.details}>
+                    <div className={styles.meta}>
+                      {(task.leader || task.labels.length > 0) && (
+                        <div className={styles.context}>
+                          <TaskPeopleSummary leader={task.leader} teamMembers={task.teamMembers} />
+                          {task.labels.length > 0 && (
+                            <div className={styles.labels} aria-label="Etiquetas">
+                              {task.labels.map((label) => <LabelChip name={label} key={label} />)}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <dl className={styles.properties}>
-                        <div>
-                          <dt>Prioridad</dt>
+                        <div title="Prioridad">
+                          <dt className={styles.srOnly}>Prioridad</dt>
                           <dd><Priority priority={task.priority} /></dd>
                         </div>
-                        <div>
-                          <dt>Tipo</dt>
-                          <dd>
-                            <TaskCategoryChip kind="type" id={task.typeId} />
-                            {!task.typeId && <span className={styles.unset}>Sin tipo</span>}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Impacto</dt>
-                          <dd>
-                            <TaskCategoryChip kind="impact" id={task.impactId} />
-                            {!task.impactId && <span className={styles.unset}>Sin impacto</span>}
-                          </dd>
-                        </div>
-                      </dl>
-                      {(task.applicationIds ?? []).length > 0 && <div className="application-chips"><ApplicationChips ids={task.applicationIds} /></div>}
-                      <dl className={styles.schedule} title={taskScheduleLabel(task)}>
-                        {task.startDate && (
+                        {task.typeId && (
                           <div>
+                            <dt className={styles.srOnly}>Tipo</dt>
+                            <dd><TaskCategoryChip kind="type" id={task.typeId} /></dd>
+                          </div>
+                        )}
+                        {task.impactId && (
+                          <div>
+                            <dt className={styles.srOnly}>Impacto</dt>
+                            <dd><TaskCategoryChip kind="impact" id={task.impactId} /></dd>
+                          </div>
+                        )}
+                        {(task.applicationIds ?? []).length > 0 && (
+                          <div>
+                            <dt className={styles.srOnly}>Aplicaciones</dt>
+                            <dd className={styles.applications}><ApplicationChips ids={task.applicationIds} /></dd>
+                          </div>
+                        )}
+                        {task.startDate && (
+                          <div className={styles.date} title={taskScheduleLabel(task)}>
                             <dt>Inicio</dt>
                             <dd>
                               <time dateTime={`${task.startDate}${task.startTime ? `T${task.startTime}` : ""}`}>
@@ -791,17 +797,17 @@ export function ListView({
                             </dd>
                           </div>
                         )}
-                        <div className={overdue ? styles.overdue : undefined}>
-                          <dt>Entrega{overdue && <span> · Vencida</span>}</dt>
-                          <dd>
-                            {task.dueDate ? (
+                        {task.dueDate && (
+                          <div className={`${styles.date} ${overdue ? styles.overdue : ""}`} title={taskScheduleLabel(task)}>
+                            <dt>Entrega{overdue && <span> · Vencida</span>}</dt>
+                            <dd>
                               <time dateTime={`${task.dueDate}${task.dueTime ? `T${task.dueTime}` : ""}`}>
                                 {shortDate(task.dueDate)}
                                 {task.dueTime && ` · ${task.dueTime}`}
                               </time>
-                            ) : <span className={styles.unset}>Sin fecha</span>}
-                          </dd>
-                        </div>
+                            </dd>
+                          </div>
+                        )}
                       </dl>
                     </div>
                   </li>
