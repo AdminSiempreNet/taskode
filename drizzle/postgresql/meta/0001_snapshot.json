@@ -1,0 +1,2365 @@
+{
+  "id": "e37520de-413e-4687-9cfa-055ed8ec35e5",
+  "prevId": "814dcbbf-1b34-4e82-93fc-ff90a74f74d0",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.account": {
+      "name": "account",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "accountId": {
+          "name": "accountId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "providerId": {
+          "name": "providerId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "accessToken": {
+          "name": "accessToken",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refreshToken": {
+          "name": "refreshToken",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "idToken": {
+          "name": "idToken",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "password": {
+          "name": "password",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "accessTokenExpiresAt": {
+          "name": "accessTokenExpiresAt",
+          "type": "timestamp (3) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refreshTokenExpiresAt": {
+          "name": "refreshTokenExpiresAt",
+          "type": "timestamp (3) with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp (3) with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp (3) with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "account_provider_identity": {
+          "name": "account_provider_identity",
+          "columns": [
+            {
+              "expression": "providerId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "accountId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "account_user": {
+          "name": "account_user",
+          "columns": [
+            {
+              "expression": "userId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "account_userId_user_id_fk": {
+          "name": "account_userId_user_id_fk",
+          "tableFrom": "account",
+          "tableTo": "user",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.checklist_items": {
+      "name": "checklist_items",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "checklistId": {
+          "name": "checklistId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "completed": {
+          "name": "completed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "position": {
+          "name": "position",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "item_checklist": {
+          "name": "item_checklist",
+          "columns": [
+            {
+              "expression": "checklistId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "checklist_items_checklistId_checklists_id_fk": {
+          "name": "checklist_items_checklistId_checklists_id_fk",
+          "tableFrom": "checklist_items",
+          "tableTo": "checklists",
+          "columnsFrom": [
+            "checklistId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.checklists": {
+      "name": "checklists",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "taskId": {
+          "name": "taskId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "checklist_task": {
+          "name": "checklist_task",
+          "columns": [
+            {
+              "expression": "taskId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "checklists_taskId_tasks_id_fk": {
+          "name": "checklists_taskId_tasks_id_fk",
+          "tableFrom": "checklists",
+          "tableTo": "tasks",
+          "columnsFrom": [
+            "taskId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.cities": {
+      "name": "cities",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "departmentId": {
+          "name": "departmentId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "city_department": {
+          "name": "city_department",
+          "columns": [
+            {
+              "expression": "departmentId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cities_departmentId_departments_id_fk": {
+          "name": "cities_departmentId_departments_id_fk",
+          "tableFrom": "cities",
+          "tableTo": "departments",
+          "columnsFrom": [
+            "departmentId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.clients": {
+      "name": "clients",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "normalizedName": {
+          "name": "normalizedName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cityId": {
+          "name": "cityId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "client_name_city": {
+          "name": "client_name_city",
+          "columns": [
+            {
+              "expression": "normalizedName",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "cityId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "clients_cityId_cities_id_fk": {
+          "name": "clients_cityId_cities_id_fk",
+          "tableFrom": "clients",
+          "tableTo": "cities",
+          "columnsFrom": [
+            "cityId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.comments": {
+      "name": "comments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "taskId": {
+          "name": "taskId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "comment_task": {
+          "name": "comment_task",
+          "columns": [
+            {
+              "expression": "taskId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "createdAt",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "comments_taskId_tasks_id_fk": {
+          "name": "comments_taskId_tasks_id_fk",
+          "tableFrom": "comments",
+          "tableTo": "tasks",
+          "columnsFrom": [
+            "taskId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.departments": {
+      "name": "departments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.features": {
+      "name": "features",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "projectId": {
+          "name": "projectId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "moduleId": {
+          "name": "moduleId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "number": {
+          "name": "number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pinned": {
+          "name": "pinned",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {
+        "feature_identity": {
+          "name": "feature_identity",
+          "columns": [
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "projectId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "feature_number": {
+          "name": "feature_number",
+          "columns": [
+            {
+              "expression": "projectId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "moduleId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "feature_general_number": {
+          "name": "feature_general_number",
+          "columns": [
+            {
+              "expression": "projectId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"features\".\"moduleId\" is null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "feature_module": {
+          "name": "feature_module",
+          "columns": [
+            {
+              "expression": "moduleId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "features_projectId_projects_id_fk": {
+          "name": "features_projectId_projects_id_fk",
+          "tableFrom": "features",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "projectId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "features_moduleId_modules_id_fk": {
+          "name": "features_moduleId_modules_id_fk",
+          "tableFrom": "features",
+          "tableTo": "modules",
+          "columnsFrom": [
+            "moduleId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "positive_feature_number": {
+          "name": "positive_feature_number",
+          "value": "\"features\".\"number\" >= 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.impacts": {
+      "name": "impacts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "projectId": {
+          "name": "projectId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "impact_name": {
+          "name": "impact_name",
+          "columns": [
+            {
+              "expression": "projectId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "impacts_projectId_projects_id_fk": {
+          "name": "impacts_projectId_projects_id_fk",
+          "tableFrom": "impacts",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "projectId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.installation": {
+      "name": "installation",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "adminId": {
+          "name": "adminId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "onboardingStep": {
+          "name": "onboardingStep",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "firstProjectId": {
+          "name": "firstProjectId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "installation_adminId_user_id_fk": {
+          "name": "installation_adminId_user_id_fk",
+          "tableFrom": "installation",
+          "tableTo": "user",
+          "columnsFrom": [
+            "adminId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "single_installation": {
+          "name": "single_installation",
+          "value": "\"installation\".\"id\" = 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.invitation_projects": {
+      "name": "invitation_projects",
+      "schema": "",
+      "columns": {
+        "invitationId": {
+          "name": "invitationId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "projectId": {
+          "name": "projectId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "invitation_projects_invitationId_invitations_id_fk": {
+          "name": "invitation_projects_invitationId_invitations_id_fk",
+          "tableFrom": "invitation_projects",
+          "tableTo": "invitations",
+          "columnsFrom": [
+            "invitationId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "invitation_projects_projectId_projects_id_fk": {
+          "name": "invitation_projects_projectId_projects_id_fk",
+          "tableFrom": "invitation_projects",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "projectId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "invitation_projects_invitationId_projectId_pk": {
+          "name": "invitation_projects_invitationId_projectId_pk",
+          "columns": [
+            "invitationId",
+            "projectId"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.invitations": {
+      "name": "invitations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdBy": {
+          "name": "createdBy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revokedAt": {
+          "name": "revokedAt",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acceptedAt": {
+          "name": "acceptedAt",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "acceptedBy": {
+          "name": "acceptedBy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "deliveryStatus": {
+          "name": "deliveryStatus",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        }
+      },
+      "indexes": {
+        "invitation_email": {
+          "name": "invitation_email",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "invitations_createdBy_user_id_fk": {
+          "name": "invitations_createdBy_user_id_fk",
+          "tableFrom": "invitations",
+          "tableTo": "user",
+          "columnsFrom": [
+            "createdBy"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "invitations_acceptedBy_user_id_fk": {
+          "name": "invitations_acceptedBy_user_id_fk",
+          "tableFrom": "invitations",
+          "tableTo": "user",
+          "columnsFrom": [
+            "acceptedBy"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.labels": {
+      "name": "labels",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "projectId": {
+          "name": "projectId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "label_name": {
+          "name": "label_name",
+          "columns": [
+            {
+              "expression": "projectId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "labels_projectId_projects_id_fk": {
+          "name": "labels_projectId_projects_id_fk",
+          "tableFrom": "labels",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "projectId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.modules": {
+      "name": "modules",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "projectId": {
+          "name": "projectId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "module_project": {
+          "name": "module_project",
+          "columns": [
+            {
+              "expression": "projectId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "position",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "modules_projectId_projects_id_fk": {
+          "name": "modules_projectId_projects_id_fk",
+          "tableFrom": "modules",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "projectId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.priorities": {
+      "name": "priorities",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "projectId": {
+          "name": "projectId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "priority_name": {
+          "name": "priority_name",
+          "columns": [
+            {
+              "expression": "projectId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "priorities_projectId_projects_id_fk": {
+          "name": "priorities_projectId_projects_id_fk",
+          "tableFrom": "priorities",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "projectId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "priorities_id_projectId_pk": {
+          "name": "priorities_id_projectId_pk",
+          "columns": [
+            "id",
+            "projectId"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.project_members": {
+      "name": "project_members",
+      "schema": "",
+      "columns": {
+        "projectId": {
+          "name": "projectId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "membership_user": {
+          "name": "membership_user",
+          "columns": [
+            {
+              "expression": "userId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "project_members_projectId_projects_id_fk": {
+          "name": "project_members_projectId_projects_id_fk",
+          "tableFrom": "project_members",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "projectId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "project_members_userId_user_id_fk": {
+          "name": "project_members_userId_user_id_fk",
+          "tableFrom": "project_members",
+          "tableTo": "user",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "project_members_projectId_userId_pk": {
+          "name": "project_members_projectId_userId_pk",
+          "columns": [
+            "projectId",
+            "userId"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.projects": {
+      "name": "projects",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "ownerId": {
+          "name": "ownerId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "icon": {
+          "name": "icon",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "project_owner": {
+          "name": "project_owner",
+          "columns": [
+            {
+              "expression": "ownerId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "projects_ownerId_user_id_fk": {
+          "name": "projects_ownerId_user_id_fk",
+          "tableFrom": "projects",
+          "tableTo": "user",
+          "columnsFrom": [
+            "ownerId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.session": {
+      "name": "session",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "token": {
+          "name": "token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "timestamp (3) with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp (3) with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp (3) with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ipAddress": {
+          "name": "ipAddress",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "userAgent": {
+          "name": "userAgent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "userId": {
+          "name": "userId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "session_user": {
+          "name": "session_user",
+          "columns": [
+            {
+              "expression": "userId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "session_userId_user_id_fk": {
+          "name": "session_userId_user_id_fk",
+          "tableFrom": "session",
+          "tableTo": "user",
+          "columnsFrom": [
+            "userId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "session_token_unique": {
+          "name": "session_token_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.statuses": {
+      "name": "statuses",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "projectId": {
+          "name": "projectId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "isDone": {
+          "name": "isDone",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        }
+      },
+      "indexes": {
+        "status_identity": {
+          "name": "status_identity",
+          "columns": [
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "projectId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "status_name": {
+          "name": "status_name",
+          "columns": [
+            {
+              "expression": "projectId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "statuses_projectId_projects_id_fk": {
+          "name": "statuses_projectId_projects_id_fk",
+          "tableFrom": "statuses",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "projectId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.task_clients": {
+      "name": "task_clients",
+      "schema": "",
+      "columns": {
+        "taskId": {
+          "name": "taskId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "clientId": {
+          "name": "clientId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "task_client_client": {
+          "name": "task_client_client",
+          "columns": [
+            {
+              "expression": "clientId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "task_clients_taskId_tasks_id_fk": {
+          "name": "task_clients_taskId_tasks_id_fk",
+          "tableFrom": "task_clients",
+          "tableTo": "tasks",
+          "columnsFrom": [
+            "taskId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "task_clients_clientId_clients_id_fk": {
+          "name": "task_clients_clientId_clients_id_fk",
+          "tableFrom": "task_clients",
+          "tableTo": "clients",
+          "columnsFrom": [
+            "clientId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "task_clients_taskId_clientId_pk": {
+          "name": "task_clients_taskId_clientId_pk",
+          "columns": [
+            "taskId",
+            "clientId"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.task_status_history": {
+      "name": "task_status_history",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "task_status_history_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "taskId": {
+          "name": "taskId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fromStatusId": {
+          "name": "fromStatusId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fromStatusName": {
+          "name": "fromStatusName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fromStatusColor": {
+          "name": "fromStatusColor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "toStatusId": {
+          "name": "toStatusId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "toStatusName": {
+          "name": "toStatusName",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "toStatusColor": {
+          "name": "toStatusColor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "changedAt": {
+          "name": "changedAt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "status_history_task": {
+          "name": "status_history_task",
+          "columns": [
+            {
+              "expression": "taskId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "task_status_history_taskId_tasks_id_fk": {
+          "name": "task_status_history_taskId_tasks_id_fk",
+          "tableFrom": "task_status_history",
+          "tableTo": "tasks",
+          "columnsFrom": [
+            "taskId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.task_types": {
+      "name": "task_types",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "projectId": {
+          "name": "projectId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "color": {
+          "name": "color",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "position": {
+          "name": "position",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "task_type_name": {
+          "name": "task_type_name",
+          "columns": [
+            {
+              "expression": "projectId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "lower(\"name\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "task_types_projectId_projects_id_fk": {
+          "name": "task_types_projectId_projects_id_fk",
+          "tableFrom": "task_types",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "projectId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tasks": {
+      "name": "tasks",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "projectId": {
+          "name": "projectId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "featureId": {
+          "name": "featureId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "statusId": {
+          "name": "statusId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "priority": {
+          "name": "priority",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "typeId": {
+          "name": "typeId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "impactId": {
+          "name": "impactId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ticketNumber": {
+          "name": "ticketNumber",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dueDate": {
+          "name": "dueDate",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dueTime": {
+          "name": "dueTime",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "startDate": {
+          "name": "startDate",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "startTime": {
+          "name": "startTime",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "archived": {
+          "name": "archived",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "position": {
+          "name": "position",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "labels": {
+          "name": "labels",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "externalId": {
+          "name": "externalId",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "task_external": {
+          "name": "task_external",
+          "columns": [
+            {
+              "expression": "projectId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "externalId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "task_project": {
+          "name": "task_project",
+          "columns": [
+            {
+              "expression": "projectId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "archived",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "task_feature": {
+          "name": "task_feature",
+          "columns": [
+            {
+              "expression": "featureId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "task_status": {
+          "name": "task_status",
+          "columns": [
+            {
+              "expression": "statusId",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "tasks_projectId_projects_id_fk": {
+          "name": "tasks_projectId_projects_id_fk",
+          "tableFrom": "tasks",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "projectId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "tasks_typeId_task_types_id_fk": {
+          "name": "tasks_typeId_task_types_id_fk",
+          "tableFrom": "tasks",
+          "tableTo": "task_types",
+          "columnsFrom": [
+            "typeId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tasks_impactId_impacts_id_fk": {
+          "name": "tasks_impactId_impacts_id_fk",
+          "tableFrom": "tasks",
+          "tableTo": "impacts",
+          "columnsFrom": [
+            "impactId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tasks_featureId_projectId_features_id_projectId_fk": {
+          "name": "tasks_featureId_projectId_features_id_projectId_fk",
+          "tableFrom": "tasks",
+          "tableTo": "features",
+          "columnsFrom": [
+            "featureId",
+            "projectId"
+          ],
+          "columnsTo": [
+            "id",
+            "projectId"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "tasks_statusId_projectId_statuses_id_projectId_fk": {
+          "name": "tasks_statusId_projectId_statuses_id_projectId_fk",
+          "tableFrom": "tasks",
+          "tableTo": "statuses",
+          "columnsFrom": [
+            "statusId",
+            "projectId"
+          ],
+          "columnsTo": [
+            "id",
+            "projectId"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "tasks_priority_projectId_priorities_id_projectId_fk": {
+          "name": "tasks_priority_projectId_priorities_id_projectId_fk",
+          "tableFrom": "tasks",
+          "tableTo": "priorities",
+          "columnsFrom": [
+            "priority",
+            "projectId"
+          ],
+          "columnsTo": [
+            "id",
+            "projectId"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "due_time": {
+          "name": "due_time",
+          "value": "\"tasks\".\"dueTime\" is null or (\"tasks\".\"dueDate\" is not null and \"tasks\".\"dueTime\" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')"
+        },
+        "start_time": {
+          "name": "start_time",
+          "value": "\"tasks\".\"startTime\" is null or (\"tasks\".\"startDate\" is not null and \"tasks\".\"startTime\" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.user": {
+      "name": "user",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "emailVerified": {
+          "name": "emailVerified",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "image": {
+          "name": "image",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp (3) with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp (3) with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'member'"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "user_email_unique": {
+          "name": "user_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.verification": {
+      "name": "verification",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "identifier": {
+          "name": "identifier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expiresAt": {
+          "name": "expiresAt",
+          "type": "timestamp (3) with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": "timestamp (3) with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updatedAt": {
+          "name": "updatedAt",
+          "type": "timestamp (3) with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "verification_identifier": {
+          "name": "verification_identifier",
+          "columns": [
+            {
+              "expression": "identifier",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

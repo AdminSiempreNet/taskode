@@ -1,161 +1,170 @@
-# Preparación de producción
+# Despliegue de producción
 
-Esta guía describe la configuración y los pasos para publicar Taskode en Vercel con PostgreSQL en Dokploy.
+La aplicación está en el proyecto **siemprenet/tareas** de Vercel, con el dominio
+**https://taskode.siempre.net.co**. PostgreSQL y el programador de notificaciones
+se ejecutan en Dokploy. Solo `main` despliega automáticamente; `dev` no publica.
 
-## Archivo privado para configurar Vercel
+## Configuración
 
-Guarda las variables reales de producción en `.env.production.local`, en la raíz del repositorio. Este archivo está excluido de Git y del código enviado a Vercel mediante `.vercelignore`. `.env.production.example` enumera las variables permitidas; la carga debe limitarse a esa lista y al entorno **Production**.
+Usar Node.js 24 y `npm ci`. Las variables reales se guardan en **Vercel → tareas →
+Settings → Environment Variables → Production**. `.env.production.example` enumera
+las variables; `.env.production.local` es una copia privada opcional para operación
+local, ignorada por Git. Las variables de Development o Preview no sustituyen las
+de Production. No compartir la base de producción con Preview.
 
-La preparación de producción reutiliza las credenciales OAuth y Resend de `.env.local`, genera un `BETTER_AUTH_SECRET` independiente y toma la conexión TLS de `.dokploy/vercel-database.env`. No cargar en Vercel `DOKPLOY_API_KEY`, `VERCEL_OIDC_TOKEN`, `TEST_DATABASE_URL`, contraseñas del administrador PostgreSQL ni identificadores Docker locales.
+- `BETTER_AUTH_URL=https://taskode.siempre.net.co` y un `BETTER_AUTH_SECRET` estable
+  de al menos 32 caracteres. Conservar el secreto existente para no invalidar acceso.
+- Al menos un proveedor OAuth completo. Sus callbacks son
+  `https://taskode.siempre.net.co/api/auth/callback/google` y
+  `https://taskode.siempre.net.co/api/auth/callback/github`.
+- `DATABASE_URL` apunta al PostgreSQL externo de Dokploy; `DATABASE_SSL=verify-full`,
+  `DATABASE_SSL_CA` para la CA privada y `DATABASE_POOL_MAX=5`. El hostname debe
+  coincidir con el certificado. No añadir parámetros SSL a la URL ni desactivar
+  la verificación TLS. El rol de aplicación necesita permisos para migrar sus tablas.
+- `BACKUP_STORAGE=s3` y `ATTACHMENT_STORAGE=s3`, con las variables `S3_*` de la
+  plantilla. El bucket es privado y debe permitir CORS desde el dominio de producción
+  para cargas y descargas directas. No usar almacenamiento local en Vercel.
+- `ABLY_API_KEY` exclusiva de producción, con Publish y Subscribe para
+  `taskode-production:*`; `ABLY_CHANNEL_NAMESPACE=taskode-production`.
+- `RESEND_API_KEY` y `RESEND_FROM_EMAIL` con un remitente verificado.
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`,
+  `VAPID_SUBJECT=https://taskode.siempre.net.co` y `NOTIFICATION_WORKER_SECRET`
+  de al menos 32 caracteres. Solo la clave pública puede llegar al navegador.
+  Conservar el par VAPID existente entre despliegues.
+- MCP funciona con el mismo origen. `MCP_ENABLED=false` lo desactiva;
+  `MCP_ALLOWED_ORIGINS` solo admite orígenes HTTPS adicionales de clientes de navegador.
 
-Completa `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID` y `S3_SECRET_ACCESS_KEY` en `.env.production.local`. Configura `S3_REGION` con la región del proveedor (`auto` para R2), `S3_PREFIX=taskode/production/` y `S3_FORCE_PATH_STYLE` según corresponda. El bucket debe ser privado y tener la configuración CORS descrita más adelante. El build exige estos valores y no se debe publicar con credenciales de ejemplo.
+`npm run setup:notifications -- --production` genera VAPID y el secreto si faltan,
+sin reemplazar los existentes. No crea la clave de Ably ni publica variables.
+`npm run check:production` valida sin migrar ni conectarse a servicios. La operación
+local puede leer valores de `.env.local` si faltan en los archivos de producción;
+para verificar una configuración aislada, definir explícitamente las variables del
+destino en el proceso o ejecutar en un checkout sin `.env.local`.
 
-En esta instalación, PostgreSQL está en `dbtaskode.siempre.net.co:5440`, base y usuario `taskode`. `DATABASE_SSL=verify-full` y `DATABASE_SSL_CA` son obligatorios. El certificado de CA es público; su clave privada nunca se carga en Vercel. Conserva las credenciales de producción en el archivo privado.
+## Preparación de una versión
 
-Los identificadores locales `brote-dev` y `brote-dev_brote-postgres-dev` corresponden al contenedor y volumen existentes que contienen datos. No cambiarlos mediante una sustitución de texto. `DATABASE_PATH` es una variable SQLite retirada. Las referencias Brote para respaldos, invitaciones, preferencias y bloqueos se mantienen por compatibilidad con datos existentes.
+1. Incluir en Git el código, todos los SQL de `drizzle/postgresql` y sus metadatos.
+   No editar migraciones ya aplicadas. La versión actual llega a `0014_oauth_mcp`.
+2. Ejecutar `npm test`, `npm run typecheck`, `npm run build`, `npm run test:http`
+   y `npm run test:mcp:http`. Las pruebas de datos usan `TEST_DATABASE_URL`,
+   con esquemas desechables, nunca la base de producción.
+3. Probar las migraciones pendientes sobre una restauración aislada de producción.
+4. Coordinar una ventana de mantenimiento y pausar el programador si ya existe.
+   La aplicación comprueba la versión exacta del esquema: el código anterior no
+   debe continuar atendiendo tráfico con el esquema nuevo. Bloquear temporalmente
+   el acceso externo antes del respaldo final y permitir terminar solicitudes activas.
+5. Crear el respaldo final con `npm run db:backup:production`. Requiere Docker en
+   el equipo operador y conexión TLS a PostgreSQL. Lee `.env.production.local`
+   y variables del proceso, sin recurrir a `.env.local`. Genera un archivo binario
+   `.dump` y un manifiesto SHA-256 en `data/backups/`, ignorados por Git. Copiarlos
+   a almacenamiento privado fuera del equipo; conservar también el código anterior
+   y los archivos físicos o versiones de objetos de S3.
 
-| Entorno | Aplicación Next.js y API | PostgreSQL | Respaldos |
-| --- | --- | --- | --- |
-| Desarrollo | `npm run dev`, http://localhost:5010 | Docker Desktop, `compose.dev.yaml`, 127.0.0.1:5432 | Archivos locales; S3 opcional con bucket/prefijo separado |
-| Producción | Vercel, workspace `siemprenet`, https://taskode.siempre.net.co | Dokploy, `compose.dokploy.yaml`, TLS obligatorio | Bucket privado S3 compatible: R2 o Backblaze B2 |
+El respaldo usa `pg_dump` de PostgreSQL 18, formato custom, con esquema y datos
+de la aplicación. No incluye roles globales ni la configuración del servidor.
+Verificar su integridad con el SHA-256 del manifiesto y `pg_restore --list`; una
+restauración de ensayo es la comprobación necesaria antes de un cambio incompatible.
 
-## Git y Vercel
+## Publicación
 
-`vercel.json` permite despliegues automáticos únicamente desde `main` y desactiva explícitamente `dev`. Un push a `dev` **no crea un deployment**, ni Production ni Preview. Las otras ramas tampoco despliegan automáticamente. Las ejecuciones manuales de Vercel son independientes de ese filtro; el build rechaza Preview y una rama Git distinta de `main` para evitar utilizar la base de producción por accidente.
+Hacer merge de la versión verificada a `main` y `git push origin main`.
+Vercel ejecuta `npm run build:vercel` en este orden:
 
-Al desplegar:
+1. Validar variables de Production.
+2. Compilar Next.js.
+3. Ejecutar las migraciones pendientes mediante `npm run db:migrate`.
+4. Publicar el resultado si todos los pasos terminaron correctamente.
 
-1. El remoto es `https://github.com/AdminSiempreNet/taskode.git`. Publicar los cambios de producción en `main`.
-2. Importar el repositorio en el workspace **siemprenet** y crear el proyecto **tareas**. Crear/importar un proyecto puede iniciar un primer despliegue: hacerlo únicamente en la fase de despliegue.
-3. Framework **Next.js**, directorio raíz del repositorio, Node.js **24.x**, instalación `npm ci`, build `npm run build:vercel`. No configurar salida estática ni un comando `npm run dev` en Vercel.
-4. Seleccionar **main** como Production Branch en la configuración de producción del proyecto. Este ajuste de cuenta no se puede imponer con `vercel.json`. Mantener habilitada la integración Git. Confirmar que `dev` queda deshabilitada por la configuración del repositorio.
-5. Completar las variables de `.env.production.example` exclusivamente en **Production**. No copiar `.env.local`, `TEST_DATABASE_URL` ni contraseñas de desarrollo. Ningún secreto usa `NEXT_PUBLIC_`.
-6. Añadir `taskode.siempre.net.co` a Domains y crear exactamente el registro DNS que muestre Vercel. No fijar aquí una IP o CNAME asumido. Esperar la emisión HTTPS.
+Así una compilación fallida no cambia el esquema. La migración toma un bloqueo
+asesor para serializar ejecuciones. Esto no detiene las escrituras de la web ni
+convierte el cambio de esquema y la publicación en una única transacción.
+Si falla la publicación después de migrar, mantener el mantenimiento y resolver
+el despliegue o ejecutar el procedimiento de recuperación.
 
-Vercel aloja la interfaz y las rutas API/autenticación de Next.js. Solo el servidor accede a PostgreSQL; el navegador no recibe `DATABASE_URL`.
+Las migraciones manuales usan `npm run db:migrate` con las variables de producción
+explícitas; `-- --development` queda reservado para una base local. Repetir la
+ejecución no vuelve a aplicar las entradas ya registradas. Nunca ejecutar semillas
+de ejemplos en producción.
 
-## PostgreSQL en Dokploy
+## Programador en Dokploy
 
-El Compose de producción contiene solo `postgres`, usa `pgvector/pgvector:0.8.7-pg18-bookworm` y conserva el volumen `taskode-postgres`. La web y el migrador ya no son servicios de Dokploy. El Compose completo `compose.yaml` sigue disponible como alternativa local.
+`npm run prepare:dokploy` prepara `.dokploy/notifications.compose.yaml`, un Compose
+independiente que contiene solo el programador. Crear un servicio Compose de tipo
+Raw en el entorno de producción existente y copiar ese archivo, con:
 
-En instalaciones anteriores al cambio de marca, establece `TASKODE_POSTGRES_VOLUME` con el nombre físico del volumen existente y conserva el proyecto Compose, la base y el rol mediante `COMPOSE_PROJECT_NAME`, `POSTGRES_DB` y `TASKODE_DB_USER`. La variable de contraseña ahora es `TASKODE_DB_PASSWORD`. No cambies el volumen por uno vacío; el [README](../README.md#instalaciones-anteriores-al-cambio-de-marca) detalla la compatibilidad.
+- `NOTIFICATION_PROCESS_URL=https://taskode.siempre.net.co/api/internal/notifications/process`.
+- `NOTIFICATION_WORKER_SECRET` idéntico al de Vercel.
 
-Preparar sin desplegar:
+El servicio usa Node 24, llama cada minuto por POST, rechaza redirecciones y no
+necesita acceso a la base ni credenciales S3 o VAPID. Mantener intactos el Compose,
+los certificados y los volúmenes del PostgreSQL existente. El `compose.yaml`
+general es una alternativa de alojamiento local; no es el despliegue Vercel/Dokploy.
 
-```powershell
-npm run prepare:dokploy
-```
+La protección de Vercel debe permitir llamadas al dominio de producción. El Bearer
+del programador no sustituye los mecanismos de protección propios de Vercel. La
+configuración habitual deja accesible el dominio personalizado y protege las URLs
+de despliegues; si se cambia, revisar el acceso del programador.
 
-Genera `.dokploy/compose.yaml` sin secretos, sin empaquetar código de la aplicación y sin llamadas remotas. El script antiguo rechaza los modos `deploy`, `status` y `logs` para evitar reutilizar el flujo retirado.
+## Verificación y recuperación
 
-En el servidor, antes de arrancar PostgreSQL:
+- Vercel debe mostrar el commit publicado en estado **Ready**.
+- `GET /api/health` debe devolver 200 y `{"status":"ok"}`; valida conexión y esquema.
+- Login y los callbacks OAuth deben usar el dominio canónico. Probar acceso,
+  lectura/escritura y carga/descarga de un archivo con una cuenta autorizada.
+- `/sw.js`, `/manifest.webmanifest` y los iconos PWA deben servirse correctamente.
+- Las API privadas sin sesión deben rechazar acceso. Los metadatos MCP deben
+  anunciar el origen de producción y `/api/mcp` debe exigir autorización.
+- Reanudar o desplegar el programador y revisar `failed` y `pending`, además de
+  su healthcheck. Un HTTP 200 del procesador puede contener entregas fallidas.
+- Probar push en un dispositivo real. En iPhone/iPad debe estar instalada en la
+  pantalla de inicio; las pruebas de navegador simulan permisos y recepción.
+- Retirar la protección temporal de mantenimiento tras verificar la versión.
 
-1. Reservar un hostname DNS para la base, por ejemplo `dbtaskode.siempre.net.co`, apuntando al servidor sin proxy HTTP. Su valor final debe coincidir con el certificado y con `DATABASE_URL`.
-2. Obtener un certificado TLS para ese hostname (CA pública o privada). Colocar la cadena en `server.crt` y la clave en `server.key`, dentro de la ruta absoluta `POSTGRES_TLS_DIR` del servidor. El certificado HTTPS de la web no configura TLS de PostgreSQL.
-3. Dar acceso de lectura al usuario `postgres` del contenedor. Para la clave, PostgreSQL admite propietario `postgres` y modo `0600`, o propietario `root`, grupo del usuario PostgreSQL y modo `0640`. Consultar el UID/GID real de la imagen; no asumir el del host. Montar el directorio en solo lectura, renovar los certificados y recargar PostgreSQL antes de que expiren.
-4. Crear un servicio **Docker Compose** en Dokploy con `compose.dokploy.yaml`. Completar `.env.dokploy.example` en su entorno, con contraseñas nuevas y un puerto externo libre. No asignar un dominio HTTP/Traefik a PostgreSQL: Vercel conecta por TCP.
-5. Configurar el firewall del servidor/proveedor y el acceso saliente de Vercel. El puerto debe ser accesible desde el build y las funciones de Vercel. Si se restringen IP, usar los rangos salientes que correspondan a Static IPs/Secure Compute del proyecto; las IP de salida normales de Vercel son dinámicas. No asumir una IP fija de Vercel.
-6. Desplegar la base y verificar TLS, autenticación y `vector`. La configuración `pg_hba` del Compose rechaza TCP sin TLS. El rol `taskode` puede migrar su esquema y no es superusuario; `postgres` solo se usa para administrar e inicializar.
+Volver al despliegue anterior de Vercel no revierte PostgreSQL. Para una migración
+incompatible, mantener el mantenimiento, detener procesos, restaurar el snapshot
+previo mediante `pg_restore` y recuperar los archivos asociados y el código
+anterior. Preparar y ensayar la restauración con los permisos adecuados; preservar
+la extensión `vector` y la configuración TLS del servidor. Un JSON de respaldo
+de la aplicación restaura datos sobre el esquema actual y no deshace migraciones.
 
-`DATABASE_URL` de Vercel debe usar el hostname y puerto externos, usuario `taskode` y su contraseña (escapada como URL si contiene caracteres especiales). No usar `postgres:5432`, `localhost` ni la IP interna de Docker. Mantener `DATABASE_SSL=verify-full`; si la CA es privada, configurar el PEM en `DATABASE_SSL_CA`. No añadir `sslmode`, `sslrootcert`, `sslcert` o `sslkey` a la URL: sobrescribirían la configuración TLS del driver.
+## Infraestructura existente
 
-El pool se reutiliza por instancia, se registra con `attachDatabasePool` y usa un máximo inicial de cinco conexiones en Vercel. `DATABASE_POOL_MAX` acepta 3–50. El total crece con las instancias; dimensionar PostgreSQL y reservar conexiones para migraciones y administración. Si se añade PgBouncer, usar modo **session**: el proyecto utiliza bloqueos de sesión y `search_path` por conexión.
+PostgreSQL está en `dbtaskode.siempre.net.co:5440`, con base y rol `taskode`,
+imagen `pgvector/pgvector:0.8.7-pg18-bookworm` y extensión `vector` activada.
+La CA privada se carga como certificado en `DATABASE_SSL_CA`; su clave privada
+permanece fuera de Vercel. El certificado del servidor debe incluir ese hostname.
+PostgreSQL usa sus propios certificados TLS, independientes del HTTPS de la web.
 
-No reemplazar a ciegas una instalación anterior: identificar y respaldar su volumen y verificar las credenciales existentes. Las variables de inicialización solo crean roles en un volumen vacío; no rotan contraseñas de un volumen existente. No ejecutar `down -v`.
+Conservar el servicio `taskode-db`, el nombre físico de su volumen y sus montajes
+de certificados. Las variables de inicialización solo crean usuarios sobre un
+volumen vacío; no cambian la contraseña de un rol existente. No ejecutar `down -v`.
+Las referencias históricas `brote-dev` del entorno local identifican recursos
+existentes y no deben renombrarse mediante sustituciones de texto.
 
-## Respaldos S3: interfaz intercambiable
+El puerto de PostgreSQL es TCP, sin proxy HTTP/Traefik, y debe aceptar las conexiones
+del build y de las funciones de Vercel con TLS verificado. Las IP normales de salida
+de Vercel son dinámicas; una restricción de firewall por IP necesita el mecanismo
+de IP estática correspondiente al proyecto. El rol de aplicación no es superusuario.
+Renovar los certificados antes de que expiren y mantener la clave del servidor
+legible por PostgreSQL con permisos adecuados, montada en solo lectura.
 
-`src/server/backup-storage.ts` define `BackupStorage`. `S3BackupStorage` implementa listado paginado, metadatos, lectura, escritura, borrado y transferencias con enlaces firmados. `BackupManager` conserva la validación, coordinación y restauración transaccional, independientemente del proveedor. Para añadir otro adaptador se implementa el contrato y se selecciona en `createBackupStorage`.
+El pool se reutiliza por instancia y su total crece con las instancias de Vercel.
+Reservar conexiones para administración y migraciones. Si se incorpora PgBouncer,
+usar modo **session** por los bloqueos de sesión y el `search_path` del proyecto.
 
-En desarrollo `BACKUP_STORAGE=filesystem` mantiene `BACKUP_DIR`. En Vercel se exige `s3`; `/tmp` se usa solo para procesar un archivo durante una operación y se limpia. Para probar S3 localmente, configurar las variables S3 en `.env.local` y usar un bucket separado o `S3_PREFIX=tareas/development/`.
+El bucket S3/R2 es privado, con credenciales limitadas para listar, leer, escribir
+y borrar objetos. El prefijo de esta instalación es `taskode/production/`; cambiar
+el proveedor o el prefijo no mueve los objetos existentes. Su regla CORS permite
+el origen `https://taskode.siempre.net.co`, métodos `GET`, `PUT` y `HEAD`, todos
+los encabezados de solicitud y exposición de `ETag`.
 
-| Variable | Cloudflare R2 | Backblaze B2 |
-| --- | --- | --- |
-| `S3_ENDPOINT` | `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` | `https://s3.<REGION>.backblazeb2.com` |
-| `S3_REGION` | `auto` | La región exacta del bucket, por ejemplo `us-west-004` |
-| `S3_BUCKET` | Nombre del bucket privado | Nombre del bucket privado |
-| `S3_ACCESS_KEY_ID` | Access Key ID del token R2 | Application Key ID con acceso al bucket |
-| `S3_SECRET_ACCESS_KEY` | Secret Access Key | Application Key |
-| `S3_PREFIX` | `tareas/production/` | `tareas/production/` |
-| `S3_FORCE_PATH_STYLE` | `false` por defecto | `false` por defecto |
+Los respaldos de aplicación van en `backups/`, las cargas temporales en `uploads/`,
+los archivos en `attachments/` y los snapshots operativos en `release-snapshots/`,
+siempre bajo el prefijo. Aplicar retención a los snapshots y limpieza de cargas
+abandonadas; no borrar objetos definitivos usados por la aplicación. Conservar
+versiones o copias de archivos si se requiere recuperar un momento anterior.
 
-Cambiar de R2 a B2 requiere cambiar las variables y reiniciar/replegar. Los objetos existentes **no se copian automáticamente**: copiarlos conservando el prefijo y los nombres antes de cambiar si se desea mantener el historial visible.
-
-Crear el bucket privado y una credencial con permisos de listar, leer, escribir y borrar objetos, limitada al bucket/prefijo. No habilitar acceso público. Configurar esta regla CORS (formato S3; cada consola puede mostrarla con otros nombres):
-
-```json
-[
-  {
-    "AllowedOrigins": ["https://taskode.siempre.net.co"],
-    "AllowedMethods": ["PUT", "GET", "HEAD"],
-    "AllowedHeaders": ["*"],
-    "ExposeHeaders": ["ETag"],
-    "MaxAgeSeconds": 3600
-  }
-]
-```
-
-Para probar desde el equipo, añadir `http://localhost:5010` únicamente a la regla del bucket de desarrollo. En Backblaze, si se usa la API B2 de CORS, los equivalentes son `allowedOrigins`, `allowedHeaders`, `exposeHeaders`, `maxAgeSeconds` y operaciones `s3_put`, `s3_get`, `s3_head`.
-
-Los archivos duraderos viven bajo `<S3_PREFIX>backups/`. Las cargas temporales van a `<S3_PREFIX>uploads/`, no se muestran en el panel y se eliminan después de intentar restaurarlas. Configurar una regla de ciclo de vida que elimine las cargas abandonadas de `uploads/` después de un día. Elegir también retención/versionado de las copias definitivas; borrar desde el panel puede dejar versiones antiguas si el proveedor tiene versionado.
-
-Los enlaces PUT/GET expiran en cinco minutos y solo se emiten tras autenticar a un administrador. La subida va directamente del navegador al bucket; el servidor valida el tamaño (hasta 100 MB), el contenido y las referencias antes de restaurar. La descarga también va directamente al bucket. Las credenciales S3 permanecen en el servidor. Las copias previas se completan en el bucket antes de modificar datos; si falla su escritura, la restauración no se aplica.
-
-La limitación HTTP de Vercel sigue aplicando a otras API, como importaciones Trello grandes o espacios cuyo JSON supere 4,5 MB. Los respaldos del panel usan transferencias directas para evitarla. Las restauraciones también deben terminar dentro del tiempo de ejecución y memoria del plan; probar tamaños representativos antes de producción.
-
-Los respaldos de aplicación no sustituyen copias nativas de PostgreSQL. Programar `pg_dump`/respaldo operativo del volumen hacia almacenamiento externo, definir retención y probar una recuperación. No copiar el directorio de datos de una base en ejecución como sustituto de `pg_dump`.
-
-## Variables, autenticación y migraciones
-
-Configurar `BETTER_AUTH_URL=https://taskode.siempre.net.co`, secreto nuevo de al menos 32 caracteres y uno o ambos proveedores OAuth. Registrar:
-
-- Google: `https://taskode.siempre.net.co/api/auth/callback/google`.
-- GitHub: `https://taskode.siempre.net.co/api/auth/callback/github`.
-
-Conservar los callbacks de localhost para desarrollo en credenciales separadas cuando el proveedor lo requiera. GitHub OAuth Apps tiene un único callback: usar otra App para producción. Para invitaciones por correo, configurar Resend y un remitente de dominio verificado.
-
-`npm run check:production` valida la configuración sin conectarse a los servicios. `npm run build:vercel` valida, aplica migraciones con `npm run db:migrate` y compila. Un error de configuración o migración falla el build. Las migraciones se coordinan con un bloqueo PostgreSQL; no se ejecutan en cada petición. `npm run build` sigue permitiendo compilar localmente sin base remota ni secretos reales.
-
-**Actualizaciones futuras:** una migración aplicada no se revierte si la compilación o publicación posterior falla. Además, la aplicación comprueba la versión exacta del esquema: una migración nueva puede dejar temporalmente incompatible la versión anterior mientras termina el despliegue. Respaldar, revisar SQL y planificar una ventana de mantenimiento antes de cambios de esquema; no usar el rollback del frontend como rollback de base. La primera publicación debe partir de una base inicializada/migrada y completarse antes de abrir el acceso.
-
-## Orden y responsables al desplegar
-
-### Te corresponde a ti
-
-1. Confirmar el repositorio y dar acceso al workspace **siemprenet**, al servidor Dokploy, al DNS de `siempre.net.co` y al proveedor elegido (R2 o B2).
-2. Elegir R2 o B2, región, retención, hostname/puerto de PostgreSQL y los recursos/plan de Vercel necesarios para el acceso de red.
-3. Autorizar los accesos OAuth, crear/entregar las credenciales por los gestores de secretos de las plataformas y completar verificaciones de dominio o facturación que requieran tu cuenta.
-4. Acceder primero con la cuenta que deba ser administradora; la primera cuenta válida obtiene ese rol.
-5. Dar la instrucción de desplegar y, si se trasladan datos existentes, confirmar qué datos y volumen son la fuente definitiva.
-
-### Puedo hacer yo con esos accesos y tu instrucción
-
-1. Configurar el remoto, preparar el commit y las ramas y subir los cambios.
-2. Preparar certificados y firewall, configurar/desplegar PostgreSQL en Dokploy y comprobar TLS, roles, extensión y persistencia.
-3. Crear/configurar el bucket privado, permisos, CORS y limpieza de cargas temporales en R2 o B2.
-4. Configurar el proyecto Vercel en **siemprenet**, variables, integración Git, **main** como Production Branch y **dev sin despliegues automáticos**.
-5. Añadir el dominio y los registros DNS mediante los accesos disponibles; si el proveedor exige una acción personal, darte los valores exactos.
-6. Ejecutar migraciones y despliegue, verificar HTTPS, `/api/health`, acceso OAuth, permisos, invitaciones, respaldo/descarga/restauración y comportamiento de las ramas. Las pruebas de restauración se hacen en una base de prueba, nunca sobre datos reales sin una instrucción específica.
-7. Configurar y probar respaldos operativos y dejar registrado el procedimiento de recuperación.
-
-No se ha realizado ninguna de esas acciones remotas durante esta preparación.
-
-## Validación realizada
-
-- PostgreSQL de desarrollo saludable en Docker Desktop y `/api/health` local con respuesta 200.
-- 79 pruebas de aplicación, configuración y S3; 8 pruebas HTTP sobre la compilación.
-- TypeScript y compilación con `VERCEL=1` correctos; Compose local y de Dokploy válidos.
-- Las pruebas S3 usan un cliente simulado para operaciones y el SDK real para firmar URLs de R2/B2. La conectividad, permisos, CORS y TLS de los servicios remotos se comprobarán al configurar las cuentas; todavía no se ha usado un bucket real ni una base remota.
-
-## Referencias oficiales
-
-- [Filtro Git por rama en Vercel](https://vercel.com/docs/project-configuration/git-configuration).
-- [Configuración de Git en Vercel](https://vercel.com/docs/project-configuration/git-settings).
-- [Pool de conexiones en Vercel](https://vercel.com/kb/guide/connection-pooling-with-functions).
-- [Límites de las funciones](https://vercel.com/docs/functions/limitations).
-- [Conexión externa de bases Dokploy](https://docs.dokploy.com/docs/core/databases/connection).
-- [TLS en PostgreSQL](https://www.postgresql.org/docs/current/ssl-tcp.html).
-- [TLS con node-postgres](https://node-postgres.com/features/ssl).
-- [R2 con AWS SDK v3](https://developers.cloudflare.com/r2/examples/aws/aws-sdk-js-v3/).
-- [Backblaze B2 con AWS SDK v3](https://www.backblaze.com/docs/cloud-storage-use-the-aws-sdk-for-javascript-v3-with-backblaze-b2).
-- [CORS de R2](https://developers.cloudflare.com/r2/buckets/cors/) y [CORS de Backblaze](https://www.backblaze.com/docs/cloud-storage-cross-origin-resource-sharing-rules).
+La configuración de cuenta de Vercel debe conservar **main** como Production Branch,
+Node.js **24.x** y la integración Git de `AdminSiempreNet/taskode`. `vercel.json`
+controla el filtro por rama, pero no reemplaza ese ajuste de la cuenta. Los callbacks
+OAuth y los DNS deben conservar el dominio canónico ya verificado.

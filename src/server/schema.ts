@@ -1,4 +1,5 @@
 import { relations, sql } from "drizzle-orm";
+import type { DiagramScene } from "../lib/diagrams";
 import {
   pgTable,
   text,
@@ -127,6 +128,204 @@ export const verification = pgTable(
   },
   (t) => [index("verification_identifier").on(t.identifier)],
 );
+// OAuth 2.1 authorization server for MCP clients (Better Auth jwt + oauth-provider plugins).
+// Export keys must match Better Auth model names and properties its field names.
+const instant = () =>
+  timestamp({ withTimezone: true, precision: 3, mode: "date" });
+export const jwks = pgTable("jwks", {
+  id: text().primaryKey(),
+  publicKey: text().notNull(),
+  privateKey: text().notNull(),
+  createdAt: instant().notNull(),
+  expiresAt: instant(),
+  alg: text(),
+  crv: text(),
+});
+export const oauthClient = pgTable(
+  "oauth_client",
+  {
+    id: text().primaryKey(),
+    clientId: text().notNull().unique(),
+    clientSecret: text(),
+    clientDiscoveryId: text(),
+    disabled: boolean().default(false),
+    skipConsent: boolean(),
+    enableEndSession: boolean(),
+    subjectType: text(),
+    scopes: text().array(),
+    clientCredentialsScopes: text().array().default(sql`'{}'::text[]`),
+    userId: text().references(() => user.id, { onDelete: "cascade" }),
+    createdAt: instant(),
+    updatedAt: instant(),
+    name: text(),
+    uri: text(),
+    icon: text(),
+    contacts: text().array(),
+    tos: text(),
+    policy: text(),
+    softwareId: text(),
+    softwareVersion: text(),
+    softwareStatement: text(),
+    redirectUris: text().array().notNull(),
+    postLogoutRedirectUris: text().array(),
+    backchannelLogoutUri: text(),
+    backchannelLogoutSessionRequired: boolean(),
+    tokenEndpointAuthMethod: text(),
+    applicationType: text(),
+    jwks: text(),
+    jwksUri: text(),
+    grantTypes: text().array(),
+    responseTypes: text().array(),
+    requirePKCE: boolean(),
+    dpopBoundAccessTokens: boolean().default(false),
+    referenceId: text(),
+    metadata: jsonb(),
+  },
+  (t) => [index("oauth_client_user").on(t.userId)],
+);
+export const oauthResource = pgTable("oauth_resource", {
+  id: text().primaryKey(),
+  identifier: text().notNull().unique(),
+  name: text().notNull(),
+  accessTokenTtl: integer(),
+  refreshTokenTtl: integer(),
+  signingAlgorithm: text(),
+  signingKeyId: text(),
+  allowedScopes: text().array(),
+  customClaims: jsonb(),
+  dpopBoundAccessTokensRequired: boolean().default(false),
+  disabled: boolean().default(false),
+  createdAt: instant(),
+  updatedAt: instant(),
+  policyVersion: integer().default(1),
+  metadata: jsonb(),
+});
+export const oauthClientResource = pgTable(
+  "oauth_client_resource",
+  {
+    id: text().primaryKey(),
+    clientId: text()
+      .notNull()
+      .references(() => oauthClient.clientId, { onDelete: "cascade" }),
+    resourceId: text()
+      .notNull()
+      .references(() => oauthResource.identifier, { onDelete: "cascade" }),
+    metadata: jsonb(),
+    createdAt: instant(),
+  },
+  (t) => [
+    uniqueIndex("oauth_client_resource_pair").on(t.clientId, t.resourceId),
+    index("oauth_client_resource_resource").on(t.resourceId),
+  ],
+);
+export const oauthRefreshToken = pgTable(
+  "oauth_refresh_token",
+  {
+    id: text().primaryKey(),
+    token: text().notNull().unique(),
+    clientId: text()
+      .notNull()
+      .references(() => oauthClient.clientId, { onDelete: "cascade" }),
+    sessionId: text().references(() => session.id, { onDelete: "set null" }),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    referenceId: text(),
+    authorizationCodeId: text(),
+    resources: text().array(),
+    requestedUserInfoClaims: text().array(),
+    expiresAt: instant().notNull(),
+    createdAt: instant().notNull(),
+    revoked: instant(),
+    rotatedAt: instant(),
+    rotationReplayResponse: text(),
+    rotationReplayExpiresAt: instant(),
+    authTime: instant(),
+    confirmation: jsonb(),
+    scopes: text().array().notNull(),
+  },
+  (t) => [
+    index("oauth_refresh_token_client").on(t.clientId),
+    index("oauth_refresh_token_session").on(t.sessionId),
+    index("oauth_refresh_token_user").on(t.userId),
+    index("oauth_refresh_token_code").on(t.authorizationCodeId),
+  ],
+);
+export const oauthAccessToken = pgTable(
+  "oauth_access_token",
+  {
+    id: text().primaryKey(),
+    token: text().notNull().unique(),
+    clientId: text()
+      .notNull()
+      .references(() => oauthClient.clientId, { onDelete: "cascade" }),
+    sessionId: text().references(() => session.id, { onDelete: "set null" }),
+    userId: text().references(() => user.id, { onDelete: "cascade" }),
+    referenceId: text(),
+    authorizationCodeId: text(),
+    resources: text().array(),
+    requestedUserInfoClaims: text().array(),
+    refreshId: text().references(() => oauthRefreshToken.id, {
+      onDelete: "cascade",
+    }),
+    expiresAt: instant().notNull(),
+    createdAt: instant().notNull(),
+    revoked: instant(),
+    confirmation: jsonb(),
+    scopes: text().array().notNull(),
+  },
+  (t) => [
+    index("oauth_access_token_client").on(t.clientId),
+    index("oauth_access_token_session").on(t.sessionId),
+    index("oauth_access_token_user").on(t.userId),
+    index("oauth_access_token_code").on(t.authorizationCodeId),
+    index("oauth_access_token_refresh").on(t.refreshId),
+  ],
+);
+export const oauthConsent = pgTable(
+  "oauth_consent",
+  {
+    id: text().primaryKey(),
+    clientId: text()
+      .notNull()
+      .references(() => oauthClient.clientId, { onDelete: "cascade" }),
+    userId: text().references(() => user.id, { onDelete: "cascade" }),
+    referenceId: text(),
+    resources: text().array(),
+    requestedUserInfoClaims: text().array(),
+    scopes: text().array().notNull(),
+    createdAt: instant().notNull(),
+    updatedAt: instant().notNull(),
+  },
+  (t) => [
+    index("oauth_consent_client").on(t.clientId),
+    index("oauth_consent_user_client").on(t.userId, t.clientId),
+  ],
+);
+export const oauthClientAssertion = pgTable("oauth_client_assertion", {
+  id: text().primaryKey(),
+  expiresAt: instant().notNull(),
+});
+// Audit of MCP tool calls: who, through which client, on what. Never stores content.
+export const mcpActivity = pgTable(
+  "mcp_activity",
+  {
+    id: text().primaryKey(),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    clientId: text().notNull(),
+    tool: text().notNull(),
+    targetType: text(),
+    targetId: text(),
+    outcome: text({ enum: ["ok", "error", "denied"] }).notNull(),
+    createdAt: instant().notNull().defaultNow(),
+  },
+  (t) => [
+    index("mcp_activity_user").on(t.userId, t.createdAt),
+    index("mcp_activity_client").on(t.clientId, t.createdAt),
+  ],
+);
 export const installation = pgTable(
   "installation",
   {
@@ -134,6 +333,7 @@ export const installation = pgTable(
     adminId: text().references(() => user.id),
     onboardingStep: integer().notNull().default(0),
     firstProjectId: text(),
+    maxAttachmentBytes: integer().notNull().default(10485760),
   },
   (t) => [check("single_installation", sql`${t.id} = 1`)],
 );
@@ -141,19 +341,20 @@ export const projects = pgTable(
   "projects",
   {
     id: text().primaryKey(),
-    ownerId: text()
+    leaderId: text()
       .notNull()
       .references(() => user.id),
     name: text().notNull(),
     description: text().notNull(),
     icon: text().notNull(),
     color: text().notNull(),
+    timeZone: text().notNull().default("America/Bogota"),
     createdAt: text().notNull(),
   },
-  (t) => [index("project_owner").on(t.ownerId)],
+  (t) => [index("project_leader").on(t.leaderId)],
 );
-export const projectMembers = pgTable(
-  "project_members",
+export const projectTeamMembers = pgTable(
+  "project_team_members",
   {
     projectId: text()
       .notNull()
@@ -164,7 +365,7 @@ export const projectMembers = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.projectId, t.userId] }),
-    index("membership_user").on(t.userId),
+    index("project_team_user").on(t.userId),
   ],
 );
 export const invitations = pgTable(
@@ -200,6 +401,9 @@ export const modules = pgTable(
   "modules",
   {
     id: text().primaryKey(),
+    leaderId: text()
+      .notNull()
+      .references(() => user.id),
     projectId: text()
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
@@ -207,12 +411,18 @@ export const modules = pgTable(
     description: text().notNull(),
     position: doublePrecision().notNull(),
   },
-  (t) => [index("module_project").on(t.projectId, t.position)],
+  (t) => [
+    index("module_project").on(t.projectId, t.position),
+    uniqueIndex("module_identity").on(t.id, t.projectId),
+  ],
 );
 export const features = pgTable(
   "features",
   {
     id: text().primaryKey(),
+    leaderId: text()
+      .notNull()
+      .references(() => user.id),
     projectId: text()
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
@@ -231,6 +441,36 @@ export const features = pgTable(
       .where(sql`${t.moduleId} is null`),
     index("feature_module").on(t.moduleId),
     check("positive_feature_number", sql`${t.number} >= 1`),
+  ],
+);
+export const moduleTeamMembers = pgTable(
+  "module_team_members",
+  {
+    moduleId: text()
+      .notNull()
+      .references(() => modules.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.moduleId, t.userId] }),
+    index("module_team_user").on(t.userId),
+  ],
+);
+export const featureTeamMembers = pgTable(
+  "feature_team_members",
+  {
+    featureId: text()
+      .notNull()
+      .references(() => features.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.featureId, t.userId] }),
+    index("feature_team_user").on(t.userId),
   ],
 );
 export const statuses = pgTable(
@@ -309,6 +549,10 @@ export const tasks = pgTable(
   "tasks",
   {
     id: text().primaryKey(),
+    createdById: text().references(() => user.id),
+    leaderId: text()
+      .notNull()
+      .references(() => user.id),
     projectId: text()
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
@@ -319,7 +563,6 @@ export const tasks = pgTable(
     priority: text().notNull(),
     typeId: text().references(() => taskTypes.id),
     impactId: text().references(() => impacts.id),
-    ticketNumber: text(),
     dueDate: text(),
     dueTime: text(),
     startDate: text(),
@@ -345,6 +588,7 @@ export const tasks = pgTable(
       foreignColumns: [priorities.id, priorities.projectId],
     }),
     uniqueIndex("task_external").on(t.projectId, t.externalId),
+    uniqueIndex("task_identity").on(t.id, t.projectId),
     index("task_project").on(t.projectId, t.archived),
     index("task_feature").on(t.featureId),
     index("task_status").on(t.statusId),
@@ -387,14 +631,44 @@ export const comments = pgTable(
   "comments",
   {
     id: text().primaryKey(),
-    taskId: text()
+    authorId: text().references(() => user.id),
+    projectId: text()
       .notNull()
-      .references(() => tasks.id, { onDelete: "cascade" }),
+      .references(() => projects.id, { onDelete: "cascade" }),
+    scopeType: text().notNull().default("task"),
+    taskId: text(),
+    moduleId: text(),
+    featureId: text(),
     content: text().notNull(),
     createdAt: text().notNull(),
     updatedAt: text().notNull(),
   },
-  (t) => [index("comment_task").on(t.taskId, t.createdAt)],
+  (t) => [
+    index("comment_task").on(t.taskId, t.createdAt),
+    index("comment_scope").on(
+      t.projectId,
+      t.scopeType,
+      t.moduleId,
+      t.featureId,
+      t.createdAt,
+    ),
+    foreignKey({
+      columns: [t.taskId, t.projectId],
+      foreignColumns: [tasks.id, tasks.projectId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.moduleId, t.projectId],
+      foreignColumns: [modules.id, modules.projectId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.featureId, t.projectId],
+      foreignColumns: [features.id, features.projectId],
+    }).onDelete("cascade"),
+    check(
+      "comment_scope_target",
+      sql`(${t.scopeType} = 'project' and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 0) or (${t.scopeType} = 'task' and ${t.taskId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'module' and ${t.moduleId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'feature' and ${t.featureId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1)`,
+    ),
+  ],
 );
 export const taskStatusHistory = pgTable(
   "task_status_history",
@@ -424,7 +698,310 @@ export const accountRelations = relations(account, ({ one }) => ({
   user: one(user, { fields: [account.userId], references: [user.id] }),
 }));
 
+export const departments = pgTable("departments", {
+  id: text().primaryKey(),
+  name: text().notNull(),
+});
+export const cities = pgTable(
+  "cities",
+  {
+    id: text().primaryKey(),
+    departmentId: text()
+      .notNull()
+      .references(() => departments.id),
+    name: text().notNull(),
+    kind: text().notNull(),
+  },
+  (t) => [index("city_department").on(t.departmentId)],
+);
+export const clients = pgTable(
+  "clients",
+  {
+    id: text().primaryKey(),
+    name: text().notNull(),
+    normalizedName: text().notNull(),
+    cityId: text()
+      .notNull()
+      .references(() => cities.id),
+    createdAt: text().notNull(),
+    updatedAt: text().notNull(),
+  },
+  (t) => [uniqueIndex("client_name_city").on(t.normalizedName, t.cityId)],
+);
+export const taskClients = pgTable(
+  "task_clients",
+  {
+    taskId: text()
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    clientId: text()
+      .notNull()
+      .references(() => clients.id, { onDelete: "restrict" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.taskId, t.clientId] }),
+    index("task_client_client").on(t.clientId),
+  ],
+);
+
+export const tickets = pgTable("tickets", {
+  id: text().primaryKey(),
+  number: text().notNull(),
+  description: text().notNull().default(""),
+  url: text(),
+  clientId: text().references(() => clients.id, { onDelete: "restrict" }),
+  createdAt: text().notNull(),
+  updatedAt: text().notNull(),
+}, (t) => [index("ticket_client").on(t.clientId), index("ticket_number").on(t.number)]);
+
+export const projectClients = pgTable("project_clients", {
+  projectId: text().notNull().references(() => projects.id, { onDelete: "cascade" }),
+  clientId: text().notNull().references(() => clients.id, { onDelete: "restrict" }),
+}, (t) => [primaryKey({ columns: [t.projectId, t.clientId] }), index("project_clients_client").on(t.clientId)]);
+
+export const projectTickets = pgTable("project_tickets", {
+  projectId: text().notNull().references(() => projects.id, { onDelete: "cascade" }),
+  ticketId: text().notNull().references(() => tickets.id, { onDelete: "restrict" }),
+}, (t) => [primaryKey({ columns: [t.projectId, t.ticketId] }), index("project_tickets_ticket").on(t.ticketId)]);
+
+export const moduleClients = pgTable("module_clients", {
+  moduleId: text().notNull().references(() => modules.id, { onDelete: "cascade" }),
+  clientId: text().notNull().references(() => clients.id, { onDelete: "restrict" }),
+}, (t) => [primaryKey({ columns: [t.moduleId, t.clientId] }), index("module_clients_client").on(t.clientId)]);
+
+export const moduleTickets = pgTable("module_tickets", {
+  moduleId: text().notNull().references(() => modules.id, { onDelete: "cascade" }),
+  ticketId: text().notNull().references(() => tickets.id, { onDelete: "restrict" }),
+}, (t) => [primaryKey({ columns: [t.moduleId, t.ticketId] }), index("module_tickets_ticket").on(t.ticketId)]);
+
+export const featureClients = pgTable("feature_clients", {
+  featureId: text().notNull().references(() => features.id, { onDelete: "cascade" }),
+  clientId: text().notNull().references(() => clients.id, { onDelete: "restrict" }),
+}, (t) => [primaryKey({ columns: [t.featureId, t.clientId] }), index("feature_clients_client").on(t.clientId)]);
+
+export const featureTickets = pgTable("feature_tickets", {
+  featureId: text().notNull().references(() => features.id, { onDelete: "cascade" }),
+  ticketId: text().notNull().references(() => tickets.id, { onDelete: "restrict" }),
+}, (t) => [primaryKey({ columns: [t.featureId, t.ticketId] }), index("feature_tickets_ticket").on(t.ticketId)]);
+
+export const taskTickets = pgTable("task_tickets", {
+  taskId: text().notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  ticketId: text().notNull().references(() => tickets.id, { onDelete: "restrict" }),
+}, (t) => [primaryKey({ columns: [t.taskId, t.ticketId] }), index("task_tickets_ticket").on(t.ticketId)]);
+
+export const taskTeamMembers = pgTable(
+  "task_team_members",
+  {
+    taskId: text()
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    userId: text()
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.taskId, t.userId] }),
+    index("team_member_user").on(t.userId),
+  ],
+);
+
+export const files = pgTable(
+  "files",
+  {
+    id: text().primaryKey(),
+    projectId: text()
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    taskId: text().references(() => tasks.id, { onDelete: "cascade" }),
+    scopeType: text(),
+    moduleId: text(),
+    featureId: text(),
+    uploadedBy: text()
+      .notNull()
+      .references(() => user.id),
+    name: text().notNull(),
+    mimeType: text().notNull(),
+    size: integer().notNull(),
+    storageKey: text().notNull(),
+    status: text().notNull().default("pending"),
+    purpose: text().notNull().default("file"),
+    createdAt: text().notNull(),
+  },
+  (t) => [
+    index("file_task").on(t.taskId),
+    index("file_pending").on(t.status, t.createdAt),
+    index("file_scope").on(t.projectId, t.scopeType, t.moduleId, t.featureId),
+    foreignKey({
+      columns: [t.taskId, t.projectId],
+      foreignColumns: [tasks.id, tasks.projectId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.moduleId, t.projectId],
+      foreignColumns: [modules.id, modules.projectId],
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [t.featureId, t.projectId],
+      foreignColumns: [features.id, features.projectId],
+    }).onDelete("cascade"),
+    check(
+      "file_scope_target",
+      sql`coalesce(((${t.scopeType} is null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 0) or (${t.scopeType} = 'project' and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 0) or (${t.scopeType} = 'task' and ${t.taskId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'module' and ${t.moduleId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'feature' and ${t.featureId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1)), false)`,
+    ),
+    check(
+      "file_scope_ready",
+      sql`${t.scopeType} is null or ${t.status} = 'ready'`,
+    ),
+  ],
+);
+
+// Delivery state is operational data, deliberately excluded from JSON backups.
+export const diagrams = pgTable("diagrams", {
+  id: text().primaryKey(),
+  projectId: text().notNull().references(() => projects.id, { onDelete: "cascade" }),
+  scopeType: text().notNull(),
+  taskId: text(), moduleId: text(), featureId: text(),
+  title: text().notNull(), description: text().notNull().default(""),
+  scene: jsonb().$type<DiagramScene>().notNull(),
+  revision: integer().notNull().default(1),
+  publicToken: text(),
+  createdAt: text().notNull(), updatedAt: text().notNull(),
+}, (t) => [
+  index("diagram_scope").on(t.projectId, t.scopeType, t.taskId, t.moduleId, t.featureId),
+  uniqueIndex("diagram_public_token").on(t.publicToken),
+  foreignKey({ columns: [t.taskId, t.projectId], foreignColumns: [tasks.id, tasks.projectId] }).onDelete("cascade"),
+  foreignKey({ columns: [t.moduleId, t.projectId], foreignColumns: [modules.id, modules.projectId] }).onDelete("cascade"),
+  foreignKey({ columns: [t.featureId, t.projectId], foreignColumns: [features.id, features.projectId] }).onDelete("cascade"),
+  check("diagram_revision", sql`${t.revision} > 0`),
+  check("diagram_scope_target", sql`(${t.scopeType} = 'project' and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 0) or (${t.scopeType} = 'task' and ${t.taskId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'module' and ${t.moduleId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'feature' and ${t.featureId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1)`),
+]);
+
+export const documents = pgTable("documents", {
+  id: text().primaryKey(),
+  projectId: text().notNull().references(() => projects.id, { onDelete: "cascade" }),
+  scopeType: text().notNull(),
+  taskId: text(), moduleId: text(), featureId: text(),
+  title: text().notNull(), description: text().notNull().default(""),
+  content: text().notNull().default(""),
+  revision: integer().notNull().default(1),
+  createdAt: text().notNull(), updatedAt: text().notNull(),
+}, (t) => [
+  index("document_scope").on(t.projectId, t.scopeType, t.taskId, t.moduleId, t.featureId),
+  foreignKey({ columns: [t.taskId, t.projectId], foreignColumns: [tasks.id, tasks.projectId] }).onDelete("cascade"),
+  foreignKey({ columns: [t.moduleId, t.projectId], foreignColumns: [modules.id, modules.projectId] }).onDelete("cascade"),
+  foreignKey({ columns: [t.featureId, t.projectId], foreignColumns: [features.id, features.projectId] }).onDelete("cascade"),
+  check("document_revision", sql`${t.revision} > 0`),
+  check("document_scope_target", sql`(${t.scopeType} = 'project' and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 0) or (${t.scopeType} = 'task' and ${t.taskId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'module' and ${t.moduleId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'feature' and ${t.featureId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1)`),
+]);
+
+export const commentOutbox = pgTable(
+  "comment_outbox",
+  {
+    scopeType: text().notNull().default("task"),
+    scopeId: text().notNull(),
+    taskId: text(),
+    eventId: text()
+      .notNull()
+      .default(sql`gen_random_uuid()::text`),
+    attempts: integer().notNull().default(0),
+    availableAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    leaseUntil: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.scopeType, t.scopeId] }),
+    index("comment_outbox_available").on(t.availableAt),
+  ],
+);
+
+export const notifications = pgTable("notifications", {
+  id: text().primaryKey(),
+  sequence: bigint({ mode: "number" }).generatedByDefaultAsIdentity().notNull(),
+  recipientId: text().notNull().references(() => user.id, { onDelete: "cascade" }),
+  actorId: text().references(() => user.id, { onDelete: "set null" }),
+  projectId: text().references(() => projects.id, { onDelete: "cascade" }),
+  scopeType: text({ enum: ["project", "module", "feature", "task", "account"] }).notNull().default("task"),
+  taskId: text().references(() => tasks.id, { onDelete: "cascade" }),
+  moduleId: text().references(() => modules.id, { onDelete: "cascade" }),
+  featureId: text().references(() => features.id, { onDelete: "cascade" }),
+  commentId: text().references(() => comments.id, { onDelete: "cascade" }),
+  documentId: text().references(() => documents.id, { onDelete: "cascade" }),
+  type: text({ enum: ["assigned", "shared", "reminder", "mention", "project_access_granted", "project_access_removed", "invitation_accepted"] }).notNull(),
+  // Retain the portable legacy column name; mentions use the source title.
+  taskTitle: text().notNull(),
+  offsetMinutes: integer(),
+  dedupKey: text().notNull(),
+  createdAt: timestamp({ withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  readAt: timestamp({ withTimezone: true, mode: "date" }),
+}, (t) => [check("notification_scope_target", sql`(${t.scopeType} = 'account' and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 0) or (${t.projectId} is not null and ((${t.scopeType} = 'project' and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 0) or (${t.scopeType} = 'task' and ${t.taskId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'module' and ${t.moduleId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1) or (${t.scopeType} = 'feature' and ${t.featureId} is not null and num_nonnulls(${t.taskId}, ${t.moduleId}, ${t.featureId}) = 1)))`),
+  check("notification_source", sql`num_nonnulls(${t.commentId}, ${t.documentId}) <= 1 and ((${t.scopeType} = 'account' and ${t.type} in ('project_access_granted', 'project_access_removed', 'invitation_accepted') and num_nonnulls(${t.commentId}, ${t.documentId}) = 0 and ${t.offsetMinutes} is null and (${t.type} = 'invitation_accepted' or ${t.projectId} is not null)) or (${t.scopeType} <> 'account' and (${t.type} = 'mention' or (${t.type} in ('assigned', 'shared', 'reminder') and ${t.scopeType} = 'task' and num_nonnulls(${t.commentId}, ${t.documentId}) = 0))))`),
+  index("notification_project").on(t.projectId),
+  uniqueIndex("notification_dedup").on(t.dedupKey),
+  index("notification_inbox").on(t.recipientId, t.createdAt, t.id),
+  index("notification_unread").on(t.recipientId).where(sql`${t.readAt} is null`),
+  uniqueIndex("notification_sequence").on(t.sequence),
+  index("notification_recipient_sequence").on(t.recipientId, t.sequence)]);
+
+export const notificationPreferences = pgTable("notification_preferences", {
+  userId: text().primaryKey().references(() => user.id, { onDelete: "cascade" }),
+  // String arrays keep the portable backup representation consistent.
+  offsets: jsonb().$type<string[]>().notNull().default(["1440", "60"]),
+  dateOnlyTime: text().notNull().default("08:00"),
+}, (t) => [check("reminder_time", sql`${t.dateOnlyTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`)]);
+
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: text().primaryKey(),
+  userId: text().notNull().references(() => user.id, { onDelete: "cascade" }),
+  sessionId: text().notNull().references(() => session.id, { onDelete: "cascade" }),
+  endpoint: text().notNull(),
+  p256dh: text().notNull(),
+  auth: text().notNull(),
+  createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+}, (t) => [uniqueIndex("push_endpoint").on(t.endpoint), index("push_user").on(t.userId)]);
+
+export const taskReminders = pgTable("task_reminders", {
+  id: text().primaryKey(),
+  taskId: text().notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  userId: text().notNull().references(() => user.id, { onDelete: "cascade" }),
+  offsetMinutes: integer().notNull(),
+  scheduledFor: timestamp({ withTimezone: true }).notNull(),
+  expiresAt: timestamp({ withTimezone: true }).notNull(),
+  dedupKey: text().notNull(),
+  processedAt: timestamp({ withTimezone: true }),
+}, (t) => [uniqueIndex("reminder_dedup").on(t.dedupKey),
+  index("reminder_pending").on(t.scheduledFor).where(sql`${t.processedAt} is null`)]);
+
+// One row per transport/device, so successful recipients are not sent again.
+export const notificationDeliveries = pgTable("notification_deliveries", {
+  id: text().primaryKey(),
+  recipientId: text().references(() => user.id, { onDelete: "cascade" }),
+  notificationId: text().references(() => notifications.id, { onDelete: "cascade" }),
+  subscriptionId: text().references(() => pushSubscriptions.id, { onDelete: "cascade" }),
+  invitationId: text().references(() => invitations.id, { onDelete: "cascade" }),
+  transport: text({ enum: ["ably", "push", "email"] }).notNull(),
+  attempts: integer().notNull().default(0),
+  availableAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp({ withTimezone: true }).notNull(),
+  leaseUntil: timestamp({ withTimezone: true }),
+}, (t) => [index("notification_delivery_pending").on(t.availableAt),
+  check("notification_delivery_target", sql`(${t.invitationId} is not null and ${t.transport} = 'email' and num_nonnulls(${t.recipientId}, ${t.notificationId}, ${t.subscriptionId}) = 0) or (${t.invitationId} is null and ${t.recipientId} is not null and (${t.transport} = 'ably' or (${t.notificationId} is not null and (${t.transport} = 'email' or (${t.transport} = 'push' and ${t.subscriptionId} is not null)))))`)]);
+
 export const domainTables = {
+  project_team_members: projectTeamMembers,
+  module_team_members: moduleTeamMembers,
+  feature_team_members: featureTeamMembers,
+  task_team_members: taskTeamMembers,
+  files,
+  departments,
+  cities,
+  clients,
+  task_clients: taskClients,
+  project_clients: projectClients,
+  module_clients: moduleClients,
+  feature_clients: featureClients,
+  tickets,
+  project_tickets: projectTickets,
+  module_tickets: moduleTickets,
+  feature_tickets: featureTickets,
+  task_tickets: taskTickets,
   projects,
   modules,
   features,

@@ -51,6 +51,7 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  onEscapeKeyDown,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
@@ -65,6 +66,14 @@ function DialogContent({
           className,
         )}
         {...props}
+        onEscapeKeyDown={(event) => {
+          // An editor's active suggestions consume the first Escape.
+          const controlled = event.target instanceof Element
+            ? event.target.closest('[aria-autocomplete="list"]')?.getAttribute("aria-controls")
+            : null;
+          if (controlled && document.getElementById(controlled)) event.preventDefault();
+          onEscapeKeyDown?.(event);
+        }}
       >
         {children}
         {showCloseButton && (

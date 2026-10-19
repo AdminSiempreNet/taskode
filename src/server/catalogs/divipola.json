@@ -1,0 +1,6876 @@
+{
+  "source": "https://www.datos.gov.co/resource/gdxc-w37w.json?$limit=2000&$order=cod_mpio",
+  "publisher": "Departamento Administrativo Nacional de Estadística - DANE",
+  "retrievedOn": "2026-10-17",
+  "dataset": "gdxc-w37w",
+  "departmentCount": 33,
+  "cityCount": 1122,
+  "departments": [
+    {
+      "id": "05",
+      "name": "ANTIOQUIA"
+    },
+    {
+      "id": "08",
+      "name": "ATLÁNTICO"
+    },
+    {
+      "id": "11",
+      "name": "BOGOTÁ, D.C."
+    },
+    {
+      "id": "13",
+      "name": "BOLÍVAR"
+    },
+    {
+      "id": "15",
+      "name": "BOYACÁ"
+    },
+    {
+      "id": "17",
+      "name": "CALDAS"
+    },
+    {
+      "id": "18",
+      "name": "CAQUETÁ"
+    },
+    {
+      "id": "19",
+      "name": "CAUCA"
+    },
+    {
+      "id": "20",
+      "name": "CESAR"
+    },
+    {
+      "id": "23",
+      "name": "CÓRDOBA"
+    },
+    {
+      "id": "25",
+      "name": "CUNDINAMARCA"
+    },
+    {
+      "id": "27",
+      "name": "CHOCÓ"
+    },
+    {
+      "id": "41",
+      "name": "HUILA"
+    },
+    {
+      "id": "44",
+      "name": "LA GUAJIRA"
+    },
+    {
+      "id": "47",
+      "name": "MAGDALENA"
+    },
+    {
+      "id": "50",
+      "name": "META"
+    },
+    {
+      "id": "52",
+      "name": "NARIÑO"
+    },
+    {
+      "id": "54",
+      "name": "NORTE DE SANTANDER"
+    },
+    {
+      "id": "63",
+      "name": "QUINDÍO"
+    },
+    {
+      "id": "66",
+      "name": "RISARALDA"
+    },
+    {
+      "id": "68",
+      "name": "SANTANDER"
+    },
+    {
+      "id": "70",
+      "name": "SUCRE"
+    },
+    {
+      "id": "73",
+      "name": "TOLIMA"
+    },
+    {
+      "id": "76",
+      "name": "VALLE DEL CAUCA"
+    },
+    {
+      "id": "81",
+      "name": "ARAUCA"
+    },
+    {
+      "id": "85",
+      "name": "CASANARE"
+    },
+    {
+      "id": "86",
+      "name": "PUTUMAYO"
+    },
+    {
+      "id": "88",
+      "name": "ARCHIPIÉLAGO DE SAN ANDRÉS, PROVIDENCIA Y SANTA CATALINA"
+    },
+    {
+      "id": "91",
+      "name": "AMAZONAS"
+    },
+    {
+      "id": "94",
+      "name": "GUAINÍA"
+    },
+    {
+      "id": "95",
+      "name": "GUAVIARE"
+    },
+    {
+      "id": "97",
+      "name": "VAUPÉS"
+    },
+    {
+      "id": "99",
+      "name": "VICHADA"
+    }
+  ],
+  "cities": [
+    {
+      "id": "05001",
+      "departmentId": "05",
+      "name": "MEDELLÍN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05002",
+      "departmentId": "05",
+      "name": "ABEJORRAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05004",
+      "departmentId": "05",
+      "name": "ABRIAQUÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05021",
+      "departmentId": "05",
+      "name": "ALEJANDRÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05030",
+      "departmentId": "05",
+      "name": "AMAGÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05031",
+      "departmentId": "05",
+      "name": "AMALFI",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05034",
+      "departmentId": "05",
+      "name": "ANDES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05036",
+      "departmentId": "05",
+      "name": "ANGELÓPOLIS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05038",
+      "departmentId": "05",
+      "name": "ANGOSTURA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05040",
+      "departmentId": "05",
+      "name": "ANORÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05042",
+      "departmentId": "05",
+      "name": "SANTA FÉ DE ANTIOQUIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05044",
+      "departmentId": "05",
+      "name": "ANZÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05045",
+      "departmentId": "05",
+      "name": "APARTADÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05051",
+      "departmentId": "05",
+      "name": "ARBOLETES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05055",
+      "departmentId": "05",
+      "name": "ARGELIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05059",
+      "departmentId": "05",
+      "name": "ARMENIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05079",
+      "departmentId": "05",
+      "name": "BARBOSA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05086",
+      "departmentId": "05",
+      "name": "BELMIRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05088",
+      "departmentId": "05",
+      "name": "BELLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05091",
+      "departmentId": "05",
+      "name": "BETANIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05093",
+      "departmentId": "05",
+      "name": "BETULIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05101",
+      "departmentId": "05",
+      "name": "CIUDAD BOLÍVAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05107",
+      "departmentId": "05",
+      "name": "BRICEÑO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05113",
+      "departmentId": "05",
+      "name": "BURITICÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05120",
+      "departmentId": "05",
+      "name": "CÁCERES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05125",
+      "departmentId": "05",
+      "name": "CAICEDO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05129",
+      "departmentId": "05",
+      "name": "CALDAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05134",
+      "departmentId": "05",
+      "name": "CAMPAMENTO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05138",
+      "departmentId": "05",
+      "name": "CAÑASGORDAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05142",
+      "departmentId": "05",
+      "name": "CARACOLÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05145",
+      "departmentId": "05",
+      "name": "CARAMANTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05147",
+      "departmentId": "05",
+      "name": "CAREPA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05148",
+      "departmentId": "05",
+      "name": "EL CARMEN DE VIBORAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05150",
+      "departmentId": "05",
+      "name": "CAROLINA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05154",
+      "departmentId": "05",
+      "name": "CAUCASIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05172",
+      "departmentId": "05",
+      "name": "CHIGORODÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05190",
+      "departmentId": "05",
+      "name": "CISNEROS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05197",
+      "departmentId": "05",
+      "name": "COCORNÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05206",
+      "departmentId": "05",
+      "name": "CONCEPCIÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05209",
+      "departmentId": "05",
+      "name": "CONCORDIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05212",
+      "departmentId": "05",
+      "name": "COPACABANA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05234",
+      "departmentId": "05",
+      "name": "DABEIBA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05237",
+      "departmentId": "05",
+      "name": "DONMATÍAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05240",
+      "departmentId": "05",
+      "name": "EBÉJICO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05250",
+      "departmentId": "05",
+      "name": "EL BAGRE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05264",
+      "departmentId": "05",
+      "name": "ENTRERRÍOS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05266",
+      "departmentId": "05",
+      "name": "ENVIGADO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05282",
+      "departmentId": "05",
+      "name": "FREDONIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05284",
+      "departmentId": "05",
+      "name": "FRONTINO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05306",
+      "departmentId": "05",
+      "name": "GIRALDO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05308",
+      "departmentId": "05",
+      "name": "GIRARDOTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05310",
+      "departmentId": "05",
+      "name": "GÓMEZ PLATA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05313",
+      "departmentId": "05",
+      "name": "GRANADA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05315",
+      "departmentId": "05",
+      "name": "GUADALUPE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05318",
+      "departmentId": "05",
+      "name": "GUARNE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05321",
+      "departmentId": "05",
+      "name": "GUATAPÉ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05347",
+      "departmentId": "05",
+      "name": "HELICONIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05353",
+      "departmentId": "05",
+      "name": "HISPANIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05360",
+      "departmentId": "05",
+      "name": "ITAGÜÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05361",
+      "departmentId": "05",
+      "name": "ITUANGO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05364",
+      "departmentId": "05",
+      "name": "JARDÍN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05368",
+      "departmentId": "05",
+      "name": "JERICÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05376",
+      "departmentId": "05",
+      "name": "LA CEJA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05380",
+      "departmentId": "05",
+      "name": "LA ESTRELLA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05390",
+      "departmentId": "05",
+      "name": "LA PINTADA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05400",
+      "departmentId": "05",
+      "name": "LA UNIÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05411",
+      "departmentId": "05",
+      "name": "LIBORINA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05425",
+      "departmentId": "05",
+      "name": "MACEO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05440",
+      "departmentId": "05",
+      "name": "MARINILLA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05467",
+      "departmentId": "05",
+      "name": "MONTEBELLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05475",
+      "departmentId": "05",
+      "name": "MURINDÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05480",
+      "departmentId": "05",
+      "name": "MUTATÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05483",
+      "departmentId": "05",
+      "name": "NARIÑO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05490",
+      "departmentId": "05",
+      "name": "NECOCLÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05495",
+      "departmentId": "05",
+      "name": "NECHÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05501",
+      "departmentId": "05",
+      "name": "OLAYA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05541",
+      "departmentId": "05",
+      "name": "PEÑOL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05543",
+      "departmentId": "05",
+      "name": "PEQUE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05576",
+      "departmentId": "05",
+      "name": "PUEBLORRICO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05579",
+      "departmentId": "05",
+      "name": "PUERTO BERRÍO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05585",
+      "departmentId": "05",
+      "name": "PUERTO NARE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05591",
+      "departmentId": "05",
+      "name": "PUERTO TRIUNFO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05604",
+      "departmentId": "05",
+      "name": "REMEDIOS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05607",
+      "departmentId": "05",
+      "name": "RETIRO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05615",
+      "departmentId": "05",
+      "name": "RIONEGRO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05628",
+      "departmentId": "05",
+      "name": "SABANALARGA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05631",
+      "departmentId": "05",
+      "name": "SABANETA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05642",
+      "departmentId": "05",
+      "name": "SALGAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05647",
+      "departmentId": "05",
+      "name": "SAN ANDRÉS DE CUERQUÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05649",
+      "departmentId": "05",
+      "name": "SAN CARLOS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05652",
+      "departmentId": "05",
+      "name": "SAN FRANCISCO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05656",
+      "departmentId": "05",
+      "name": "SAN JERÓNIMO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05658",
+      "departmentId": "05",
+      "name": "SAN JOSÉ DE LA MONTAÑA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05659",
+      "departmentId": "05",
+      "name": "SAN JUAN DE URABÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05660",
+      "departmentId": "05",
+      "name": "SAN LUIS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05664",
+      "departmentId": "05",
+      "name": "SAN PEDRO DE LOS MILAGROS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05665",
+      "departmentId": "05",
+      "name": "SAN PEDRO DE URABÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05667",
+      "departmentId": "05",
+      "name": "SAN RAFAEL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05670",
+      "departmentId": "05",
+      "name": "SAN ROQUE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05674",
+      "departmentId": "05",
+      "name": "SAN VICENTE FERRER",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05679",
+      "departmentId": "05",
+      "name": "SANTA BÁRBARA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05686",
+      "departmentId": "05",
+      "name": "SANTA ROSA DE OSOS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05690",
+      "departmentId": "05",
+      "name": "SANTO DOMINGO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05697",
+      "departmentId": "05",
+      "name": "EL SANTUARIO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05736",
+      "departmentId": "05",
+      "name": "SEGOVIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05756",
+      "departmentId": "05",
+      "name": "SONSÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05761",
+      "departmentId": "05",
+      "name": "SOPETRÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05789",
+      "departmentId": "05",
+      "name": "TÁMESIS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05790",
+      "departmentId": "05",
+      "name": "TARAZÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05792",
+      "departmentId": "05",
+      "name": "TARSO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05809",
+      "departmentId": "05",
+      "name": "TITIRIBÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05819",
+      "departmentId": "05",
+      "name": "TOLEDO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05837",
+      "departmentId": "05",
+      "name": "TURBO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05842",
+      "departmentId": "05",
+      "name": "URAMITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05847",
+      "departmentId": "05",
+      "name": "URRAO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05854",
+      "departmentId": "05",
+      "name": "VALDIVIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05856",
+      "departmentId": "05",
+      "name": "VALPARAÍSO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05858",
+      "departmentId": "05",
+      "name": "VEGACHÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05861",
+      "departmentId": "05",
+      "name": "VENECIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05873",
+      "departmentId": "05",
+      "name": "VIGÍA DEL FUERTE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05885",
+      "departmentId": "05",
+      "name": "YALÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05887",
+      "departmentId": "05",
+      "name": "YARUMAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05890",
+      "departmentId": "05",
+      "name": "YOLOMBÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05893",
+      "departmentId": "05",
+      "name": "YONDÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "05895",
+      "departmentId": "05",
+      "name": "ZARAGOZA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08001",
+      "departmentId": "08",
+      "name": "BARRANQUILLA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08078",
+      "departmentId": "08",
+      "name": "BARANOA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08137",
+      "departmentId": "08",
+      "name": "CAMPO DE LA CRUZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08141",
+      "departmentId": "08",
+      "name": "CANDELARIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08296",
+      "departmentId": "08",
+      "name": "GALAPA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08372",
+      "departmentId": "08",
+      "name": "JUAN DE ACOSTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08421",
+      "departmentId": "08",
+      "name": "LURUACO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08433",
+      "departmentId": "08",
+      "name": "MALAMBO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08436",
+      "departmentId": "08",
+      "name": "MANATÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08520",
+      "departmentId": "08",
+      "name": "PALMAR DE VARELA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08549",
+      "departmentId": "08",
+      "name": "PIOJÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08558",
+      "departmentId": "08",
+      "name": "POLONUEVO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08560",
+      "departmentId": "08",
+      "name": "PONEDERA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08573",
+      "departmentId": "08",
+      "name": "PUERTO COLOMBIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08606",
+      "departmentId": "08",
+      "name": "REPELÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08634",
+      "departmentId": "08",
+      "name": "SABANAGRANDE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08638",
+      "departmentId": "08",
+      "name": "SABANALARGA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08675",
+      "departmentId": "08",
+      "name": "SANTA LUCÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08685",
+      "departmentId": "08",
+      "name": "SANTO TOMÁS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08758",
+      "departmentId": "08",
+      "name": "SOLEDAD",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08770",
+      "departmentId": "08",
+      "name": "SUAN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08832",
+      "departmentId": "08",
+      "name": "TUBARÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "08849",
+      "departmentId": "08",
+      "name": "USIACURÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "11001",
+      "departmentId": "11",
+      "name": "BOGOTÁ, D.C.",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13001",
+      "departmentId": "13",
+      "name": "CARTAGENA DE INDIAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13006",
+      "departmentId": "13",
+      "name": "ACHÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13030",
+      "departmentId": "13",
+      "name": "ALTOS DEL ROSARIO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13042",
+      "departmentId": "13",
+      "name": "ARENAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13052",
+      "departmentId": "13",
+      "name": "ARJONA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13062",
+      "departmentId": "13",
+      "name": "ARROYOHONDO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13074",
+      "departmentId": "13",
+      "name": "BARRANCO DE LOBA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13140",
+      "departmentId": "13",
+      "name": "CALAMAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13160",
+      "departmentId": "13",
+      "name": "CANTAGALLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13188",
+      "departmentId": "13",
+      "name": "CICUCO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13212",
+      "departmentId": "13",
+      "name": "CÓRDOBA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13222",
+      "departmentId": "13",
+      "name": "CLEMENCIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13244",
+      "departmentId": "13",
+      "name": "EL CARMEN DE BOLÍVAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13248",
+      "departmentId": "13",
+      "name": "EL GUAMO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13268",
+      "departmentId": "13",
+      "name": "EL PEÑÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13300",
+      "departmentId": "13",
+      "name": "HATILLO DE LOBA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13430",
+      "departmentId": "13",
+      "name": "MAGANGUÉ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13433",
+      "departmentId": "13",
+      "name": "MAHATES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13440",
+      "departmentId": "13",
+      "name": "MARGARITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13442",
+      "departmentId": "13",
+      "name": "MARÍA LA BAJA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13458",
+      "departmentId": "13",
+      "name": "MONTECRISTO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13468",
+      "departmentId": "13",
+      "name": "SANTA CRUZ DE MOMPOX",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13473",
+      "departmentId": "13",
+      "name": "MORALES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13490",
+      "departmentId": "13",
+      "name": "NOROSÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13549",
+      "departmentId": "13",
+      "name": "PINILLOS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13580",
+      "departmentId": "13",
+      "name": "REGIDOR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13600",
+      "departmentId": "13",
+      "name": "RÍO VIEJO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13620",
+      "departmentId": "13",
+      "name": "SAN CRISTÓBAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13647",
+      "departmentId": "13",
+      "name": "SAN ESTANISLAO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13650",
+      "departmentId": "13",
+      "name": "SAN FERNANDO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13654",
+      "departmentId": "13",
+      "name": "SAN JACINTO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13655",
+      "departmentId": "13",
+      "name": "SAN JACINTO DEL CAUCA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13657",
+      "departmentId": "13",
+      "name": "SAN JUAN NEPOMUCENO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13667",
+      "departmentId": "13",
+      "name": "SAN MARTÍN DE LOBA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13670",
+      "departmentId": "13",
+      "name": "SAN PABLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13673",
+      "departmentId": "13",
+      "name": "SANTA CATALINA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13683",
+      "departmentId": "13",
+      "name": "SANTA ROSA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13688",
+      "departmentId": "13",
+      "name": "SANTA ROSA DEL SUR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13744",
+      "departmentId": "13",
+      "name": "SIMITÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13760",
+      "departmentId": "13",
+      "name": "SOPLAVIENTO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13780",
+      "departmentId": "13",
+      "name": "TALAIGUA NUEVO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13810",
+      "departmentId": "13",
+      "name": "TIQUISIO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13836",
+      "departmentId": "13",
+      "name": "TURBACO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13838",
+      "departmentId": "13",
+      "name": "TURBANÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13873",
+      "departmentId": "13",
+      "name": "VILLANUEVA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "13894",
+      "departmentId": "13",
+      "name": "ZAMBRANO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15001",
+      "departmentId": "15",
+      "name": "TUNJA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15022",
+      "departmentId": "15",
+      "name": "ALMEIDA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15047",
+      "departmentId": "15",
+      "name": "AQUITANIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15051",
+      "departmentId": "15",
+      "name": "ARCABUCO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15087",
+      "departmentId": "15",
+      "name": "BELÉN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15090",
+      "departmentId": "15",
+      "name": "BERBEO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15092",
+      "departmentId": "15",
+      "name": "BETÉITIVA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15097",
+      "departmentId": "15",
+      "name": "BOAVITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15104",
+      "departmentId": "15",
+      "name": "BOYACÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15106",
+      "departmentId": "15",
+      "name": "BRICEÑO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15109",
+      "departmentId": "15",
+      "name": "BUENAVISTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15114",
+      "departmentId": "15",
+      "name": "BUSBANZÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15131",
+      "departmentId": "15",
+      "name": "CALDAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15135",
+      "departmentId": "15",
+      "name": "CAMPOHERMOSO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15162",
+      "departmentId": "15",
+      "name": "CERINZA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15172",
+      "departmentId": "15",
+      "name": "CHINAVITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15176",
+      "departmentId": "15",
+      "name": "CHIQUINQUIRÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15180",
+      "departmentId": "15",
+      "name": "CHISCAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15183",
+      "departmentId": "15",
+      "name": "CHITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15185",
+      "departmentId": "15",
+      "name": "CHITARAQUE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15187",
+      "departmentId": "15",
+      "name": "CHIVATÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15189",
+      "departmentId": "15",
+      "name": "CIÉNEGA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15204",
+      "departmentId": "15",
+      "name": "CÓMBITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15212",
+      "departmentId": "15",
+      "name": "COPER",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15215",
+      "departmentId": "15",
+      "name": "CORRALES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15218",
+      "departmentId": "15",
+      "name": "COVARACHÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15223",
+      "departmentId": "15",
+      "name": "CUBARÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15224",
+      "departmentId": "15",
+      "name": "CUCAITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15226",
+      "departmentId": "15",
+      "name": "CUÍTIVA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15232",
+      "departmentId": "15",
+      "name": "CHÍQUIZA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15236",
+      "departmentId": "15",
+      "name": "CHIVOR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15238",
+      "departmentId": "15",
+      "name": "DUITAMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15244",
+      "departmentId": "15",
+      "name": "EL COCUY",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15248",
+      "departmentId": "15",
+      "name": "EL ESPINO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15272",
+      "departmentId": "15",
+      "name": "FIRAVITOBA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15276",
+      "departmentId": "15",
+      "name": "FLORESTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15293",
+      "departmentId": "15",
+      "name": "GACHANTIVÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15296",
+      "departmentId": "15",
+      "name": "GÁMEZA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15299",
+      "departmentId": "15",
+      "name": "GARAGOA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15317",
+      "departmentId": "15",
+      "name": "GUACAMAYAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15322",
+      "departmentId": "15",
+      "name": "GUATEQUE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15325",
+      "departmentId": "15",
+      "name": "GUAYATÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15332",
+      "departmentId": "15",
+      "name": "GÜICÁN DE LA SIERRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15362",
+      "departmentId": "15",
+      "name": "IZA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15367",
+      "departmentId": "15",
+      "name": "JENESANO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15368",
+      "departmentId": "15",
+      "name": "JERICÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15377",
+      "departmentId": "15",
+      "name": "LABRANZAGRANDE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15380",
+      "departmentId": "15",
+      "name": "LA CAPILLA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15401",
+      "departmentId": "15",
+      "name": "LA VICTORIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15403",
+      "departmentId": "15",
+      "name": "LA UVITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15407",
+      "departmentId": "15",
+      "name": "VILLA DE LEYVA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15425",
+      "departmentId": "15",
+      "name": "MACANAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15442",
+      "departmentId": "15",
+      "name": "MARIPÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15455",
+      "departmentId": "15",
+      "name": "MIRAFLORES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15464",
+      "departmentId": "15",
+      "name": "MONGUA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15466",
+      "departmentId": "15",
+      "name": "MONGUÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15469",
+      "departmentId": "15",
+      "name": "MONIQUIRÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15476",
+      "departmentId": "15",
+      "name": "MOTAVITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15480",
+      "departmentId": "15",
+      "name": "MUZO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15491",
+      "departmentId": "15",
+      "name": "NOBSA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15494",
+      "departmentId": "15",
+      "name": "NUEVO COLÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15500",
+      "departmentId": "15",
+      "name": "OICATÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15507",
+      "departmentId": "15",
+      "name": "OTANCHE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15511",
+      "departmentId": "15",
+      "name": "PACHAVITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15514",
+      "departmentId": "15",
+      "name": "PÁEZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15516",
+      "departmentId": "15",
+      "name": "PAIPA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15518",
+      "departmentId": "15",
+      "name": "PAJARITO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15522",
+      "departmentId": "15",
+      "name": "PANQUEBA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15531",
+      "departmentId": "15",
+      "name": "PAUNA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15533",
+      "departmentId": "15",
+      "name": "PAYA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15537",
+      "departmentId": "15",
+      "name": "PAZ DE RÍO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15542",
+      "departmentId": "15",
+      "name": "PESCA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15550",
+      "departmentId": "15",
+      "name": "PISBA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15572",
+      "departmentId": "15",
+      "name": "PUERTO BOYACÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15580",
+      "departmentId": "15",
+      "name": "QUÍPAMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15599",
+      "departmentId": "15",
+      "name": "RAMIRIQUÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15600",
+      "departmentId": "15",
+      "name": "RÁQUIRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15621",
+      "departmentId": "15",
+      "name": "RONDÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15632",
+      "departmentId": "15",
+      "name": "SABOYÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15638",
+      "departmentId": "15",
+      "name": "SÁCHICA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15646",
+      "departmentId": "15",
+      "name": "SAMACÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15660",
+      "departmentId": "15",
+      "name": "SAN EDUARDO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15664",
+      "departmentId": "15",
+      "name": "SAN JOSÉ DE PARE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15667",
+      "departmentId": "15",
+      "name": "SAN LUIS DE GACENO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15673",
+      "departmentId": "15",
+      "name": "SAN MATEO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15676",
+      "departmentId": "15",
+      "name": "SAN MIGUEL DE SEMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15681",
+      "departmentId": "15",
+      "name": "SAN PABLO DE BORBUR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15686",
+      "departmentId": "15",
+      "name": "SANTANA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15690",
+      "departmentId": "15",
+      "name": "SANTA MARÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15693",
+      "departmentId": "15",
+      "name": "SANTA ROSA DE VITERBO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15696",
+      "departmentId": "15",
+      "name": "SANTA SOFÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15720",
+      "departmentId": "15",
+      "name": "SATIVANORTE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15723",
+      "departmentId": "15",
+      "name": "SATIVASUR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15740",
+      "departmentId": "15",
+      "name": "SIACHOQUE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15753",
+      "departmentId": "15",
+      "name": "SOATÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15755",
+      "departmentId": "15",
+      "name": "SOCOTÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15757",
+      "departmentId": "15",
+      "name": "SOCHA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15759",
+      "departmentId": "15",
+      "name": "SOGAMOSO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15761",
+      "departmentId": "15",
+      "name": "SOMONDOCO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15762",
+      "departmentId": "15",
+      "name": "SORA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15763",
+      "departmentId": "15",
+      "name": "SOTAQUIRÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15764",
+      "departmentId": "15",
+      "name": "SORACÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15774",
+      "departmentId": "15",
+      "name": "SUSACÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15776",
+      "departmentId": "15",
+      "name": "SUTAMARCHÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15778",
+      "departmentId": "15",
+      "name": "SUTATENZA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15790",
+      "departmentId": "15",
+      "name": "TASCO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15798",
+      "departmentId": "15",
+      "name": "TENZA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15804",
+      "departmentId": "15",
+      "name": "TIBANÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15806",
+      "departmentId": "15",
+      "name": "TIBASOSA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15808",
+      "departmentId": "15",
+      "name": "TINJACÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15810",
+      "departmentId": "15",
+      "name": "TIPACOQUE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15814",
+      "departmentId": "15",
+      "name": "TOCA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15816",
+      "departmentId": "15",
+      "name": "TOGÜÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15820",
+      "departmentId": "15",
+      "name": "TÓPAGA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15822",
+      "departmentId": "15",
+      "name": "TOTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15832",
+      "departmentId": "15",
+      "name": "TUNUNGUÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15835",
+      "departmentId": "15",
+      "name": "TURMEQUÉ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15837",
+      "departmentId": "15",
+      "name": "TUTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15839",
+      "departmentId": "15",
+      "name": "TUTAZÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15842",
+      "departmentId": "15",
+      "name": "ÚMBITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15861",
+      "departmentId": "15",
+      "name": "VENTAQUEMADA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15879",
+      "departmentId": "15",
+      "name": "VIRACACHÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "15897",
+      "departmentId": "15",
+      "name": "ZETAQUIRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17001",
+      "departmentId": "17",
+      "name": "MANIZALES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17013",
+      "departmentId": "17",
+      "name": "AGUADAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17042",
+      "departmentId": "17",
+      "name": "ANSERMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17050",
+      "departmentId": "17",
+      "name": "ARANZAZU",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17088",
+      "departmentId": "17",
+      "name": "BELALCÁZAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17174",
+      "departmentId": "17",
+      "name": "CHINCHINÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17272",
+      "departmentId": "17",
+      "name": "FILADELFIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17380",
+      "departmentId": "17",
+      "name": "LA DORADA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17388",
+      "departmentId": "17",
+      "name": "LA MERCED",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17433",
+      "departmentId": "17",
+      "name": "MANZANARES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17442",
+      "departmentId": "17",
+      "name": "MARMATO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17444",
+      "departmentId": "17",
+      "name": "MARQUETALIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17446",
+      "departmentId": "17",
+      "name": "MARULANDA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17486",
+      "departmentId": "17",
+      "name": "NEIRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17495",
+      "departmentId": "17",
+      "name": "NORCASIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17513",
+      "departmentId": "17",
+      "name": "PÁCORA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17524",
+      "departmentId": "17",
+      "name": "PALESTINA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17541",
+      "departmentId": "17",
+      "name": "PENSILVANIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17614",
+      "departmentId": "17",
+      "name": "RIOSUCIO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17616",
+      "departmentId": "17",
+      "name": "RISARALDA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17653",
+      "departmentId": "17",
+      "name": "SALAMINA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17662",
+      "departmentId": "17",
+      "name": "SAMANÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17665",
+      "departmentId": "17",
+      "name": "SAN JOSÉ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17777",
+      "departmentId": "17",
+      "name": "SUPÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17867",
+      "departmentId": "17",
+      "name": "VICTORIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17873",
+      "departmentId": "17",
+      "name": "VILLAMARÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "17877",
+      "departmentId": "17",
+      "name": "VITERBO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "18001",
+      "departmentId": "18",
+      "name": "FLORENCIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "18029",
+      "departmentId": "18",
+      "name": "ALBANIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "18094",
+      "departmentId": "18",
+      "name": "BELÉN DE LOS ANDAQUÍES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "18150",
+      "departmentId": "18",
+      "name": "CARTAGENA DEL CHAIRÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "18205",
+      "departmentId": "18",
+      "name": "CURILLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "18247",
+      "departmentId": "18",
+      "name": "EL DONCELLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "18256",
+      "departmentId": "18",
+      "name": "EL PAUJÍL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "18410",
+      "departmentId": "18",
+      "name": "LA MONTAÑITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "18460",
+      "departmentId": "18",
+      "name": "MILÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "18479",
+      "departmentId": "18",
+      "name": "MORELIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "18592",
+      "departmentId": "18",
+      "name": "PUERTO RICO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "18610",
+      "departmentId": "18",
+      "name": "SAN JOSÉ DEL FRAGUA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "18753",
+      "departmentId": "18",
+      "name": "SAN VICENTE DEL CAGUÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "18756",
+      "departmentId": "18",
+      "name": "SOLANO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "18785",
+      "departmentId": "18",
+      "name": "SOLITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "18860",
+      "departmentId": "18",
+      "name": "VALPARAÍSO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19001",
+      "departmentId": "19",
+      "name": "POPAYÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19022",
+      "departmentId": "19",
+      "name": "ALMAGUER",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19050",
+      "departmentId": "19",
+      "name": "ARGELIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19075",
+      "departmentId": "19",
+      "name": "BALBOA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19100",
+      "departmentId": "19",
+      "name": "BOLÍVAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19110",
+      "departmentId": "19",
+      "name": "BUENOS AIRES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19130",
+      "departmentId": "19",
+      "name": "CAJIBÍO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19137",
+      "departmentId": "19",
+      "name": "CALDONO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19142",
+      "departmentId": "19",
+      "name": "CALOTO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19212",
+      "departmentId": "19",
+      "name": "CORINTO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19256",
+      "departmentId": "19",
+      "name": "EL TAMBO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19290",
+      "departmentId": "19",
+      "name": "FLORENCIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19300",
+      "departmentId": "19",
+      "name": "GUACHENÉ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19318",
+      "departmentId": "19",
+      "name": "GUAPI",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19355",
+      "departmentId": "19",
+      "name": "INZÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19364",
+      "departmentId": "19",
+      "name": "JAMBALÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19392",
+      "departmentId": "19",
+      "name": "LA SIERRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19397",
+      "departmentId": "19",
+      "name": "LA VEGA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19418",
+      "departmentId": "19",
+      "name": "LÓPEZ DE MICAY",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19450",
+      "departmentId": "19",
+      "name": "MERCADERES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19455",
+      "departmentId": "19",
+      "name": "MIRANDA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19473",
+      "departmentId": "19",
+      "name": "MORALES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19513",
+      "departmentId": "19",
+      "name": "PADILLA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19517",
+      "departmentId": "19",
+      "name": "PÁEZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19532",
+      "departmentId": "19",
+      "name": "PATÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19533",
+      "departmentId": "19",
+      "name": "PIAMONTE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19548",
+      "departmentId": "19",
+      "name": "PIENDAMÓ - TUNÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19573",
+      "departmentId": "19",
+      "name": "PUERTO TEJADA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19585",
+      "departmentId": "19",
+      "name": "PURACÉ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19622",
+      "departmentId": "19",
+      "name": "ROSAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19693",
+      "departmentId": "19",
+      "name": "SAN SEBASTIÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19698",
+      "departmentId": "19",
+      "name": "SANTANDER DE QUILICHAO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19701",
+      "departmentId": "19",
+      "name": "SANTA ROSA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19743",
+      "departmentId": "19",
+      "name": "SILVIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19760",
+      "departmentId": "19",
+      "name": "SOTARÁ - PAISPAMBA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19780",
+      "departmentId": "19",
+      "name": "SUÁREZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19785",
+      "departmentId": "19",
+      "name": "SUCRE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19807",
+      "departmentId": "19",
+      "name": "TIMBÍO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19809",
+      "departmentId": "19",
+      "name": "TIMBIQUÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19821",
+      "departmentId": "19",
+      "name": "TORIBÍO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19824",
+      "departmentId": "19",
+      "name": "TOTORÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "19845",
+      "departmentId": "19",
+      "name": "VILLA RICA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20001",
+      "departmentId": "20",
+      "name": "VALLEDUPAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20011",
+      "departmentId": "20",
+      "name": "AGUACHICA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20013",
+      "departmentId": "20",
+      "name": "AGUSTÍN CODAZZI",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20032",
+      "departmentId": "20",
+      "name": "ASTREA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20045",
+      "departmentId": "20",
+      "name": "BECERRIL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20060",
+      "departmentId": "20",
+      "name": "BOSCONIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20175",
+      "departmentId": "20",
+      "name": "CHIMICHAGUA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20178",
+      "departmentId": "20",
+      "name": "CHIRIGUANÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20228",
+      "departmentId": "20",
+      "name": "CURUMANÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20238",
+      "departmentId": "20",
+      "name": "EL COPEY",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20250",
+      "departmentId": "20",
+      "name": "EL PASO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20295",
+      "departmentId": "20",
+      "name": "GAMARRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20310",
+      "departmentId": "20",
+      "name": "GONZÁLEZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20383",
+      "departmentId": "20",
+      "name": "LA GLORIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20400",
+      "departmentId": "20",
+      "name": "LA JAGUA DE IBIRICO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20443",
+      "departmentId": "20",
+      "name": "MANAURE BALCÓN DEL CESAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20517",
+      "departmentId": "20",
+      "name": "PAILITAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20550",
+      "departmentId": "20",
+      "name": "PELAYA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20570",
+      "departmentId": "20",
+      "name": "PUEBLO BELLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20614",
+      "departmentId": "20",
+      "name": "RÍO DE ORO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20621",
+      "departmentId": "20",
+      "name": "LA PAZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20710",
+      "departmentId": "20",
+      "name": "SAN ALBERTO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20750",
+      "departmentId": "20",
+      "name": "SAN DIEGO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20770",
+      "departmentId": "20",
+      "name": "SAN MARTÍN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "20787",
+      "departmentId": "20",
+      "name": "TAMALAMEQUE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23001",
+      "departmentId": "23",
+      "name": "MONTERÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23068",
+      "departmentId": "23",
+      "name": "AYAPEL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23079",
+      "departmentId": "23",
+      "name": "BUENAVISTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23090",
+      "departmentId": "23",
+      "name": "CANALETE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23162",
+      "departmentId": "23",
+      "name": "CERETÉ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23168",
+      "departmentId": "23",
+      "name": "CHIMÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23182",
+      "departmentId": "23",
+      "name": "CHINÚ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23189",
+      "departmentId": "23",
+      "name": "CIÉNAGA DE ORO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23300",
+      "departmentId": "23",
+      "name": "COTORRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23350",
+      "departmentId": "23",
+      "name": "LA APARTADA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23417",
+      "departmentId": "23",
+      "name": "LORICA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23419",
+      "departmentId": "23",
+      "name": "LOS CÓRDOBAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23464",
+      "departmentId": "23",
+      "name": "MOMIL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23466",
+      "departmentId": "23",
+      "name": "MONTELÍBANO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23500",
+      "departmentId": "23",
+      "name": "MOÑITOS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23555",
+      "departmentId": "23",
+      "name": "PLANETA RICA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23570",
+      "departmentId": "23",
+      "name": "PUEBLO NUEVO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23574",
+      "departmentId": "23",
+      "name": "PUERTO ESCONDIDO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23580",
+      "departmentId": "23",
+      "name": "PUERTO LIBERTADOR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23586",
+      "departmentId": "23",
+      "name": "PURÍSIMA DE LA CONCEPCIÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23660",
+      "departmentId": "23",
+      "name": "SAHAGÚN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23670",
+      "departmentId": "23",
+      "name": "SAN ANDRÉS DE SOTAVENTO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23672",
+      "departmentId": "23",
+      "name": "SAN ANTERO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23675",
+      "departmentId": "23",
+      "name": "SAN BERNARDO DEL VIENTO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23678",
+      "departmentId": "23",
+      "name": "SAN CARLOS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23682",
+      "departmentId": "23",
+      "name": "SAN JOSÉ DE URÉ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23686",
+      "departmentId": "23",
+      "name": "SAN PELAYO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23807",
+      "departmentId": "23",
+      "name": "TIERRALTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23815",
+      "departmentId": "23",
+      "name": "TUCHÍN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "23855",
+      "departmentId": "23",
+      "name": "VALENCIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25001",
+      "departmentId": "25",
+      "name": "AGUA DE DIOS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25019",
+      "departmentId": "25",
+      "name": "ALBÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25035",
+      "departmentId": "25",
+      "name": "ANAPOIMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25040",
+      "departmentId": "25",
+      "name": "ANOLAIMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25053",
+      "departmentId": "25",
+      "name": "ARBELÁEZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25086",
+      "departmentId": "25",
+      "name": "BELTRÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25095",
+      "departmentId": "25",
+      "name": "BITUIMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25099",
+      "departmentId": "25",
+      "name": "BOJACÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25120",
+      "departmentId": "25",
+      "name": "CABRERA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25123",
+      "departmentId": "25",
+      "name": "CACHIPAY",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25126",
+      "departmentId": "25",
+      "name": "CAJICÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25148",
+      "departmentId": "25",
+      "name": "CAPARRAPÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25151",
+      "departmentId": "25",
+      "name": "CÁQUEZA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25154",
+      "departmentId": "25",
+      "name": "CARMEN DE CARUPA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25168",
+      "departmentId": "25",
+      "name": "CHAGUANÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25175",
+      "departmentId": "25",
+      "name": "CHÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25178",
+      "departmentId": "25",
+      "name": "CHIPAQUE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25181",
+      "departmentId": "25",
+      "name": "CHOACHÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25183",
+      "departmentId": "25",
+      "name": "CHOCONTÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25200",
+      "departmentId": "25",
+      "name": "COGUA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25214",
+      "departmentId": "25",
+      "name": "COTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25224",
+      "departmentId": "25",
+      "name": "CUCUNUBÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25245",
+      "departmentId": "25",
+      "name": "EL COLEGIO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25258",
+      "departmentId": "25",
+      "name": "EL PEÑÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25260",
+      "departmentId": "25",
+      "name": "EL ROSAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25269",
+      "departmentId": "25",
+      "name": "FACATATIVÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25279",
+      "departmentId": "25",
+      "name": "FÓMEQUE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25281",
+      "departmentId": "25",
+      "name": "FOSCA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25286",
+      "departmentId": "25",
+      "name": "FUNZA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25288",
+      "departmentId": "25",
+      "name": "FÚQUENE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25290",
+      "departmentId": "25",
+      "name": "FUSAGASUGÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25293",
+      "departmentId": "25",
+      "name": "GACHALÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25295",
+      "departmentId": "25",
+      "name": "GACHANCIPÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25297",
+      "departmentId": "25",
+      "name": "GACHETÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25299",
+      "departmentId": "25",
+      "name": "GAMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25307",
+      "departmentId": "25",
+      "name": "GIRARDOT",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25312",
+      "departmentId": "25",
+      "name": "GRANADA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25317",
+      "departmentId": "25",
+      "name": "GUACHETÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25320",
+      "departmentId": "25",
+      "name": "GUADUAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25322",
+      "departmentId": "25",
+      "name": "GUASCA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25324",
+      "departmentId": "25",
+      "name": "GUATAQUÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25326",
+      "departmentId": "25",
+      "name": "GUATAVITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25328",
+      "departmentId": "25",
+      "name": "GUAYABAL DE SÍQUIMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25335",
+      "departmentId": "25",
+      "name": "GUAYABETAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25339",
+      "departmentId": "25",
+      "name": "GUTIÉRREZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25368",
+      "departmentId": "25",
+      "name": "JERUSALÉN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25372",
+      "departmentId": "25",
+      "name": "JUNÍN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25377",
+      "departmentId": "25",
+      "name": "LA CALERA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25386",
+      "departmentId": "25",
+      "name": "LA MESA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25394",
+      "departmentId": "25",
+      "name": "LA PALMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25398",
+      "departmentId": "25",
+      "name": "LA PEÑA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25402",
+      "departmentId": "25",
+      "name": "LA VEGA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25407",
+      "departmentId": "25",
+      "name": "LENGUAZAQUE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25426",
+      "departmentId": "25",
+      "name": "MACHETÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25430",
+      "departmentId": "25",
+      "name": "MADRID",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25436",
+      "departmentId": "25",
+      "name": "MANTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25438",
+      "departmentId": "25",
+      "name": "MEDINA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25473",
+      "departmentId": "25",
+      "name": "MOSQUERA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25483",
+      "departmentId": "25",
+      "name": "NARIÑO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25486",
+      "departmentId": "25",
+      "name": "NEMOCÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25488",
+      "departmentId": "25",
+      "name": "NILO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25489",
+      "departmentId": "25",
+      "name": "NIMAIMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25491",
+      "departmentId": "25",
+      "name": "NOCAIMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25506",
+      "departmentId": "25",
+      "name": "VENECIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25513",
+      "departmentId": "25",
+      "name": "PACHO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25518",
+      "departmentId": "25",
+      "name": "PAIME",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25524",
+      "departmentId": "25",
+      "name": "PANDI",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25530",
+      "departmentId": "25",
+      "name": "PARATEBUENO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25535",
+      "departmentId": "25",
+      "name": "PASCA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25572",
+      "departmentId": "25",
+      "name": "PUERTO SALGAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25580",
+      "departmentId": "25",
+      "name": "PULÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25592",
+      "departmentId": "25",
+      "name": "QUEBRADANEGRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25594",
+      "departmentId": "25",
+      "name": "QUETAME",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25596",
+      "departmentId": "25",
+      "name": "QUIPILE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25599",
+      "departmentId": "25",
+      "name": "APULO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25612",
+      "departmentId": "25",
+      "name": "RICAURTE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25645",
+      "departmentId": "25",
+      "name": "SAN ANTONIO DEL TEQUENDAMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25649",
+      "departmentId": "25",
+      "name": "SAN BERNARDO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25653",
+      "departmentId": "25",
+      "name": "SAN CAYETANO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25658",
+      "departmentId": "25",
+      "name": "SAN FRANCISCO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25662",
+      "departmentId": "25",
+      "name": "SAN JUAN DE RIOSECO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25718",
+      "departmentId": "25",
+      "name": "SASAIMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25736",
+      "departmentId": "25",
+      "name": "SESQUILÉ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25740",
+      "departmentId": "25",
+      "name": "SIBATÉ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25743",
+      "departmentId": "25",
+      "name": "SILVANIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25745",
+      "departmentId": "25",
+      "name": "SIMIJACA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25754",
+      "departmentId": "25",
+      "name": "SOACHA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25758",
+      "departmentId": "25",
+      "name": "SOPÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25769",
+      "departmentId": "25",
+      "name": "SUBACHOQUE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25772",
+      "departmentId": "25",
+      "name": "SUESCA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25777",
+      "departmentId": "25",
+      "name": "SUPATÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25779",
+      "departmentId": "25",
+      "name": "SUSA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25781",
+      "departmentId": "25",
+      "name": "SUTATAUSA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25785",
+      "departmentId": "25",
+      "name": "TABIO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25793",
+      "departmentId": "25",
+      "name": "TAUSA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25797",
+      "departmentId": "25",
+      "name": "TENA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25799",
+      "departmentId": "25",
+      "name": "TENJO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25805",
+      "departmentId": "25",
+      "name": "TIBACUY",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25807",
+      "departmentId": "25",
+      "name": "TIBIRITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25815",
+      "departmentId": "25",
+      "name": "TOCAIMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25817",
+      "departmentId": "25",
+      "name": "TOCANCIPÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25823",
+      "departmentId": "25",
+      "name": "TOPAIPÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25839",
+      "departmentId": "25",
+      "name": "UBALÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25841",
+      "departmentId": "25",
+      "name": "UBAQUE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25843",
+      "departmentId": "25",
+      "name": "VILLA DE SAN DIEGO DE UBATÉ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25845",
+      "departmentId": "25",
+      "name": "UNE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25851",
+      "departmentId": "25",
+      "name": "ÚTICA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25862",
+      "departmentId": "25",
+      "name": "VERGARA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25867",
+      "departmentId": "25",
+      "name": "VIANÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25871",
+      "departmentId": "25",
+      "name": "VILLAGÓMEZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25873",
+      "departmentId": "25",
+      "name": "VILLAPINZÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25875",
+      "departmentId": "25",
+      "name": "VILLETA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25878",
+      "departmentId": "25",
+      "name": "VIOTÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25885",
+      "departmentId": "25",
+      "name": "YACOPÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25898",
+      "departmentId": "25",
+      "name": "ZIPACÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "25899",
+      "departmentId": "25",
+      "name": "ZIPAQUIRÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27001",
+      "departmentId": "27",
+      "name": "QUIBDÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27006",
+      "departmentId": "27",
+      "name": "ACANDÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27025",
+      "departmentId": "27",
+      "name": "ALTO BAUDÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27050",
+      "departmentId": "27",
+      "name": "ATRATO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27073",
+      "departmentId": "27",
+      "name": "BAGADÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27075",
+      "departmentId": "27",
+      "name": "BAHÍA SOLANO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27077",
+      "departmentId": "27",
+      "name": "BAJO BAUDÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27099",
+      "departmentId": "27",
+      "name": "BOJAYÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27135",
+      "departmentId": "27",
+      "name": "EL CANTÓN DEL SAN PABLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27150",
+      "departmentId": "27",
+      "name": "CARMEN DEL DARIÉN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27160",
+      "departmentId": "27",
+      "name": "CÉRTEGUI",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27205",
+      "departmentId": "27",
+      "name": "CONDOTO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27245",
+      "departmentId": "27",
+      "name": "EL CARMEN DE ATRATO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27250",
+      "departmentId": "27",
+      "name": "EL LITORAL DEL SAN JUAN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27361",
+      "departmentId": "27",
+      "name": "ISTMINA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27372",
+      "departmentId": "27",
+      "name": "JURADÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27413",
+      "departmentId": "27",
+      "name": "LLORÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27425",
+      "departmentId": "27",
+      "name": "MEDIO ATRATO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27430",
+      "departmentId": "27",
+      "name": "MEDIO BAUDÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27450",
+      "departmentId": "27",
+      "name": "MEDIO SAN JUAN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27491",
+      "departmentId": "27",
+      "name": "NÓVITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27493",
+      "departmentId": "27",
+      "name": "NUEVO BELÉN DE BAJIRÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27495",
+      "departmentId": "27",
+      "name": "NUQUÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27580",
+      "departmentId": "27",
+      "name": "RÍO IRÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27600",
+      "departmentId": "27",
+      "name": "RÍO QUITO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27615",
+      "departmentId": "27",
+      "name": "RIOSUCIO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27660",
+      "departmentId": "27",
+      "name": "SAN JOSÉ DEL PALMAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27745",
+      "departmentId": "27",
+      "name": "SIPÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27787",
+      "departmentId": "27",
+      "name": "TADÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27800",
+      "departmentId": "27",
+      "name": "UNGUÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "27810",
+      "departmentId": "27",
+      "name": "UNIÓN PANAMERICANA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41001",
+      "departmentId": "41",
+      "name": "NEIVA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41006",
+      "departmentId": "41",
+      "name": "ACEVEDO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41013",
+      "departmentId": "41",
+      "name": "AGRADO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41016",
+      "departmentId": "41",
+      "name": "AIPE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41020",
+      "departmentId": "41",
+      "name": "ALGECIRAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41026",
+      "departmentId": "41",
+      "name": "ALTAMIRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41078",
+      "departmentId": "41",
+      "name": "BARAYA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41132",
+      "departmentId": "41",
+      "name": "CAMPOALEGRE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41206",
+      "departmentId": "41",
+      "name": "COLOMBIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41244",
+      "departmentId": "41",
+      "name": "ELÍAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41298",
+      "departmentId": "41",
+      "name": "GARZÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41306",
+      "departmentId": "41",
+      "name": "GIGANTE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41319",
+      "departmentId": "41",
+      "name": "GUADALUPE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41349",
+      "departmentId": "41",
+      "name": "HOBO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41357",
+      "departmentId": "41",
+      "name": "ÍQUIRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41359",
+      "departmentId": "41",
+      "name": "ISNOS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41378",
+      "departmentId": "41",
+      "name": "LA ARGENTINA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41396",
+      "departmentId": "41",
+      "name": "LA PLATA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41483",
+      "departmentId": "41",
+      "name": "NÁTAGA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41503",
+      "departmentId": "41",
+      "name": "OPORAPA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41518",
+      "departmentId": "41",
+      "name": "PAICOL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41524",
+      "departmentId": "41",
+      "name": "PALERMO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41530",
+      "departmentId": "41",
+      "name": "PALESTINA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41548",
+      "departmentId": "41",
+      "name": "PITAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41551",
+      "departmentId": "41",
+      "name": "PITALITO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41615",
+      "departmentId": "41",
+      "name": "RIVERA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41660",
+      "departmentId": "41",
+      "name": "SALADOBLANCO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41668",
+      "departmentId": "41",
+      "name": "SAN AGUSTÍN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41676",
+      "departmentId": "41",
+      "name": "SANTA MARÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41770",
+      "departmentId": "41",
+      "name": "SUAZA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41791",
+      "departmentId": "41",
+      "name": "TARQUI",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41797",
+      "departmentId": "41",
+      "name": "TESALIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41799",
+      "departmentId": "41",
+      "name": "TELLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41801",
+      "departmentId": "41",
+      "name": "TERUEL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41807",
+      "departmentId": "41",
+      "name": "TIMANÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41872",
+      "departmentId": "41",
+      "name": "VILLAVIEJA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "41885",
+      "departmentId": "41",
+      "name": "YAGUARÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "44001",
+      "departmentId": "44",
+      "name": "RIOHACHA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "44035",
+      "departmentId": "44",
+      "name": "ALBANIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "44078",
+      "departmentId": "44",
+      "name": "BARRANCAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "44090",
+      "departmentId": "44",
+      "name": "DIBULLA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "44098",
+      "departmentId": "44",
+      "name": "DISTRACCIÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "44110",
+      "departmentId": "44",
+      "name": "EL MOLINO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "44279",
+      "departmentId": "44",
+      "name": "FONSECA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "44378",
+      "departmentId": "44",
+      "name": "HATONUEVO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "44420",
+      "departmentId": "44",
+      "name": "LA JAGUA DEL PILAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "44430",
+      "departmentId": "44",
+      "name": "MAICAO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "44560",
+      "departmentId": "44",
+      "name": "MANAURE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "44650",
+      "departmentId": "44",
+      "name": "SAN JUAN DEL CESAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "44847",
+      "departmentId": "44",
+      "name": "URIBIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "44855",
+      "departmentId": "44",
+      "name": "URUMITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "44874",
+      "departmentId": "44",
+      "name": "VILLANUEVA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47001",
+      "departmentId": "47",
+      "name": "SANTA MARTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47030",
+      "departmentId": "47",
+      "name": "ALGARROBO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47053",
+      "departmentId": "47",
+      "name": "ARACATACA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47058",
+      "departmentId": "47",
+      "name": "ARIGUANÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47161",
+      "departmentId": "47",
+      "name": "CERRO DE SAN ANTONIO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47170",
+      "departmentId": "47",
+      "name": "CHIVOLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47189",
+      "departmentId": "47",
+      "name": "CIÉNAGA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47205",
+      "departmentId": "47",
+      "name": "CONCORDIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47245",
+      "departmentId": "47",
+      "name": "EL BANCO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47258",
+      "departmentId": "47",
+      "name": "EL PIÑÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47268",
+      "departmentId": "47",
+      "name": "EL RETÉN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47288",
+      "departmentId": "47",
+      "name": "FUNDACIÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47318",
+      "departmentId": "47",
+      "name": "GUAMAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47460",
+      "departmentId": "47",
+      "name": "NUEVA GRANADA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47541",
+      "departmentId": "47",
+      "name": "PEDRAZA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47545",
+      "departmentId": "47",
+      "name": "PIJIÑO DEL CARMEN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47551",
+      "departmentId": "47",
+      "name": "PIVIJAY",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47555",
+      "departmentId": "47",
+      "name": "PLATO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47570",
+      "departmentId": "47",
+      "name": "PUEBLOVIEJO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47605",
+      "departmentId": "47",
+      "name": "REMOLINO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47660",
+      "departmentId": "47",
+      "name": "SABANAS DE SAN ÁNGEL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47675",
+      "departmentId": "47",
+      "name": "SALAMINA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47692",
+      "departmentId": "47",
+      "name": "SAN SEBASTIÁN DE BUENAVISTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47703",
+      "departmentId": "47",
+      "name": "SAN ZENÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47707",
+      "departmentId": "47",
+      "name": "SANTA ANA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47720",
+      "departmentId": "47",
+      "name": "SANTA BÁRBARA DE PINTO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47745",
+      "departmentId": "47",
+      "name": "SITIONUEVO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47798",
+      "departmentId": "47",
+      "name": "TENERIFE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47960",
+      "departmentId": "47",
+      "name": "ZAPAYÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "47980",
+      "departmentId": "47",
+      "name": "ZONA BANANERA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50001",
+      "departmentId": "50",
+      "name": "VILLAVICENCIO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50006",
+      "departmentId": "50",
+      "name": "ACACÍAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50110",
+      "departmentId": "50",
+      "name": "BARRANCA DE UPÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50124",
+      "departmentId": "50",
+      "name": "CABUYARO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50150",
+      "departmentId": "50",
+      "name": "CASTILLA LA NUEVA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50223",
+      "departmentId": "50",
+      "name": "CUBARRAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50226",
+      "departmentId": "50",
+      "name": "CUMARAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50245",
+      "departmentId": "50",
+      "name": "EL CALVARIO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50251",
+      "departmentId": "50",
+      "name": "EL CASTILLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50270",
+      "departmentId": "50",
+      "name": "EL DORADO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50287",
+      "departmentId": "50",
+      "name": "FUENTE DE ORO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50313",
+      "departmentId": "50",
+      "name": "GRANADA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50318",
+      "departmentId": "50",
+      "name": "GUAMAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50325",
+      "departmentId": "50",
+      "name": "MAPIRIPÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50330",
+      "departmentId": "50",
+      "name": "MESETAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50350",
+      "departmentId": "50",
+      "name": "LA MACARENA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50370",
+      "departmentId": "50",
+      "name": "URIBE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50400",
+      "departmentId": "50",
+      "name": "LEJANÍAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50450",
+      "departmentId": "50",
+      "name": "PUERTO CONCORDIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50568",
+      "departmentId": "50",
+      "name": "PUERTO GAITÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50573",
+      "departmentId": "50",
+      "name": "PUERTO LÓPEZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50577",
+      "departmentId": "50",
+      "name": "PUERTO LLERAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50590",
+      "departmentId": "50",
+      "name": "PUERTO RICO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50606",
+      "departmentId": "50",
+      "name": "RESTREPO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50680",
+      "departmentId": "50",
+      "name": "SAN CARLOS DE GUAROA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50683",
+      "departmentId": "50",
+      "name": "SAN JUAN DE ARAMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50686",
+      "departmentId": "50",
+      "name": "SAN JUANITO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50689",
+      "departmentId": "50",
+      "name": "SAN MARTÍN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "50711",
+      "departmentId": "50",
+      "name": "VISTAHERMOSA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52001",
+      "departmentId": "52",
+      "name": "PASTO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52019",
+      "departmentId": "52",
+      "name": "ALBÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52022",
+      "departmentId": "52",
+      "name": "ALDANA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52036",
+      "departmentId": "52",
+      "name": "ANCUYA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52051",
+      "departmentId": "52",
+      "name": "ARBOLEDA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52079",
+      "departmentId": "52",
+      "name": "BARBACOAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52083",
+      "departmentId": "52",
+      "name": "BELÉN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52110",
+      "departmentId": "52",
+      "name": "BUESACO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52203",
+      "departmentId": "52",
+      "name": "COLÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52207",
+      "departmentId": "52",
+      "name": "CONSACÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52210",
+      "departmentId": "52",
+      "name": "CONTADERO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52215",
+      "departmentId": "52",
+      "name": "CÓRDOBA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52224",
+      "departmentId": "52",
+      "name": "CUASPUD CARLOSAMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52227",
+      "departmentId": "52",
+      "name": "CUMBAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52233",
+      "departmentId": "52",
+      "name": "CUMBITARA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52240",
+      "departmentId": "52",
+      "name": "CHACHAGÜÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52250",
+      "departmentId": "52",
+      "name": "EL CHARCO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52254",
+      "departmentId": "52",
+      "name": "EL PEÑOL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52256",
+      "departmentId": "52",
+      "name": "EL ROSARIO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52258",
+      "departmentId": "52",
+      "name": "EL TABLÓN DE GÓMEZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52260",
+      "departmentId": "52",
+      "name": "EL TAMBO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52287",
+      "departmentId": "52",
+      "name": "FUNES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52317",
+      "departmentId": "52",
+      "name": "GUACHUCAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52320",
+      "departmentId": "52",
+      "name": "GUAITARILLA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52323",
+      "departmentId": "52",
+      "name": "GUALMATÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52352",
+      "departmentId": "52",
+      "name": "ILES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52354",
+      "departmentId": "52",
+      "name": "IMUÉS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52356",
+      "departmentId": "52",
+      "name": "IPIALES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52378",
+      "departmentId": "52",
+      "name": "LA CRUZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52381",
+      "departmentId": "52",
+      "name": "LA FLORIDA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52385",
+      "departmentId": "52",
+      "name": "LA LLANADA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52390",
+      "departmentId": "52",
+      "name": "LA TOLA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52399",
+      "departmentId": "52",
+      "name": "LA UNIÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52405",
+      "departmentId": "52",
+      "name": "LEIVA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52411",
+      "departmentId": "52",
+      "name": "LINARES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52418",
+      "departmentId": "52",
+      "name": "LOS ANDES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52427",
+      "departmentId": "52",
+      "name": "MAGÜÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52435",
+      "departmentId": "52",
+      "name": "MALLAMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52473",
+      "departmentId": "52",
+      "name": "MOSQUERA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52480",
+      "departmentId": "52",
+      "name": "NARIÑO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52490",
+      "departmentId": "52",
+      "name": "OLAYA HERRERA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52506",
+      "departmentId": "52",
+      "name": "OSPINA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52520",
+      "departmentId": "52",
+      "name": "FRANCISCO PIZARRO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52540",
+      "departmentId": "52",
+      "name": "POLICARPA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52560",
+      "departmentId": "52",
+      "name": "POTOSÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52565",
+      "departmentId": "52",
+      "name": "PROVIDENCIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52573",
+      "departmentId": "52",
+      "name": "PUERRES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52585",
+      "departmentId": "52",
+      "name": "PUPIALES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52612",
+      "departmentId": "52",
+      "name": "RICAURTE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52621",
+      "departmentId": "52",
+      "name": "ROBERTO PAYÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52678",
+      "departmentId": "52",
+      "name": "SAMANIEGO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52683",
+      "departmentId": "52",
+      "name": "SANDONÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52685",
+      "departmentId": "52",
+      "name": "SAN BERNARDO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52687",
+      "departmentId": "52",
+      "name": "SAN LORENZO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52693",
+      "departmentId": "52",
+      "name": "SAN PABLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52694",
+      "departmentId": "52",
+      "name": "SAN PEDRO DE CARTAGO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52696",
+      "departmentId": "52",
+      "name": "SANTA BÁRBARA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52699",
+      "departmentId": "52",
+      "name": "SANTACRUZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52720",
+      "departmentId": "52",
+      "name": "SAPUYES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52786",
+      "departmentId": "52",
+      "name": "TAMINANGO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52788",
+      "departmentId": "52",
+      "name": "TANGUA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52835",
+      "departmentId": "52",
+      "name": "SAN ANDRÉS DE TUMACO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52838",
+      "departmentId": "52",
+      "name": "TÚQUERRES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "52885",
+      "departmentId": "52",
+      "name": "YACUANQUER",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54001",
+      "departmentId": "54",
+      "name": "SAN JOSÉ DE CÚCUTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54003",
+      "departmentId": "54",
+      "name": "ÁBREGO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54051",
+      "departmentId": "54",
+      "name": "ARBOLEDAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54099",
+      "departmentId": "54",
+      "name": "BOCHALEMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54109",
+      "departmentId": "54",
+      "name": "BUCARASICA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54125",
+      "departmentId": "54",
+      "name": "CÁCOTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54128",
+      "departmentId": "54",
+      "name": "CÁCHIRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54172",
+      "departmentId": "54",
+      "name": "CHINÁCOTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54174",
+      "departmentId": "54",
+      "name": "CHITAGÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54206",
+      "departmentId": "54",
+      "name": "CONVENCIÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54223",
+      "departmentId": "54",
+      "name": "CUCUTILLA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54239",
+      "departmentId": "54",
+      "name": "DURANIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54245",
+      "departmentId": "54",
+      "name": "EL CARMEN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54250",
+      "departmentId": "54",
+      "name": "EL TARRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54261",
+      "departmentId": "54",
+      "name": "EL ZULIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54313",
+      "departmentId": "54",
+      "name": "GRAMALOTE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54344",
+      "departmentId": "54",
+      "name": "HACARÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54347",
+      "departmentId": "54",
+      "name": "HERRÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54377",
+      "departmentId": "54",
+      "name": "LABATECA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54385",
+      "departmentId": "54",
+      "name": "LA ESPERANZA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54398",
+      "departmentId": "54",
+      "name": "LA PLAYA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54405",
+      "departmentId": "54",
+      "name": "LOS PATIOS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54418",
+      "departmentId": "54",
+      "name": "LOURDES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54480",
+      "departmentId": "54",
+      "name": "MUTISCUA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54498",
+      "departmentId": "54",
+      "name": "OCAÑA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54518",
+      "departmentId": "54",
+      "name": "PAMPLONA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54520",
+      "departmentId": "54",
+      "name": "PAMPLONITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54553",
+      "departmentId": "54",
+      "name": "PUERTO SANTANDER",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54599",
+      "departmentId": "54",
+      "name": "RAGONVALIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54660",
+      "departmentId": "54",
+      "name": "SALAZAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54670",
+      "departmentId": "54",
+      "name": "SAN CALIXTO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54673",
+      "departmentId": "54",
+      "name": "SAN CAYETANO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54680",
+      "departmentId": "54",
+      "name": "SANTIAGO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54720",
+      "departmentId": "54",
+      "name": "SARDINATA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54743",
+      "departmentId": "54",
+      "name": "SILOS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54800",
+      "departmentId": "54",
+      "name": "TEORAMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54810",
+      "departmentId": "54",
+      "name": "TIBÚ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54820",
+      "departmentId": "54",
+      "name": "TOLEDO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54871",
+      "departmentId": "54",
+      "name": "VILLA CARO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "54874",
+      "departmentId": "54",
+      "name": "VILLA DEL ROSARIO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "63001",
+      "departmentId": "63",
+      "name": "ARMENIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "63111",
+      "departmentId": "63",
+      "name": "BUENAVISTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "63130",
+      "departmentId": "63",
+      "name": "CALARCÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "63190",
+      "departmentId": "63",
+      "name": "CIRCASIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "63212",
+      "departmentId": "63",
+      "name": "CÓRDOBA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "63272",
+      "departmentId": "63",
+      "name": "FILANDIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "63302",
+      "departmentId": "63",
+      "name": "GÉNOVA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "63401",
+      "departmentId": "63",
+      "name": "LA TEBAIDA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "63470",
+      "departmentId": "63",
+      "name": "MONTENEGRO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "63548",
+      "departmentId": "63",
+      "name": "PIJAO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "63594",
+      "departmentId": "63",
+      "name": "QUIMBAYA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "63690",
+      "departmentId": "63",
+      "name": "SALENTO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "66001",
+      "departmentId": "66",
+      "name": "PEREIRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "66045",
+      "departmentId": "66",
+      "name": "APÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "66075",
+      "departmentId": "66",
+      "name": "BALBOA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "66088",
+      "departmentId": "66",
+      "name": "BELÉN DE UMBRÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "66170",
+      "departmentId": "66",
+      "name": "DOSQUEBRADAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "66318",
+      "departmentId": "66",
+      "name": "GUÁTICA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "66383",
+      "departmentId": "66",
+      "name": "LA CELIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "66400",
+      "departmentId": "66",
+      "name": "LA VIRGINIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "66440",
+      "departmentId": "66",
+      "name": "MARSELLA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "66456",
+      "departmentId": "66",
+      "name": "MISTRATÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "66572",
+      "departmentId": "66",
+      "name": "PUEBLO RICO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "66594",
+      "departmentId": "66",
+      "name": "QUINCHÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "66682",
+      "departmentId": "66",
+      "name": "SANTA ROSA DE CABAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "66687",
+      "departmentId": "66",
+      "name": "SANTUARIO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68001",
+      "departmentId": "68",
+      "name": "BUCARAMANGA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68013",
+      "departmentId": "68",
+      "name": "AGUADA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68020",
+      "departmentId": "68",
+      "name": "ALBANIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68051",
+      "departmentId": "68",
+      "name": "ARATOCA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68077",
+      "departmentId": "68",
+      "name": "BARBOSA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68079",
+      "departmentId": "68",
+      "name": "BARICHARA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68081",
+      "departmentId": "68",
+      "name": "BARRANCABERMEJA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68092",
+      "departmentId": "68",
+      "name": "BETULIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68101",
+      "departmentId": "68",
+      "name": "BOLÍVAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68121",
+      "departmentId": "68",
+      "name": "CABRERA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68132",
+      "departmentId": "68",
+      "name": "CALIFORNIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68147",
+      "departmentId": "68",
+      "name": "CAPITANEJO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68152",
+      "departmentId": "68",
+      "name": "CARCASÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68160",
+      "departmentId": "68",
+      "name": "CEPITÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68162",
+      "departmentId": "68",
+      "name": "CERRITO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68167",
+      "departmentId": "68",
+      "name": "CHARALÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68169",
+      "departmentId": "68",
+      "name": "CHARTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68176",
+      "departmentId": "68",
+      "name": "CHIMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68179",
+      "departmentId": "68",
+      "name": "CHIPATÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68190",
+      "departmentId": "68",
+      "name": "CIMITARRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68207",
+      "departmentId": "68",
+      "name": "CONCEPCIÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68209",
+      "departmentId": "68",
+      "name": "CONFINES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68211",
+      "departmentId": "68",
+      "name": "CONTRATACIÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68217",
+      "departmentId": "68",
+      "name": "COROMORO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68229",
+      "departmentId": "68",
+      "name": "CURITÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68235",
+      "departmentId": "68",
+      "name": "EL CARMEN DE CHUCURÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68245",
+      "departmentId": "68",
+      "name": "EL GUACAMAYO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68250",
+      "departmentId": "68",
+      "name": "EL PEÑÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68255",
+      "departmentId": "68",
+      "name": "EL PLAYÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68264",
+      "departmentId": "68",
+      "name": "ENCINO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68266",
+      "departmentId": "68",
+      "name": "ENCISO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68271",
+      "departmentId": "68",
+      "name": "FLORIÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68276",
+      "departmentId": "68",
+      "name": "FLORIDABLANCA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68296",
+      "departmentId": "68",
+      "name": "GALÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68298",
+      "departmentId": "68",
+      "name": "GÁMBITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68307",
+      "departmentId": "68",
+      "name": "GIRÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68318",
+      "departmentId": "68",
+      "name": "GUACA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68320",
+      "departmentId": "68",
+      "name": "GUADALUPE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68322",
+      "departmentId": "68",
+      "name": "GUAPOTÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68324",
+      "departmentId": "68",
+      "name": "GUAVATÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68327",
+      "departmentId": "68",
+      "name": "GÜEPSA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68344",
+      "departmentId": "68",
+      "name": "HATO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68368",
+      "departmentId": "68",
+      "name": "JESÚS MARÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68370",
+      "departmentId": "68",
+      "name": "JORDÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68377",
+      "departmentId": "68",
+      "name": "LA BELLEZA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68385",
+      "departmentId": "68",
+      "name": "LANDÁZURI",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68397",
+      "departmentId": "68",
+      "name": "LA PAZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68406",
+      "departmentId": "68",
+      "name": "LEBRIJA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68418",
+      "departmentId": "68",
+      "name": "LOS SANTOS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68425",
+      "departmentId": "68",
+      "name": "MACARAVITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68432",
+      "departmentId": "68",
+      "name": "MÁLAGA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68444",
+      "departmentId": "68",
+      "name": "MATANZA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68464",
+      "departmentId": "68",
+      "name": "MOGOTES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68468",
+      "departmentId": "68",
+      "name": "MOLAGAVITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68498",
+      "departmentId": "68",
+      "name": "OCAMONTE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68500",
+      "departmentId": "68",
+      "name": "OIBA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68502",
+      "departmentId": "68",
+      "name": "ONZAGA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68522",
+      "departmentId": "68",
+      "name": "PALMAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68524",
+      "departmentId": "68",
+      "name": "PALMAS DEL SOCORRO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68533",
+      "departmentId": "68",
+      "name": "PÁRAMO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68547",
+      "departmentId": "68",
+      "name": "PIEDECUESTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68549",
+      "departmentId": "68",
+      "name": "PINCHOTE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68572",
+      "departmentId": "68",
+      "name": "PUENTE NACIONAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68573",
+      "departmentId": "68",
+      "name": "PUERTO PARRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68575",
+      "departmentId": "68",
+      "name": "PUERTO WILCHES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68615",
+      "departmentId": "68",
+      "name": "RIONEGRO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68655",
+      "departmentId": "68",
+      "name": "SABANA DE TORRES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68669",
+      "departmentId": "68",
+      "name": "SAN ANDRÉS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68673",
+      "departmentId": "68",
+      "name": "SAN BENITO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68679",
+      "departmentId": "68",
+      "name": "SAN GIL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68682",
+      "departmentId": "68",
+      "name": "SAN JOAQUÍN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68684",
+      "departmentId": "68",
+      "name": "SAN JOSÉ DE MIRANDA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68686",
+      "departmentId": "68",
+      "name": "SAN MIGUEL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68689",
+      "departmentId": "68",
+      "name": "SAN VICENTE DE CHUCURÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68705",
+      "departmentId": "68",
+      "name": "SANTA BÁRBARA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68720",
+      "departmentId": "68",
+      "name": "SANTA HELENA DEL OPÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68745",
+      "departmentId": "68",
+      "name": "SIMACOTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68755",
+      "departmentId": "68",
+      "name": "SOCORRO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68770",
+      "departmentId": "68",
+      "name": "SUAITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68773",
+      "departmentId": "68",
+      "name": "SUCRE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68780",
+      "departmentId": "68",
+      "name": "SURATÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68820",
+      "departmentId": "68",
+      "name": "TONA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68855",
+      "departmentId": "68",
+      "name": "VALLE DE SAN JOSÉ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68861",
+      "departmentId": "68",
+      "name": "VÉLEZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68867",
+      "departmentId": "68",
+      "name": "VETAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68872",
+      "departmentId": "68",
+      "name": "VILLANUEVA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "68895",
+      "departmentId": "68",
+      "name": "ZAPATOCA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70001",
+      "departmentId": "70",
+      "name": "SINCELEJO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70110",
+      "departmentId": "70",
+      "name": "BUENAVISTA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70124",
+      "departmentId": "70",
+      "name": "CAIMITO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70204",
+      "departmentId": "70",
+      "name": "COLOSÓ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70215",
+      "departmentId": "70",
+      "name": "COROZAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70221",
+      "departmentId": "70",
+      "name": "COVEÑAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70230",
+      "departmentId": "70",
+      "name": "CHALÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70233",
+      "departmentId": "70",
+      "name": "EL ROBLE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70235",
+      "departmentId": "70",
+      "name": "GALERAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70265",
+      "departmentId": "70",
+      "name": "GUARANDA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70400",
+      "departmentId": "70",
+      "name": "LA UNIÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70418",
+      "departmentId": "70",
+      "name": "LOS PALMITOS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70429",
+      "departmentId": "70",
+      "name": "MAJAGUAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70473",
+      "departmentId": "70",
+      "name": "MORROA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70508",
+      "departmentId": "70",
+      "name": "OVEJAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70523",
+      "departmentId": "70",
+      "name": "PALMITO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70670",
+      "departmentId": "70",
+      "name": "SAMPUÉS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70678",
+      "departmentId": "70",
+      "name": "SAN BENITO ABAD",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70702",
+      "departmentId": "70",
+      "name": "SAN JUAN DE BETULIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70708",
+      "departmentId": "70",
+      "name": "SAN MARCOS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70713",
+      "departmentId": "70",
+      "name": "SAN ONOFRE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70717",
+      "departmentId": "70",
+      "name": "SAN PEDRO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70742",
+      "departmentId": "70",
+      "name": "SAN LUIS DE SINCÉ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70771",
+      "departmentId": "70",
+      "name": "SUCRE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70820",
+      "departmentId": "70",
+      "name": "SANTIAGO DE TOLÚ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "70823",
+      "departmentId": "70",
+      "name": "SAN JOSÉ DE TOLUVIEJO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73001",
+      "departmentId": "73",
+      "name": "IBAGUÉ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73024",
+      "departmentId": "73",
+      "name": "ALPUJARRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73026",
+      "departmentId": "73",
+      "name": "ALVARADO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73030",
+      "departmentId": "73",
+      "name": "AMBALEMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73043",
+      "departmentId": "73",
+      "name": "ANZOÁTEGUI",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73055",
+      "departmentId": "73",
+      "name": "ARMERO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73067",
+      "departmentId": "73",
+      "name": "ATACO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73124",
+      "departmentId": "73",
+      "name": "CAJAMARCA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73148",
+      "departmentId": "73",
+      "name": "CARMEN DE APICALÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73152",
+      "departmentId": "73",
+      "name": "CASABIANCA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73168",
+      "departmentId": "73",
+      "name": "CHAPARRAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73200",
+      "departmentId": "73",
+      "name": "COELLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73217",
+      "departmentId": "73",
+      "name": "COYAIMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73226",
+      "departmentId": "73",
+      "name": "CUNDAY",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73236",
+      "departmentId": "73",
+      "name": "DOLORES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73268",
+      "departmentId": "73",
+      "name": "ESPINAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73270",
+      "departmentId": "73",
+      "name": "FALAN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73275",
+      "departmentId": "73",
+      "name": "FLANDES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73283",
+      "departmentId": "73",
+      "name": "FRESNO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73319",
+      "departmentId": "73",
+      "name": "GUAMO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73347",
+      "departmentId": "73",
+      "name": "HERVEO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73349",
+      "departmentId": "73",
+      "name": "HONDA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73352",
+      "departmentId": "73",
+      "name": "ICONONZO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73408",
+      "departmentId": "73",
+      "name": "LÉRIDA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73411",
+      "departmentId": "73",
+      "name": "LÍBANO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73443",
+      "departmentId": "73",
+      "name": "SAN SEBASTIÁN DE MARIQUITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73449",
+      "departmentId": "73",
+      "name": "MELGAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73461",
+      "departmentId": "73",
+      "name": "MURILLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73483",
+      "departmentId": "73",
+      "name": "NATAGAIMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73504",
+      "departmentId": "73",
+      "name": "ORTEGA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73520",
+      "departmentId": "73",
+      "name": "PALOCABILDO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73547",
+      "departmentId": "73",
+      "name": "PIEDRAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73555",
+      "departmentId": "73",
+      "name": "PLANADAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73563",
+      "departmentId": "73",
+      "name": "PRADO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73585",
+      "departmentId": "73",
+      "name": "PURIFICACIÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73616",
+      "departmentId": "73",
+      "name": "RIOBLANCO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73622",
+      "departmentId": "73",
+      "name": "RONCESVALLES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73624",
+      "departmentId": "73",
+      "name": "ROVIRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73671",
+      "departmentId": "73",
+      "name": "SALDAÑA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73675",
+      "departmentId": "73",
+      "name": "SAN ANTONIO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73678",
+      "departmentId": "73",
+      "name": "SAN LUIS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73686",
+      "departmentId": "73",
+      "name": "SANTA ISABEL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73770",
+      "departmentId": "73",
+      "name": "SUÁREZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73854",
+      "departmentId": "73",
+      "name": "VALLE DE SAN JUAN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73861",
+      "departmentId": "73",
+      "name": "VENADILLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73870",
+      "departmentId": "73",
+      "name": "VILLAHERMOSA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "73873",
+      "departmentId": "73",
+      "name": "VILLARRICA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76001",
+      "departmentId": "76",
+      "name": "SANTIAGO DE CALI",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76020",
+      "departmentId": "76",
+      "name": "ALCALÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76036",
+      "departmentId": "76",
+      "name": "ANDALUCÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76041",
+      "departmentId": "76",
+      "name": "ANSERMANUEVO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76054",
+      "departmentId": "76",
+      "name": "ARGELIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76100",
+      "departmentId": "76",
+      "name": "BOLÍVAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76109",
+      "departmentId": "76",
+      "name": "BUENAVENTURA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76111",
+      "departmentId": "76",
+      "name": "GUADALAJARA DE BUGA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76113",
+      "departmentId": "76",
+      "name": "BUGALAGRANDE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76122",
+      "departmentId": "76",
+      "name": "CAICEDONIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76126",
+      "departmentId": "76",
+      "name": "CALIMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76130",
+      "departmentId": "76",
+      "name": "CANDELARIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76147",
+      "departmentId": "76",
+      "name": "CARTAGO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76233",
+      "departmentId": "76",
+      "name": "DAGUA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76243",
+      "departmentId": "76",
+      "name": "EL ÁGUILA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76246",
+      "departmentId": "76",
+      "name": "EL CAIRO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76248",
+      "departmentId": "76",
+      "name": "EL CERRITO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76250",
+      "departmentId": "76",
+      "name": "EL DOVIO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76275",
+      "departmentId": "76",
+      "name": "FLORIDA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76306",
+      "departmentId": "76",
+      "name": "GINEBRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76318",
+      "departmentId": "76",
+      "name": "GUACARÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76364",
+      "departmentId": "76",
+      "name": "JAMUNDÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76377",
+      "departmentId": "76",
+      "name": "LA CUMBRE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76400",
+      "departmentId": "76",
+      "name": "LA UNIÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76403",
+      "departmentId": "76",
+      "name": "LA VICTORIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76497",
+      "departmentId": "76",
+      "name": "OBANDO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76520",
+      "departmentId": "76",
+      "name": "PALMIRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76563",
+      "departmentId": "76",
+      "name": "PRADERA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76606",
+      "departmentId": "76",
+      "name": "RESTREPO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76616",
+      "departmentId": "76",
+      "name": "RIOFRÍO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76622",
+      "departmentId": "76",
+      "name": "ROLDANILLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76670",
+      "departmentId": "76",
+      "name": "SAN PEDRO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76736",
+      "departmentId": "76",
+      "name": "SEVILLA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76823",
+      "departmentId": "76",
+      "name": "TORO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76828",
+      "departmentId": "76",
+      "name": "TRUJILLO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76834",
+      "departmentId": "76",
+      "name": "TULUÁ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76845",
+      "departmentId": "76",
+      "name": "ULLOA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76863",
+      "departmentId": "76",
+      "name": "VERSALLES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76869",
+      "departmentId": "76",
+      "name": "VIJES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76890",
+      "departmentId": "76",
+      "name": "YOTOCO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76892",
+      "departmentId": "76",
+      "name": "YUMBO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "76895",
+      "departmentId": "76",
+      "name": "ZARZAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "81001",
+      "departmentId": "81",
+      "name": "ARAUCA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "81065",
+      "departmentId": "81",
+      "name": "ARAUQUITA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "81220",
+      "departmentId": "81",
+      "name": "CRAVO NORTE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "81300",
+      "departmentId": "81",
+      "name": "FORTUL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "81591",
+      "departmentId": "81",
+      "name": "PUERTO RONDÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "81736",
+      "departmentId": "81",
+      "name": "SARAVENA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "81794",
+      "departmentId": "81",
+      "name": "TAME",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85001",
+      "departmentId": "85",
+      "name": "YOPAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85010",
+      "departmentId": "85",
+      "name": "AGUAZUL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85015",
+      "departmentId": "85",
+      "name": "CHÁMEZA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85125",
+      "departmentId": "85",
+      "name": "HATO COROZAL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85136",
+      "departmentId": "85",
+      "name": "LA SALINA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85139",
+      "departmentId": "85",
+      "name": "MANÍ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85162",
+      "departmentId": "85",
+      "name": "MONTERREY",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85225",
+      "departmentId": "85",
+      "name": "NUNCHÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85230",
+      "departmentId": "85",
+      "name": "OROCUÉ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85250",
+      "departmentId": "85",
+      "name": "PAZ DE ARIPORO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85263",
+      "departmentId": "85",
+      "name": "PORE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85279",
+      "departmentId": "85",
+      "name": "RECETOR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85300",
+      "departmentId": "85",
+      "name": "SABANALARGA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85315",
+      "departmentId": "85",
+      "name": "SÁCAMA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85325",
+      "departmentId": "85",
+      "name": "SAN LUIS DE PALENQUE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85400",
+      "departmentId": "85",
+      "name": "TÁMARA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85410",
+      "departmentId": "85",
+      "name": "TAURAMENA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85430",
+      "departmentId": "85",
+      "name": "TRINIDAD",
+      "kind": "Municipio"
+    },
+    {
+      "id": "85440",
+      "departmentId": "85",
+      "name": "VILLANUEVA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "86001",
+      "departmentId": "86",
+      "name": "MOCOA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "86219",
+      "departmentId": "86",
+      "name": "COLÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "86320",
+      "departmentId": "86",
+      "name": "ORITO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "86568",
+      "departmentId": "86",
+      "name": "PUERTO ASÍS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "86569",
+      "departmentId": "86",
+      "name": "PUERTO CAICEDO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "86571",
+      "departmentId": "86",
+      "name": "PUERTO GUZMÁN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "86573",
+      "departmentId": "86",
+      "name": "PUERTO LEGUÍZAMO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "86749",
+      "departmentId": "86",
+      "name": "SIBUNDOY",
+      "kind": "Municipio"
+    },
+    {
+      "id": "86755",
+      "departmentId": "86",
+      "name": "SAN FRANCISCO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "86757",
+      "departmentId": "86",
+      "name": "SAN MIGUEL",
+      "kind": "Municipio"
+    },
+    {
+      "id": "86760",
+      "departmentId": "86",
+      "name": "SANTIAGO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "86865",
+      "departmentId": "86",
+      "name": "VALLE DEL GUAMUEZ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "86885",
+      "departmentId": "86",
+      "name": "VILLAGARZÓN",
+      "kind": "Municipio"
+    },
+    {
+      "id": "88001",
+      "departmentId": "88",
+      "name": "SAN ANDRÉS",
+      "kind": "Isla"
+    },
+    {
+      "id": "88564",
+      "departmentId": "88",
+      "name": "PROVIDENCIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "91001",
+      "departmentId": "91",
+      "name": "LETICIA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "91263",
+      "departmentId": "91",
+      "name": "EL ENCANTO",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "91405",
+      "departmentId": "91",
+      "name": "LA CHORRERA",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "91407",
+      "departmentId": "91",
+      "name": "LA PEDRERA",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "91430",
+      "departmentId": "91",
+      "name": "LA VICTORIA",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "91460",
+      "departmentId": "91",
+      "name": "MIRITÍ - PARANÁ",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "91530",
+      "departmentId": "91",
+      "name": "PUERTO ALEGRÍA",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "91536",
+      "departmentId": "91",
+      "name": "PUERTO ARICA",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "91540",
+      "departmentId": "91",
+      "name": "PUERTO NARIÑO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "91669",
+      "departmentId": "91",
+      "name": "PUERTO SANTANDER",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "91798",
+      "departmentId": "91",
+      "name": "TARAPACÁ",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "94001",
+      "departmentId": "94",
+      "name": "INÍRIDA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "94343",
+      "departmentId": "94",
+      "name": "BARRANCOMINAS",
+      "kind": "Municipio"
+    },
+    {
+      "id": "94883",
+      "departmentId": "94",
+      "name": "SAN FELIPE",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "94884",
+      "departmentId": "94",
+      "name": "PUERTO COLOMBIA",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "94885",
+      "departmentId": "94",
+      "name": "LA GUADALUPE",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "94886",
+      "departmentId": "94",
+      "name": "CACAHUAL",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "94887",
+      "departmentId": "94",
+      "name": "PANA PANA",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "94888",
+      "departmentId": "94",
+      "name": "MORICHAL",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "95001",
+      "departmentId": "95",
+      "name": "SAN JOSÉ DEL GUAVIARE",
+      "kind": "Municipio"
+    },
+    {
+      "id": "95015",
+      "departmentId": "95",
+      "name": "CALAMAR",
+      "kind": "Municipio"
+    },
+    {
+      "id": "95025",
+      "departmentId": "95",
+      "name": "EL RETORNO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "95200",
+      "departmentId": "95",
+      "name": "MIRAFLORES",
+      "kind": "Municipio"
+    },
+    {
+      "id": "97001",
+      "departmentId": "97",
+      "name": "MITÚ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "97161",
+      "departmentId": "97",
+      "name": "CARURÚ",
+      "kind": "Municipio"
+    },
+    {
+      "id": "97511",
+      "departmentId": "97",
+      "name": "PACOA",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "97666",
+      "departmentId": "97",
+      "name": "TARAIRA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "97777",
+      "departmentId": "97",
+      "name": "PAPUNAHUA",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "97889",
+      "departmentId": "97",
+      "name": "YAVARATÉ",
+      "kind": "Área no municipalizada"
+    },
+    {
+      "id": "99001",
+      "departmentId": "99",
+      "name": "PUERTO CARREÑO",
+      "kind": "Municipio"
+    },
+    {
+      "id": "99524",
+      "departmentId": "99",
+      "name": "LA PRIMAVERA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "99624",
+      "departmentId": "99",
+      "name": "SANTA ROSALÍA",
+      "kind": "Municipio"
+    },
+    {
+      "id": "99773",
+      "departmentId": "99",
+      "name": "CUMARIBO",
+      "kind": "Municipio"
+    }
+  ]
+}

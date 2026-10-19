@@ -74,7 +74,7 @@ function task(id: string, dueTime: string | null, position = 0): Task {
     priority: "medium",
     typeId: null,
     impactId: null,
-    ticketNumber: null,
+    ticketIds: [],
     dueDate: "2026-10-15",
     startDate: null,
     startTime: null,
@@ -83,6 +83,7 @@ function task(id: string, dueTime: string | null, position = 0): Task {
     statusHistory: [],
     archived: false,
     labels: [],
+    clientIds: [],
     createdAt: "",
     updatedAt: "",
   };

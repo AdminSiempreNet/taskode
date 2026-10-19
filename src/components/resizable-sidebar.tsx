@@ -49,6 +49,8 @@ function rememberWidth(width: number) {
 
 export function ResizableSidebar({
   children,
+  footer,
+  collapsedActions,
   collapsed,
   edgeControl,
   mobileOpen,
@@ -56,6 +58,8 @@ export function ResizableSidebar({
   triggerRef,
 }: {
   children: ReactNode;
+  footer?: ReactNode;
+  collapsedActions?: ReactNode;
   collapsed: boolean;
   edgeControl: ReactNode;
   mobileOpen: boolean;
@@ -128,36 +132,42 @@ export function ResizableSidebar({
 
   if (isMobile) {
     return (
-      <Dialog.Root open={mobileOpen} onOpenChange={onMobileOpenChange}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="sidebar-drawer-overlay" />
-          <Dialog.Content
-            id="workspace-sidebar"
-            className="sidebar sidebar-drawer"
-            aria-describedby={undefined}
-            onCloseAutoFocus={(event) => {
-              event.preventDefault();
-              if (document.activeElement === document.body)
-                triggerRef.current?.focus();
-            }}
-          >
-            <div className="sidebar-drawer-heading">
-              <Dialog.Title>Navegación</Dialog.Title>
-              <Dialog.Close asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Cerrar barra lateral"
-                  title="Cerrar barra lateral"
-                >
-                  <X size={18} />
-                </Button>
-              </Dialog.Close>
-            </div>
-            {children}
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+      <>
+        <Dialog.Root open={mobileOpen} onOpenChange={onMobileOpenChange}>
+          <Dialog.Portal>
+            <Dialog.Overlay className="sidebar-drawer-overlay" />
+            <Dialog.Content
+              id="workspace-sidebar"
+              className="sidebar sidebar-drawer"
+              aria-describedby={undefined}
+              onCloseAutoFocus={(event) => {
+                event.preventDefault();
+                if (document.activeElement === document.body)
+                  triggerRef.current?.focus();
+              }}
+            >
+              <div className="sidebar-drawer-heading">
+                <Dialog.Title>Navegación</Dialog.Title>
+                <Dialog.Close asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Cerrar barra lateral"
+                    title="Cerrar barra lateral"
+                  >
+                    <X size={18} />
+                  </Button>
+                </Dialog.Close>
+              </div>
+              {children}
+              {footer}
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
+        {!mobileOpen && collapsedActions && (
+          <div className="sidebar-compact-actions">{collapsedActions}</div>
+        )}
+      </>
     );
   }
 
@@ -172,6 +182,7 @@ export function ResizableSidebar({
         style={{ "--sidebar-width": `${width}px` } as CSSProperties}
       >
         {children}
+        {!collapsed && footer}
         {!collapsed && (
           <div className="sidebar-edge">
             <div
@@ -202,7 +213,12 @@ export function ResizableSidebar({
         )}
       </aside>
       {collapsed && (
-        <div className="sidebar-edge sidebar-edge-collapsed">{edgeControl}</div>
+        <>
+          <div className="sidebar-edge sidebar-edge-collapsed">{edgeControl}</div>
+          {collapsedActions && (
+            <div className="sidebar-compact-actions">{collapsedActions}</div>
+          )}
+        </>
       )}
     </>
   );

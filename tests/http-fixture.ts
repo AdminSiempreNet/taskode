@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 import { serializeSignedCookie } from "better-call";
 import { actor, authConfig, createRepository } from "./helpers";
 import { session } from "../src/server/schema";
-export async function startHttpFixture(external = false) {
+export async function startHttpFixture(external = false, options: { ably?: { key: string; namespace: string } } = {}) {
   const directory = await mkdtemp(join(tmpdir(), "taskode-http-")),
     backupDirectory = join(directory, "backups");
   const repo = await createRepository(),
@@ -54,9 +54,16 @@ export async function startHttpFixture(external = false) {
         DATABASE_URL: repo.store.connectionString,
         DATABASE_SCHEMA: repo.store.schemaName,
         BACKUP_DIR: backupDirectory,
+        ATTACHMENT_STORAGE: "filesystem",
+        ATTACHMENT_DIR: join(directory, "attachments"),
         RESEND_API_KEY: "",
         RESEND_FROM_EMAIL: "",
         NODE_ENV: "production",
+        ABLY_API_KEY: options.ably?.key ?? "",
+        ABLY_CHANNEL_NAMESPACE: options.ably?.namespace ?? "taskode-test",
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: "",
+        VAPID_PRIVATE_KEY: "",
+        NOTIFICATION_WORKER_SECRET: "test-notification-worker-secret-32-characters",
       },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,

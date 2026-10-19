@@ -1,0 +1,47 @@
+.filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.filter {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.filter > button[data-slot="button"] {
+  height: auto;
+  min-height: 36px;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.compact .filter > button[data-slot="button"] {
+  min-height: 32px;
+  padding: 4px 9px;
+}
+
+.filter :global(.client-combobox-summary) {
+  white-space: normal;
+  text-align: left;
+}
+
+.filter[data-active] > button[data-slot="button"] {
+  border-color: var(--ring);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--ring) 7%, var(--card));
+}
+
+@container feature-tasks (max-width: 420px) {
+  .filter {
+    flex: 1 1 100%;
+  }
+
+  .compact .filter > button[data-slot="button"] {
+    min-height: 36px;
+    padding-block: 6px;
+  }
+}

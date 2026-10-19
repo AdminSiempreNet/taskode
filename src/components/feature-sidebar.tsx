@@ -1,6 +1,10 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import {
+  readSidebarExpansion,
+  saveSidebarExpansion,
+} from "@/lib/sidebar-expansion";
 import {
   DndContext,
   DragOverlay,
@@ -32,7 +36,6 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { Popover } from "radix-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -40,11 +43,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuPortal,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Feature, ProjectModule, ProjectTaskType } from "@/lib/types";
@@ -60,12 +59,14 @@ function normalize(value: string) {
 
 export function FeatureSidebar({
   projectId,
+  userId = "anonymous",
   features,
   modules,
   taskTypes,
   selectedId,
   counts,
   busy,
+  canReorder = true,
   select,
   createFeature,
   createModule,
@@ -75,12 +76,14 @@ export function FeatureSidebar({
   mutate,
 }: {
   projectId?: string;
+  userId?: string;
   features: Feature[];
   modules: ProjectModule[];
   taskTypes: ProjectTaskType[];
   selectedId: string;
   counts: Record<string, number>;
   busy: boolean;
+  canReorder?: boolean;
   select: (id: string) => void;
   createFeature: () => void;
   createModule: () => void;
@@ -90,22 +93,28 @@ export function FeatureSidebar({
   mutate: Mutate;
 }) {
   const [query, setQuery] = useState("");
-  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [dragged, setDragged] = useState<Feature | null>(null);
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [collapsedSearchModules, setCollapsedSearchModules] = useState<
+    Set<string>
+  >(() => new Set());
+  useEffect(() => {
+    let storage: Storage | undefined;
+    try {
+      storage = window.sessionStorage;
+    } catch {
+      /* Optional browser storage. */
+    }
+    setExpandedModules(readSidebarExpansion(userId, projectId ?? "", storage));
+  }, [userId, projectId]);
   const openingCreateDialog = useRef(false);
   function openCreateDialog(create: () => void) {
     openingCreateDialog.current = true;
     create();
   }
   const helpId = useId();
-  const normalizedQuery = normalize(query.trim());
-  const matches = (feature: Feature) =>
-    normalize(
-      `${formatFeatureNumber(feature.number)} ${feature.name} ${feature.description} ${modules.find((module) => module.id === feature.moduleId)?.name ?? "General"} ${modules.find((module) => module.id === feature.moduleId)?.description ?? ""}`,
-    ).includes(normalizedQuery);
-  const visible = features.filter(matches);
-  const pinned = visible.filter((feature) => feature.pinned);
   const groups = [
     {
       id: "general",
@@ -122,6 +131,23 @@ export function FeatureSidebar({
       code: String(index + 1).padStart(2, "0"),
     })),
   ];
+  const normalizedQuery = normalize(query.trim());
+  const matchingGroupIds = new Set(
+    groups
+      .filter((group) =>
+        normalize(`${group.name} ${group.description}`).includes(
+          normalizedQuery,
+        ),
+      )
+      .map((group) => group.id),
+  );
+  const matches = (feature: Feature) =>
+    matchingGroupIds.has(feature.moduleId ?? "general") ||
+    normalize(
+      `${formatFeatureNumber(feature.number)} ${feature.name} ${feature.description}`,
+    ).includes(normalizedQuery);
+  const visible = features.filter(matches);
+  const pinned = visible.filter((feature) => feature.pinned);
   const pinnedCount = features.filter((feature) => feature.pinned).length;
   const totalTasks = Object.values(counts).reduce(
     (sum, count) => sum + count,
@@ -129,7 +155,7 @@ export function FeatureSidebar({
   );
   function changeQuery(value: string) {
     setQuery(value);
-    if (value.trim()) setCollapsed(new Set());
+    setCollapsedSearchModules(new Set());
   }
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -188,6 +214,7 @@ export function FeatureSidebar({
       selected={feature.id === selectedId}
       count={counts[feature.id] ?? 0}
       busy={busy}
+      canReorder={canReorder}
       canPin={feature.pinned || pinnedCount < 5}
       select={select}
       edit={edit}
@@ -197,160 +224,83 @@ export function FeatureSidebar({
 
   return (
     <section className="feature-section" aria-label="Features del proyecto">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            className="sidebar-new-button"
-            size="sm"
-            variant="outline"
-            disabled={!projectId || busy}
-          >
-            <Plus size={15} />
-            <span>Nuevo</span>
-            <ChevronDown size={14} className="ml-auto" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          className="sidebar-new-menu"
-          align="start"
-          collisionPadding={12}
-          onCloseAutoFocus={(event) => {
-            if (openingCreateDialog.current) {
-              event.preventDefault();
-              openingCreateDialog.current = false;
-            }
-          }}
-        >
-          <DropdownMenuItem onSelect={() => openCreateDialog(createModule)}>
-            <Box />
-            Módulo
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => openCreateDialog(createFeature)}>
-            <Layers3 />
-            Feature
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          {taskTypes.length > 0 ? (
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger
-                disabled={!features.length}
-                title={!features.length ? "Crea una feature primero" : undefined}
-              >
-                <ListTodo />
-                Tarea
-              </DropdownMenuSubTrigger>
-              <DropdownMenuPortal>
-                <DropdownMenuSubContent
-                  className="sidebar-task-types-menu"
-                  collisionPadding={12}
-                >
-                  <DropdownMenuLabel>Tipo de tarea</DropdownMenuLabel>
-                  {taskTypes.map((type) => (
-                    <DropdownMenuItem
-                      key={type.id}
-                      onSelect={() =>
-                        openCreateDialog(() => createTask(type.id))
-                      }
-                    >
-                      <span
-                        className="sidebar-task-type-color"
-                        style={{ background: type.color }}
-                        aria-hidden="true"
-                      />
-                      {type.name}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuSubContent>
-              </DropdownMenuPortal>
-            </DropdownMenuSub>
-          ) : (
-            <DropdownMenuItem
-              disabled={!features.length}
-              title={!features.length ? "Crea una feature primero" : undefined}
-              onSelect={() => openCreateDialog(() => createTask())}
-            >
-              <ListTodo />
-              Tarea
-            </DropdownMenuItem>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <div className="feature-search-desktop">
+      <div className="feature-toolbar">
         <FeatureSearch
           value={query}
           change={changeQuery}
           disabled={!projectId || busy}
         />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              className="sidebar-new-button"
+              size="icon-sm"
+              variant="outline"
+              aria-label="Nuevo"
+              title="Nuevo módulo, feature o tarea"
+              disabled={!projectId || busy}
+            >
+              <Plus size={15} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="sidebar-new-menu"
+            align="end"
+            collisionPadding={12}
+            onCloseAutoFocus={(event) => {
+              if (openingCreateDialog.current) {
+                event.preventDefault();
+                openingCreateDialog.current = false;
+              }
+            }}
+          >
+            <DropdownMenuItem onSelect={() => openCreateDialog(createModule)}>
+              <Box />
+              Módulo
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => openCreateDialog(createFeature)}>
+              <Layers3 />
+              Feature
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Tarea</DropdownMenuLabel>
+            {taskTypes.length > 0 ? (
+              taskTypes.map((type) => (
+                <DropdownMenuItem
+                  key={type.id}
+                  disabled={!features.length}
+                  title={
+                    !features.length ? "Crea una feature primero" : undefined
+                  }
+                  onSelect={() => openCreateDialog(() => createTask(type.id))}
+                >
+                  <span
+                    className="sidebar-task-type-color"
+                    style={{ background: type.color }}
+                    aria-hidden="true"
+                  />
+                  {type.name}
+                </DropdownMenuItem>
+              ))
+            ) : (
+              <DropdownMenuItem
+                disabled={!features.length}
+                title={
+                  !features.length ? "Crea una feature primero" : undefined
+                }
+                onSelect={() => openCreateDialog(() => createTask())}
+              >
+                <ListTodo />
+                Crear tarea
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
-      <Popover.Root open={mobileSearchOpen} onOpenChange={setMobileSearchOpen}>
-        <Popover.Trigger asChild>
-          <button
-            className="feature-search-mobile"
-            disabled={!projectId || busy}
-            aria-label="Buscar features"
-            title="Buscar features"
-          >
-            <Search size={16} />
-            {query && <i />}
-          </button>
-        </Popover.Trigger>
-        <Popover.Portal>
-          <Popover.Content
-            className="feature-search-popover"
-            side="right"
-            align="start"
-            sideOffset={10}
-            collisionPadding={10}
-          >
-            <FeatureSearch value={query} change={changeQuery} disabled={busy} />
-            <div className="feature-search-results">
-              {visible.map((feature) => (
-                <div key={feature.id} className="feature-search-result">
-                  <button
-                    className="feature-result-link"
-                    onClick={() => {
-                      select(feature.id);
-                      setMobileSearchOpen(false);
-                    }}
-                  >
-                    <span className="feature-number">
-                      {formatFeatureNumber(feature.number)}
-                    </span>
-                    <span>{feature.name}</span>
-                    <small>{counts[feature.id] ?? 0}</small>
-                  </button>
-                  <button
-                    className="feature-result-pin"
-                    aria-label={`${feature.pinned ? "Desfijar" : "Fijar"} feature: ${feature.name}`}
-                    aria-pressed={feature.pinned}
-                    title={
-                      feature.pinned
-                        ? "Desfijar feature"
-                        : pinnedCount < 5
-                          ? "Fijar feature"
-                          : "Máximo 5 features fijadas"
-                    }
-                    disabled={busy || (!feature.pinned && pinnedCount >= 5)}
-                    onClick={() =>
-                      mutate({
-                        type: "feature.pin",
-                        id: feature.id,
-                        pinned: !feature.pinned,
-                      })
-                    }
-                  >
-                    {feature.pinned ? <PinOff size={14} /> : <Pin size={14} />}
-                  </button>
-                </div>
-              ))}
-              {!visible.length && <p>No se encontraron features.</p>}
-            </div>
-          </Popover.Content>
-        </Popover.Portal>
-      </Popover.Root>
       <button
         className={`feature-item ${selectedId === "all" ? "feature-active" : ""}`}
         aria-label="Ver todas las features"
+        aria-current={selectedId === "all" ? "true" : undefined}
         title="Todas las features"
         onClick={() => select("all")}
         disabled={!projectId}
@@ -420,12 +370,12 @@ export function FeatureSidebar({
             if (
               normalizedQuery &&
               !items.length &&
-              !normalize(`${group.name} ${group.description}`).includes(
-                normalizedQuery,
-              )
+              !matchingGroupIds.has(group.id)
             )
               return null;
-            const expanded = !collapsed.has(group.id);
+            const expanded = normalizedQuery
+              ? !collapsedSearchModules.has(group.id)
+              : expandedModules.has(group.id);
             const contentId = `${helpId}-${group.id}`;
             return (
               <section
@@ -444,14 +394,31 @@ export function FeatureSidebar({
                         ? `${group.name} · ${group.description}`
                         : group.name
                     }
-                    onClick={() =>
-                      setCollapsed((current) => {
+                    onClick={() => {
+                      const updateModules = normalizedQuery
+                        ? setCollapsedSearchModules
+                        : setExpandedModules;
+                      updateModules((current) => {
                         const next = new Set(current);
                         if (next.has(group.id)) next.delete(group.id);
                         else next.add(group.id);
+                        if (!normalizedQuery) {
+                          let storage: Storage | undefined;
+                          try {
+                            storage = window.sessionStorage;
+                          } catch {
+                            /* Optional browser storage. */
+                          }
+                          saveSidebarExpansion(
+                            userId,
+                            projectId ?? "",
+                            next,
+                            storage,
+                          );
+                        }
                         return next;
-                      })
-                    }
+                      });
+                    }}
                   >
                     <ChevronDown
                       size={12}
@@ -493,19 +460,11 @@ export function FeatureSidebar({
               </section>
             );
           })}
-          {!visible.length &&
-            normalizedQuery &&
-            !groups.some((group) =>
-              normalize(`${group.name} ${group.description}`).includes(
-                normalizedQuery,
-              ),
-            ) && (
-              <p className="feature-search-empty">
-                {query
-                  ? "No se encontraron features."
-                  : "Añade tu primera feature."}
-              </p>
-            )}
+          {!visible.length && normalizedQuery && !matchingGroupIds.size && (
+            <p className="feature-search-empty">
+              No se encontraron módulos ni features.
+            </p>
+          )}
         </div>
         <DragOverlay>
           {dragged && (
@@ -533,15 +492,15 @@ function FeatureSearch({
     <div className="feature-search">
       <Search size={14} />
       <Input
-        aria-label="Buscar features por nombre o descripción"
-        placeholder="Buscar features…"
+        aria-label="Buscar módulos y features por nombre o descripción"
+        placeholder="Buscar módulos y features…"
         value={value}
         onChange={(event) => change(event.target.value)}
         disabled={disabled}
       />
       {value && (
         <button
-          aria-label="Limpiar búsqueda de features"
+          aria-label="Limpiar búsqueda de módulos y features"
           onClick={() => change("")}
         >
           <X size={13} />
@@ -558,6 +517,7 @@ function SortableFeature({
   count,
   busy,
   canPin,
+  canReorder,
   select,
   edit,
   mutate,
@@ -568,6 +528,7 @@ function SortableFeature({
   count: number;
   busy: boolean;
   canPin: boolean;
+  canReorder: boolean;
   select: (id: string) => void;
   edit: (feature: Feature) => void;
   mutate: Mutate;
@@ -582,7 +543,7 @@ function SortableFeature({
     isDragging,
   } = useSortable({
     id: shortcut ? `pinned-${feature.id}` : feature.id,
-    disabled: busy,
+    disabled: busy || !canReorder,
     data: {
       featureId: feature.id,
       groupId: shortcut ? "pinned" : (feature.moduleId ?? "general"),
@@ -629,7 +590,7 @@ function SortableFeature({
                 ? "Fijar feature"
                 : "Máximo 5 features fijadas"
           }
-          disabled={busy || !canPin}
+          disabled={busy || !canPin || feature.canManage === false}
           onClick={() =>
             mutate({
               type: "feature.pin",

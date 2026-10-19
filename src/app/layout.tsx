@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ImagePreviewProvider } from "@/components/image-preview";
 import "./globals.css";
+import "./notifications.css";
+import "./mentions.css";
+import "./users.css";
 export const metadata: Metadata = {
   title: "Taskode · Proyectos y tareas de desarrollo",
   description:
@@ -15,7 +19,7 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning>
       <body>
         <ThemeProvider>
-          {children}
+          <ImagePreviewProvider>{children}</ImagePreviewProvider>
           <Toaster position="bottom-right" richColors closeButton />
         </ThemeProvider>
       </body>

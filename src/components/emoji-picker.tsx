@@ -81,7 +81,9 @@ export function EmojiPicker({
             align="start"
             sideOffset={6}
             collisionPadding={12}
+            updatePositionStrategy="always"
             onOpenAutoFocus={(event) => event.preventDefault()}
+            onCloseAutoFocus={(event) => event.preventDefault()}
           >
             <EmojiPickerPanel onSelect={select} />
           </Popover.Content>

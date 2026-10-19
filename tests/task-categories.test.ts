@@ -126,7 +126,7 @@ for (const [kind, catalog, field] of [
       const other = await project(repo, "Otro proyecto");
       const member = await addUser(repo, `member-${kind}`);
       await repo.execute(
-        { type: "project.member.add", projectId, userId: member.id },
+        { type: "project.team.add", projectId, userId: member.id },
         actor,
       );
       const create = {
@@ -149,7 +149,7 @@ for (const [kind, catalog, field] of [
           commandSchema.parse({ ...create, name: "Prohibida" }),
           member,
         ),
-        /propietario/,
+        /líder/,
       );
       await assert.rejects(
         repo.execute(
@@ -228,7 +228,7 @@ for (const [kind, catalog, field] of [
           commandSchema.parse({ type: `${kind}.delete`, projectId, id }),
           member,
         ),
-        /propietario/,
+        /líder/,
       );
       await assert.rejects(
         repo.execute(
@@ -289,56 +289,9 @@ for (const [kind, catalog, field] of [
   });
 }
 
-test("el ticket es opcional, conserva ceros y referencias, y las actualizaciones anteriores no lo borran", async () => {
-  const repo = await createRepository();
-  try {
-    const { fields } = await project(repo);
-    const id = (await repo.execute({ type: "task.create", ...fields }, actor))
-      .createdId!;
-    assert.equal((await repo.getWorkspace(actor)).tasks[0].ticketNumber, null);
-    for (const value of ["001234", " ABC-00042 "]) {
-      await repo.execute(
-        commandSchema.parse({
-          type: "task.update",
-          id,
-          ...fields,
-          ticketNumber: value,
-        }),
-        actor,
-      );
-      await repo.execute({ type: "task.update", id, ...fields }, actor);
-      assert.equal(
-        (await repo.getWorkspace(actor)).tasks[0].ticketNumber,
-        value.trim(),
-      );
-    }
-    for (const ticketNumber of [null, "", "   "]) {
-      await repo.execute(
-        commandSchema.parse({
-          type: "task.update",
-          id,
-          ...fields,
-          ticketNumber,
-        }),
-        actor,
-      );
-      assert.equal(
-        (await repo.getWorkspace(actor)).tasks[0].ticketNumber,
-        null,
-      );
-    }
-    for (const ticketNumber of [123, [], "a".repeat(101)])
-      assert.equal(
-        commandSchema.safeParse({
-          type: "task.create",
-          ...fields,
-          ticketNumber,
-        }).success,
-        false,
-      );
-  } finally {
-    await repo.close();
-  }
+test("los comandos del campo antiguo de ticket exigen recargar", () => {
+  for (const ticketNumber of [null, "", "001234", 123, [], "a".repeat(101)])
+    assert.equal(commandSchema.safeParse({ type: "task.create", ticketNumber }).success, false);
 });
 
 test("los filtros combinan categorías, admiten múltiples valores y tareas sin clasificación, e ignoran opciones eliminadas", () => {

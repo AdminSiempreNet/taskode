@@ -9,6 +9,6 @@ export default async function Onboarding() {
     repo = repository();
   const workspace = await repo.getWorkspace(actor);
   if (workspace.currentUser.role !== "admin" || workspace.onboarding.step >= 2)
-    redirect("/projects");
+    redirect("/dashboard");
   return <OnboardingWizard workspace={workspace} />;
 }

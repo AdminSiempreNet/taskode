@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
 import type { CurrentUser } from "@/lib/types";
+import { ConnectedApps } from "./connected-apps";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -191,6 +192,7 @@ export function ProfileModal({
             </a>
           )}
         </div>
+        <ConnectedApps />
       </DialogContent>
     </Dialog>
   );

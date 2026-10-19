@@ -12,22 +12,33 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UNASSIGNED_FILTER, validFilterIds } from "@/lib/task-filters";
 import { readPreference } from "@/lib/preferences";
+import { UserAvatar } from "./user-avatar";
+
+type FilterOption = {
+  id: string;
+  name: string;
+  color: string;
+  email?: string;
+  image?: string | null;
+};
 
 export function useProjectFilter(
   projectId: string,
   category: string,
   options: { id: string }[],
   optional = false,
+  defaults: string[] = [],
 ) {
   const [selection, setSelection] = useState({
     projectId,
-    ids: [] as string[],
+    ids: defaults,
   });
   useEffect(() => {
-    let ids: string[] = [];
+    let ids: string[] = defaults;
     try {
       const saved: unknown = JSON.parse(
-        readPreference(`taskode.${category}-filter.${projectId}`) ?? "[]",
+        readPreference(`taskode.${category}-filter.${projectId}`) ??
+          JSON.stringify(defaults),
       );
       if (Array.isArray(saved) && saved.every((id) => typeof id === "string"))
         ids = saved;
@@ -49,7 +60,7 @@ export function useProjectFilter(
   }
   return [
     validFilterIds(
-      selection.projectId === projectId ? selection.ids : [],
+      selection.projectId === projectId ? selection.ids : defaults,
       options,
       optional,
     ),
@@ -66,7 +77,7 @@ export function CatalogFilter({
   selectedIds,
   onChange,
 }: {
-  options: { id: string; name: string; color: string }[];
+  options: FilterOption[];
   category: string;
   allLabel: string;
   shortLabel: string;
@@ -74,7 +85,7 @@ export function CatalogFilter({
   selectedIds: string[];
   onChange: (ids: string[]) => void;
 }) {
-  const entries = unassignedLabel
+  const entries: FilterOption[] = unassignedLabel
     ? [
         { id: UNASSIGNED_FILTER, name: unassignedLabel, color: "#64748b" },
         ...options,
@@ -114,7 +125,7 @@ export function CatalogFilter({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="status-filter-menu"
+        className={`status-filter-menu${options.some((option) => option.email) ? " user-filter-menu" : ""}`}
         collisionPadding={8}
       >
         <DropdownMenuLabel>Filtrar por {category}</DropdownMenuLabel>
@@ -129,6 +140,7 @@ export function CatalogFilter({
         {entries.map((status) => (
           <DropdownMenuCheckboxItem
             key={status.id}
+            textValue={status.name}
             checked={selectedIds.includes(status.id)}
             onCheckedChange={(checked) =>
               onChange(
@@ -139,12 +151,24 @@ export function CatalogFilter({
             }
             onSelect={(event) => event.preventDefault()}
           >
-            <i
-              className="status-filter-dot"
-              style={{ background: status.color }}
-              aria-hidden="true"
-            />
-            <span>{status.name}</span>
+            {status.email ? (
+              <span className="search-option-content">
+                <UserAvatar name={status.name} image={status.image} />
+                <span className="client-option-text">
+                  <span>{status.name}</span>
+                  <small>{status.email}</small>
+                </span>
+              </span>
+            ) : (
+              <>
+                <i
+                  className="status-filter-dot"
+                  style={{ background: status.color }}
+                  aria-hidden="true"
+                />
+                <span>{status.name}</span>
+              </>
+            )}
           </DropdownMenuCheckboxItem>
         ))}
       </DropdownMenuContent>

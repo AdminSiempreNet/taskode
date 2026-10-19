@@ -1,0 +1,710 @@
+import { randomUUID, createHash } from "node:crypto";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  lte,
+  sql,
+  type SQL,
+} from "drizzle-orm";
+import type { PostgresRepository } from "./postgres";
+import * as s from "./schema";
+import { DomainError } from "./repository";
+import type { Actor, EntityRef } from "../lib/types";
+import { entityColumns, rowScope } from "../lib/entities";
+import { entityPath, projectPath } from "../lib/routes";
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  notificationPreferencesSchema,
+  type NotificationItem,
+  type NotificationsSnapshot,
+  type NotificationPreferences,
+} from "../lib/notifications";
+import { reminderTimes, DEFAULT_TIME_ZONE } from "../lib/project-time";
+import { ablyConfig, notificationsChannel } from "./realtime-config";
+
+type Assignment = { leaderId: string; team: string[] };
+const encodeCursor = (sequence: number) =>
+  Buffer.from(JSON.stringify(sequence)).toString("base64url");
+function cursor(value: string) {
+  try {
+    if (value.length > 600) throw Error();
+    const v: unknown = JSON.parse(Buffer.from(value, "base64url").toString());
+    if (typeof v !== "number" || !Number.isSafeInteger(v) || v < 1)
+      throw Error();
+    return v;
+  } catch {
+    throw new DomainError("Cursor de notificaciones inválido.");
+  }
+}
+
+export class NotificationsService {
+  constructor(readonly repo: PostgresRepository) {}
+  // Use the same task visibility and project membership rules as requireTask.
+  access(userId: string): SQL {
+    return sql`exists (select 1 from "user" viewer where viewer.id = ${userId}
+      and (viewer.role = 'admin' or ${s.projects.leaderId} = ${userId}
+        or exists (select 1 from ${s.projectTeamMembers} pm where pm."projectId" = ${s.projects.id} and pm."userId" = ${userId}))
+      and (viewer.role = 'admin' or ${this.repo.taskVisibility({ id: userId })}))`;
+  }
+  private inbox(userId: string) {
+    return and(eq(s.notifications.recipientId, userId), sql`exists (select 1 from "user" viewer where viewer.id = ${userId}
+      and (${s.notifications.scopeType} = 'account' or ((viewer.role = 'admin' or ${s.projects.leaderId} = ${userId}
+        or exists (select 1 from ${s.projectTeamMembers} pm where pm."projectId" = ${s.projects.id} and pm."userId" = ${userId}))
+      and (${s.notifications.scopeType} <> 'task' or viewer.role = 'admin' or ${this.repo.taskVisibility({ id: userId })}))))`);
+  }
+  async list(
+    actor: Actor,
+    options: { filter?: string; cursor?: string; limit?: number } = {},
+  ): Promise<NotificationsSnapshot> {
+    await this.repo.currentUser(actor);
+    const limit = options.limit ?? 30;
+    if (
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > 50 ||
+      (options.filter && !["all", "unread"].includes(options.filter))
+    )
+      throw new DomainError("Filtro o tamaño de página inválido.");
+    const page = options.cursor ? cursor(options.cursor) : null;
+    return this.repo.store.snapshot(async () => {
+      const rows = await this.repo.store.db
+        .select({
+          id: s.notifications.id,
+          sequence: s.notifications.sequence,
+          type: s.notifications.type,
+          actorName: s.user.name,
+          taskId: s.notifications.taskId,
+          scopeType: s.notifications.scopeType,
+          moduleId: s.notifications.moduleId,
+          featureId: s.notifications.featureId,
+          commentId: s.notifications.commentId,
+          documentId: s.notifications.documentId,
+          projectId: s.notifications.projectId,
+          projectName: sql<string>`coalesce(${s.projects.name}, '')`,
+          taskTitle: s.notifications.taskTitle,
+          offsetMinutes: s.notifications.offsetMinutes,
+          createdAt: s.notifications.createdAt,
+          readAt: s.notifications.readAt,
+        })
+        .from(s.notifications)
+        .leftJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
+        .leftJoin(s.projects, eq(s.projects.id, s.notifications.projectId))
+        .leftJoin(s.user, eq(s.user.id, s.notifications.actorId))
+        .where(
+          and(
+            this.inbox(actor.id),
+            options.filter === "unread"
+              ? isNull(s.notifications.readAt)
+              : undefined,
+            page ? sql`${s.notifications.sequence} < ${page}` : undefined,
+          ),
+        )
+        .orderBy(desc(s.notifications.sequence))
+        .limit(limit + 1);
+      const [count] = await this.repo.store.db
+        .select({ count: sql<number>`count(*)::integer` })
+        .from(s.notifications)
+        .leftJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
+        .leftJoin(s.projects, eq(s.projects.id, s.notifications.projectId))
+        .where(and(this.inbox(actor.id), isNull(s.notifications.readAt)));
+      const items: NotificationItem[] = rows.slice(0, limit).map((r) => ({
+        ...r,
+        scope: rowScope(r) ?? undefined,
+        entityTitle: r.taskTitle,
+        createdAt: r.createdAt.toISOString(),
+        readAt: r.readAt?.toISOString() ?? null,
+      }));
+      const config = ablyConfig();
+      return {
+        items,
+        unreadCount: count.count,
+        nextCursor:
+          rows.length > limit ? encodeCursor(rows[limit - 1].sequence) : null,
+        through: rows[0] ? encodeCursor(rows[0].sequence) : null,
+        realtime: {
+          enabled: !!config,
+          channel: config
+            ? notificationsChannel(config.namespace, actor.id)
+            : null,
+        },
+      };
+    });
+  }
+  async get(actor: Actor, id: string) {
+    await this.repo.store.ready;
+    const [item] = await this.repo.store.db
+      .select({
+        type: s.notifications.type,
+        actorId: s.notifications.actorId,
+        taskId: s.notifications.taskId,
+        projectId: s.notifications.projectId,
+        scopeType: s.notifications.scopeType,
+        moduleId: s.notifications.moduleId,
+        featureId: s.notifications.featureId,
+        commentId: s.notifications.commentId,
+        documentId: s.notifications.documentId,
+        readAt: s.notifications.readAt,
+      })
+      .from(s.notifications)
+      .leftJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
+      .leftJoin(s.projects, eq(s.projects.id, s.notifications.projectId))
+      .where(and(eq(s.notifications.id, id), this.inbox(actor.id)));
+    if (!item)
+      throw new DomainError(
+        "La notificación no existe o no tienes acceso.",
+        404,
+      );
+    if (item.scopeType === "account") {
+      let url = "/projects";
+      if (item.type === "invitation_accepted") {
+        const user = await this.repo.currentUser(actor);
+        if (user.role === "admin") url = `/users${item.actorId ? `?user=${encodeURIComponent(item.actorId)}` : ""}`;
+      } else if (item.type === "project_access_granted" && item.projectId) {
+        try { await this.repo.requireProject(actor, item.projectId); url = projectPath(item.projectId); }
+        catch (error) { if (!(error instanceof DomainError)) throw error; }
+      }
+      return { id, url, projectId: item.projectId, taskId: null, readAt: item.readAt?.toISOString() ?? null };
+    }
+    const scope = rowScope(item)!;
+    const url = new URL(entityPath(scope.projectId, scope.kind, scope.id, "board", item.documentId ? "documents" : "description"), "http://taskode.invalid");
+    if (item.documentId) url.searchParams.set("document", item.documentId);
+    if (item.commentId) url.hash = `comment-${item.commentId}`;
+    return {
+      id,
+      url: `${url.pathname}${url.search}${url.hash}`,
+      taskId: item.taskId,
+      projectId: item.projectId,
+      readAt: item.readAt?.toISOString() ?? null,
+    };
+  }
+  async read(
+    actor: Actor,
+    input: { id: string; read: boolean } | { through: string },
+  ) {
+    return this.repo.store.transaction(async () => {
+      await this.repo.currentUser(actor);
+      const through = "through" in input ? cursor(input.through) : null;
+      if ("id" in input) await this.get(actor, input.id);
+      const visible = this.repo.store.db
+        .select({ id: s.notifications.id })
+        .from(s.notifications)
+        .leftJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
+        .leftJoin(s.projects, eq(s.projects.id, s.notifications.projectId))
+        .where(
+          and(
+            this.inbox(actor.id),
+            "id" in input
+              ? eq(s.notifications.id, input.id)
+              : lte(s.notifications.sequence, through!),
+          ),
+        );
+      await this.repo.store.db
+        .update(s.notifications)
+        .set({ readAt: "read" in input && !input.read ? null : new Date() })
+        .where(inArray(s.notifications.id, visible));
+      await this.invalidate(actor.id);
+    });
+  }
+  async preferences(actor: Actor): Promise<NotificationPreferences> {
+    await this.repo.currentUser(actor);
+    const [row] = await this.repo.store.db
+      .select()
+      .from(s.notificationPreferences)
+      .where(eq(s.notificationPreferences.userId, actor.id));
+    return row
+      ? { offsets: row.offsets.map(Number), dateOnlyTime: row.dateOnlyTime }
+      : {
+          ...DEFAULT_NOTIFICATION_PREFERENCES,
+          offsets: [...DEFAULT_NOTIFICATION_PREFERENCES.offsets],
+        };
+  }
+  async savePreferences(actor: Actor, input: unknown, now = new Date()) {
+    const parsed = notificationPreferencesSchema.safeParse(input);
+    if (!parsed.success)
+      throw new DomainError(
+        "Selecciona hasta tres anticipaciones distintas y una hora válida.",
+      );
+    return this.repo.store.transaction(async () => {
+      await this.repo.currentUser(actor);
+      const fields = {
+        userId: actor.id,
+        offsets: parsed.data.offsets.map(String),
+        dateOnlyTime: parsed.data.dateOnlyTime,
+      };
+      await this.repo.store.db
+        .insert(s.notificationPreferences)
+        .values(fields)
+        .onConflictDoUpdate({
+          target: s.notificationPreferences.userId,
+          set: fields,
+        });
+      const ids = await this.repo.store.db
+        .select({ id: s.tasks.id })
+        .from(s.tasks)
+        .where(
+          sql`${s.tasks.leaderId} = ${actor.id} or exists (select 1 from ${s.taskTeamMembers} tm where tm."taskId" = ${s.tasks.id} and tm."userId" = ${actor.id})`,
+        );
+      await this.reconcile(
+        ids.map((t) => t.id),
+        now,
+      );
+      return parsed.data;
+    });
+  }
+  async assignment(taskId: string): Promise<Assignment | null> {
+    const [task] = await this.repo.store.db
+      .select({ leaderId: s.tasks.leaderId })
+      .from(s.tasks)
+      .where(eq(s.tasks.id, taskId));
+    if (!task) return null;
+    const team = await this.repo.store.db
+      .select()
+      .from(s.taskTeamMembers)
+      .where(eq(s.taskTeamMembers.taskId, taskId));
+    return { leaderId: task.leaderId, team: team.map((r) => r.userId) };
+  }
+  async deliveryValid(notificationId: string, now = new Date()) {
+    const [source] = await this.repo.store.db.select().from(s.notifications).where(eq(s.notifications.id, notificationId));
+    if (source?.scopeType === "account") {
+      if (source.type === "project_access_removed") return true;
+      if (source.type === "invitation_accepted") {
+        try { await this.repo.requireAdmin({ id: source.recipientId }); return true; }
+        catch (error) { if (error instanceof DomainError) return false; throw error; }
+      }
+      try { await this.repo.requireProject({ id: source.recipientId }, source.projectId!); return true; }
+      catch (error) { if (error instanceof DomainError) return false; throw error; }
+    }
+    if (source?.type === "mention") {
+      try { await this.get({ id: source.recipientId }, notificationId); return true; }
+      catch (error) { if (error instanceof DomainError) return false; throw error; }
+    }
+    const [row] = await this.repo.store.db
+      .select({
+        notification: s.notifications,
+        task: s.tasks,
+        project: s.projects,
+        status: s.statuses,
+        preference: s.notificationPreferences,
+        directMember: sql<boolean>`(${s.tasks.leaderId} = ${s.notifications.recipientId} or exists (select 1 from ${s.taskTeamMembers} member where member."taskId" = ${s.tasks.id} and member."userId" = ${s.notifications.recipientId}))`,
+      })
+      .from(s.notifications)
+      .innerJoin(s.tasks, eq(s.tasks.id, s.notifications.taskId))
+      .innerJoin(s.projects, eq(s.projects.id, s.tasks.projectId))
+      .innerJoin(s.statuses, eq(s.statuses.id, s.tasks.statusId))
+      .leftJoin(
+        s.notificationPreferences,
+        eq(s.notificationPreferences.userId, s.notifications.recipientId),
+      )
+      .where(eq(s.notifications.id, notificationId));
+    if (!row) return false;
+    const { notification: item, task, project, status } = row;
+    if (item.type !== "reminder") return true;
+    if (
+      task.archived ||
+      status.isDone ||
+      !task.dueDate ||
+      item.offsetMinutes === null
+    )
+      return false;
+    if (!row.directMember) return false;
+    const pref = row.preference
+      ? {
+          offsets: row.preference.offsets.map(Number),
+          dateOnlyTime: row.preference.dateOnlyTime,
+        }
+      : DEFAULT_NOTIFICATION_PREFERENCES;
+    if (!pref.offsets.includes(item.offsetMinutes)) return false;
+    const times = reminderTimes(
+      task.dueDate,
+      task.dueTime,
+      project.timeZone,
+      item.offsetMinutes,
+      pref.dateOnlyTime,
+    );
+    if (!times || times.expiresAt <= now) return false;
+    const key = createHash("sha256")
+      .update(
+        JSON.stringify([
+          task.id,
+          item.recipientId,
+          task.dueDate,
+          task.dueTime,
+          project.timeZone,
+          item.offsetMinutes,
+          times.scheduledFor.toISOString(),
+        ]),
+      )
+      .digest("hex");
+    return item.dedupKey === `reminder:${key}`;
+  }
+  async assigned(
+    taskId: string,
+    actor: Actor,
+    previous: Assignment | null,
+    now = new Date(),
+  ) {
+    const next = await this.assignment(taskId);
+    if (!next) return;
+    if (next.leaderId !== previous?.leaderId && next.leaderId !== actor.id)
+      await this.create(
+        taskId,
+        next.leaderId,
+        "assigned",
+        actor.id,
+        `assignment:${randomUUID()}`,
+        null,
+        now,
+      );
+    const existing = new Set(
+      previous ? [previous.leaderId, ...previous.team] : [],
+    );
+    for (const userId of next.team)
+      if (userId !== actor.id && !existing.has(userId))
+        await this.create(
+          taskId,
+          userId,
+          "shared",
+          actor.id,
+          `share:${randomUUID()}`,
+          null,
+          now,
+        );
+    const current = new Set([next.leaderId, ...next.team]);
+    await this.accessChanged([...existing].filter((id) => !current.has(id)));
+  }
+  private async invalidate(
+    userId: string,
+    notificationId: string | null = null,
+    expiresAt = new Date(Date.now() + 86400000),
+    now = new Date(),
+  ) {
+    await this.repo.store.db.insert(s.notificationDeliveries).values({
+      id: randomUUID(),
+      recipientId: userId,
+      notificationId,
+      transport: "ably",
+      expiresAt,
+      availableAt: now,
+    });
+  }
+  async accessChanged(userIds: string[]) {
+    for (const userId of new Set(userIds)) await this.invalidate(userId);
+  }
+  async projectAccess(projectId: string) {
+    const [project] = await this.repo.store.db.select().from(s.projects).where(eq(s.projects.id, projectId));
+    if (!project) return null;
+    const users = await this.repo.store.db.select({ id: s.user.id }).from(s.user)
+      .where(and(sql`${s.user.role} <> 'admin'`, sql`(${s.user.id} = ${project.leaderId} or exists (select 1 from ${s.projectTeamMembers} pm where pm."projectId" = ${projectId} and pm."userId" = ${s.user.id}))`));
+    return { name: project.name, userIds: users.map(u => u.id) };
+  }
+  async projectAccessChanged(projectId: string, before: { name: string; userIds: string[] } | null, actor: Actor) {
+    const next = await this.projectAccess(projectId);
+    if (!next) return;
+    const previous = new Set(before?.userIds ?? []), current = new Set(next.userIds);
+    for (const userId of new Set([...previous, ...current])) {
+      if (previous.has(userId) === current.has(userId)) continue;
+      const [user] = await this.repo.store.db.select({ email: s.user.email }).from(s.user).where(eq(s.user.id, userId));
+      if (user) await this.repo.users.revokePending(user.email);
+      if (userId !== actor.id) await this.accountEvent({
+        recipientId: userId, actorId: actor.id, projectId,
+        type: current.has(userId) ? "project_access_granted" : "project_access_removed",
+        title: next.name, dedupKey: `access:${randomUUID()}`,
+      });
+    }
+  }
+  async accountEvent(input: {
+    recipientId: string; actorId: string; projectId?: string;
+    type: "project_access_granted" | "project_access_removed" | "invitation_accepted";
+    title: string; dedupKey: string;
+  }) {
+    const [item] = await this.repo.store.db.insert(s.notifications).values({
+      id: randomUUID(), recipientId: input.recipientId, actorId: input.actorId,
+      projectId: input.projectId ?? null, scopeType: "account", type: input.type,
+      taskTitle: input.title, dedupKey: input.dedupKey,
+    }).onConflictDoNothing({ target: s.notifications.dedupKey }).returning();
+    if (!item) return;
+    await this.enqueue(item.id, input.recipientId, new Date(), new Date(Date.now() + 86400000), true);
+  }
+  async mentioned(scope: EntityRef, actor: Actor, userId: string, source: { commentId?: string; documentId?: string }) {
+    const { entity } = await this.repo.requireEntity({ id: userId }, scope.kind, scope.id, scope.projectId);
+    let title = String(entity.title ?? entity.name);
+    if (source.documentId) {
+      const [doc] = await this.repo.store.db.select().from(s.documents).where(eq(s.documents.id, source.documentId));
+      if (!doc) throw new DomainError("El documento no existe.", 404);
+      title = doc.title;
+    }
+    const [item] = await this.repo.store.db.insert(s.notifications).values({
+      id: randomUUID(), recipientId: userId, actorId: actor.id, ...entityColumns(scope),
+      ...source, type: "mention", taskTitle: title, dedupKey: `mention:${randomUUID()}`,
+    }).returning({ id: s.notifications.id });
+    await this.invalidate(userId, item.id);
+  }
+  private async create(
+    taskId: string,
+    userId: string,
+    type: NotificationItem["type"],
+    actorId: string | null,
+    dedupKey: string,
+    offsetMinutes: number | null,
+    now: Date,
+    expiresAt = new Date(now.getTime() + 86400000),
+  ) {
+    const [task] = await this.repo.store.db
+      .select({ title: s.tasks.title, projectId: s.tasks.projectId })
+      .from(s.tasks)
+      .innerJoin(s.projects, eq(s.projects.id, s.tasks.projectId))
+      .where(and(eq(s.tasks.id, taskId), this.access(userId)));
+    if (!task)
+      throw new DomainError("La tarea no existe o no tienes acceso.", 404);
+    const [item] = await this.repo.store.db
+      .insert(s.notifications)
+      .values({
+        id: randomUUID(),
+        recipientId: userId,
+        actorId,
+        taskId,
+        projectId: task.projectId,
+        type,
+        taskTitle: String(task.title),
+        dedupKey,
+        offsetMinutes,
+        createdAt: now,
+      })
+      .onConflictDoNothing({ target: s.notifications.dedupKey })
+      .returning();
+    if (!item) return false;
+    await this.enqueue(item.id, userId, now, expiresAt);
+    return true;
+  }
+  private async enqueue(notificationId: string, userId: string, now: Date, expiresAt: Date, email = false) {
+    await this.invalidate(userId, notificationId, expiresAt, now);
+    if (email) await this.repo.store.db.insert(s.notificationDeliveries).values({ id: randomUUID(), recipientId: userId, notificationId, transport: "email", expiresAt, availableAt: now });
+    const subscriptions = await this.repo.store.db
+      .select({ id: s.pushSubscriptions.id })
+      .from(s.pushSubscriptions)
+      .innerJoin(s.session, eq(s.session.id, s.pushSubscriptions.sessionId))
+      .where(
+        and(
+          eq(s.pushSubscriptions.userId, userId),
+          sql`${s.session.expiresAt} > ${now.toISOString()}::timestamptz`,
+        ),
+      );
+    for (const sub of subscriptions)
+      await this.repo.store.db.insert(s.notificationDeliveries).values({
+        id: randomUUID(),
+        recipientId: userId,
+        notificationId,
+        subscriptionId: sub.id,
+        transport: "push",
+        expiresAt,
+        availableAt: now,
+      });
+  }
+  // Reconciliation preserves already-scheduled due jobs, but never backfills a
+  // newly enabled threshold. A unique durable key survives retries/restores.
+  async reconcile(taskIds?: string[], now = new Date()) {
+    if (taskIds && !taskIds.length) return;
+    const records = await this.repo.store.db
+      .select({
+        task: {
+          id: s.tasks.id,
+          projectId: s.tasks.projectId,
+          leaderId: s.tasks.leaderId,
+          dueDate: s.tasks.dueDate,
+          dueTime: s.tasks.dueTime,
+          archived: s.tasks.archived,
+        },
+        project: {
+          id: s.projects.id,
+          leaderId: s.projects.leaderId,
+          timeZone: s.projects.timeZone,
+        },
+        status: { isDone: s.statuses.isDone },
+      })
+      .from(s.tasks)
+      .innerJoin(s.projects, eq(s.projects.id, s.tasks.projectId))
+      .innerJoin(s.statuses, eq(s.statuses.id, s.tasks.statusId))
+      .where(taskIds ? inArray(s.tasks.id, taskIds) : undefined);
+    if (!records.length) return;
+    const teams = await this.repo.store.db
+      .select()
+      .from(s.taskTeamMembers)
+      .where(taskIds ? inArray(s.taskTeamMembers.taskId, taskIds) : undefined);
+    const recipientIds = [
+      ...new Set([
+        ...records.map((r) => r.task.leaderId),
+        ...teams.map((r) => r.userId),
+      ]),
+    ];
+    const prefs = new Map(
+      (
+        await this.repo.store.db
+          .select()
+          .from(s.notificationPreferences)
+          .where(inArray(s.notificationPreferences.userId, recipientIds))
+      ).map((p) => [p.userId, p]),
+    );
+    const roles = new Map(
+      (
+        await this.repo.store.db
+          .select({ id: s.user.id, role: s.user.role })
+          .from(s.user)
+          .where(inArray(s.user.id, recipientIds))
+      ).map((u) => [u.id, u.role]),
+    );
+    const memberships = new Set(
+      (
+        await this.repo.store.db
+          .select()
+          .from(s.projectTeamMembers)
+          .where(
+            inArray(s.projectTeamMembers.projectId, [
+              ...new Set(records.map((r) => r.project.id)),
+            ]),
+          )
+      ).map((m) => JSON.stringify([m.projectId, m.userId])),
+    );
+    const jobs = await this.repo.store.db
+      .select()
+      .from(s.taskReminders)
+      .where(taskIds ? inArray(s.taskReminders.taskId, taskIds) : undefined);
+    const existing = new Set(jobs.map((j) => j.dedupKey));
+    const wanted = new Set<string>();
+    const newJobs: (typeof s.taskReminders.$inferInsert)[] = [];
+    for (const { task, project, status } of records) {
+      if (task.archived || status.isDone || !task.dueDate) continue;
+      const users = new Set([
+        task.leaderId,
+        ...teams.filter((t) => t.taskId === task.id).map((t) => t.userId),
+      ]);
+      for (const userId of users) {
+        // Every recipient is already a direct task participant. Validate their
+        // project access in bulk, without an N+1 authorization query per job.
+        if (
+          roles.get(userId) !== "admin" &&
+          project.leaderId !== userId &&
+          !memberships.has(JSON.stringify([project.id, userId]))
+        )
+          continue;
+        const pref = prefs.get(userId);
+        for (const offset of pref
+          ? pref.offsets.map(Number)
+          : DEFAULT_NOTIFICATION_PREFERENCES.offsets) {
+          const times = reminderTimes(
+            task.dueDate,
+            task.dueTime,
+            project.timeZone || DEFAULT_TIME_ZONE,
+            offset,
+            pref?.dateOnlyTime ?? "08:00",
+          );
+          if (!times) continue;
+          const key = createHash("sha256")
+            .update(
+              JSON.stringify([
+                task.id,
+                userId,
+                task.dueDate,
+                task.dueTime,
+                project.timeZone,
+                offset,
+                times.scheduledFor.toISOString(),
+              ]),
+            )
+            .digest("hex");
+          wanted.add(key);
+          if (!existing.has(key) && times.scheduledFor > now) {
+            newJobs.push({
+              id: randomUUID(),
+              taskId: task.id,
+              userId,
+              offsetMinutes: offset,
+              ...times,
+              dedupKey: key,
+            });
+          }
+        }
+      }
+    }
+    for (let offset = 0; offset < newJobs.length; offset += 500)
+      await this.repo.store.db
+        .insert(s.taskReminders)
+        .values(newJobs.slice(offset, offset + 500))
+        .onConflictDoNothing();
+    const canceled = jobs
+      .filter((j) => !j.processedAt && !wanted.has(j.dedupKey))
+      .map((j) => j.id);
+    if (canceled.length)
+      await this.repo.store.db
+        .delete(s.taskReminders)
+        .where(inArray(s.taskReminders.id, canceled));
+  }
+  async processReminders(now = new Date(), bootstrapTaskIds?: string[]) {
+    return this.repo.store.transaction(async () => {
+      await this.reconcile(bootstrapTaskIds, now);
+      await this.repo.store.db
+        .update(s.taskReminders)
+        .set({ processedAt: now })
+        .where(
+          and(
+            isNull(s.taskReminders.processedAt),
+            lte(s.taskReminders.expiresAt, now),
+          ),
+        );
+      // The store's cross-process write lock also serializes reconciliation.
+      const jobs = await this.repo.store.db
+        .select()
+        .from(s.taskReminders)
+        .where(
+          sql`${s.taskReminders.id} in (
+          select id from (
+            select distinct on ("taskId", "userId") id, "expiresAt", "scheduledFor"
+            from task_reminders where "processedAt" is null and "scheduledFor" <= ${now.toISOString()}::timestamptz
+            order by "taskId", "userId", "scheduledFor" desc, id desc
+          ) latest order by "expiresAt", "scheduledFor", id limit 50
+        )`,
+        )
+        .orderBy(
+          asc(s.taskReminders.expiresAt),
+          asc(s.taskReminders.scheduledFor),
+          asc(s.taskReminders.id),
+        )
+        .limit(50);
+      const seen = new Set<string>();
+      let created = 0;
+      for (const job of jobs) {
+        const group = `${job.taskId}:${job.userId}`;
+        if (!seen.has(group) && job.expiresAt > now) {
+          const inserted = await this.create(
+            job.taskId,
+            job.userId,
+            "reminder",
+            null,
+            `reminder:${job.dedupKey}`,
+            job.offsetMinutes,
+            now,
+            job.expiresAt,
+          );
+          if (inserted) created++;
+        }
+        seen.add(group);
+        // Retire every older missed threshold, including those outside this batch.
+        await this.repo.store.db
+          .update(s.taskReminders)
+          .set({ processedAt: now })
+          .where(
+            and(
+              eq(s.taskReminders.taskId, job.taskId),
+              eq(s.taskReminders.userId, job.userId),
+              isNull(s.taskReminders.processedAt),
+              lte(s.taskReminders.scheduledFor, now),
+            ),
+          );
+      }
+      return created;
+    });
+  }
+}

@@ -16,9 +16,7 @@ export default async function Projects({
   if (workspace.currentUser.role === "admin" && workspace.onboarding.step < 2)
     redirect("/onboarding");
   const { project: legacyProjectId } = await searchParams;
-  const project =
-    workspace.projects.find((p) => p.id === legacyProjectId) ??
-    workspace.projects[0];
+  const project = workspace.projects.find((p) => p.id === legacyProjectId);
   if (project) redirect(projectPath(project.id));
-  return <WorkspaceApp initialWorkspace={workspace} />;
+  return <WorkspaceApp initialWorkspace={workspace} menuSection="projects" />;
 }

@@ -1,4 +1,5 @@
 "use client";
+import styles from "./task-list.module.css";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   DndContext,
@@ -29,9 +30,12 @@ import {
   CircleCheck,
   Layers3,
   Plus,
+  Ticket,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MarkdownContent } from "./markdown-content";
+import { TaskPeopleSummary } from "./task-people";
 import type { Feature, Status, Task } from "@/lib/types";
 import {
   LabelChip,
@@ -41,6 +45,7 @@ import {
 } from "./project-catalog";
 import type { Mutate } from "./forms";
 import { dateKey, taskScheduleLabel } from "@/lib/calendar";
+import { taskOverdue } from "@/lib/project-time";
 import { boardDropTarget, type BoardDropTarget } from "@/lib/board-drop";
 export { dateKey } from "@/lib/calendar";
 
@@ -78,25 +83,49 @@ function CardContent({
   feature?: Feature;
   status?: Status;
 }) {
-  const late =
-    task.dueDate && task.dueDate < dateKey(new Date()) && !status?.isDone;
+  const { timeZone } = useProjectCatalog();
+  const late = taskOverdue(task, new Date(), timeZone) && !status?.isDone && !task.archived;
+  const relations = [
+    { count: task.clientIds.length, Icon: Users, singular: "cliente", plural: "clientes" },
+    { count: task.ticketIds.length, Icon: Ticket, singular: "ticket", plural: "tickets" },
+  ].filter(({ count }) => count > 0);
   return (
     <>
-      <div className="card-labels">
-        <Priority priority={task.priority} />
-        <TaskCategoryChip kind="type" id={task.typeId} />
-        <TaskCategoryChip kind="impact" id={task.impactId} />
-        {task.labels.slice(0, 2).map((l, i) => (
-          <LabelChip name={l} key={i} />
-        ))}
-        {task.labels.length > 2 && (
-          <span className="label-chip">+{task.labels.length - 2}</span>
+      <div className="card-header">
+        <div className="card-labels">
+          <Priority priority={task.priority} />
+          <TaskCategoryChip kind="type" id={task.typeId} />
+          <TaskCategoryChip kind="impact" id={task.impactId} />
+        </div>
+        {relations.length > 0 && (
+          <div className="card-relations">
+            {relations.map(({ count, Icon, singular, plural }) => {
+              const label = `${count} ${count === 1 ? singular : plural}`;
+              return (
+                <span className="card-relation" key={plural} role="img" aria-label={label} title={label}>
+                  <Icon size={16} aria-hidden="true" />
+                  <span className="card-relation-count" aria-hidden="true">{Math.min(count, 9)}</span>
+                </span>
+              );
+            })}
+          </div>
         )}
       </div>
       <h3>{task.title}</h3>
+      <TaskPeopleSummary leader={task.leader} teamMembers={task.teamMembers} />
       {task.description && (
         <div className="card-description">
           <MarkdownContent compact>{task.description}</MarkdownContent>
+        </div>
+      )}
+      {task.labels.length > 0 && (
+        <div className="card-labels">
+          {task.labels.slice(0, 2).map((l, i) => (
+            <LabelChip name={l} key={i} />
+          ))}
+          {task.labels.length > 2 && (
+            <span className="label-chip">+{task.labels.length - 2}</span>
+          )}
         </div>
       )}
       <div className="card-footer">
@@ -652,6 +681,7 @@ export function ListView({
   add: () => void;
   archived: boolean;
 }) {
+  const { timeZone } = useProjectCatalog();
   if (!tasks.length)
     return (
       <Empty
@@ -675,88 +705,106 @@ export function ListView({
       />
     );
   return (
-    <div className="list-view">
+    <div className={`list-view ${styles.list}`}>
       {features.map((f) => {
         const rows = tasks.filter((t) => t.featureId === f.id);
         if (!rows.length) return null;
         return (
-          <section className="feature-table" key={f.id}>
-            <div className="feature-table-header">
-              <Layers3 size={16} />
+          <section key={f.id} className={styles.group} aria-label={f.name}>
+            <header className={styles.groupHeader}>
+              <Layers3 size={16} aria-hidden="true" />
               <h2>{f.name}</h2>
-              <span>
+              <span className={styles.count}>
                 {rows.length} {rows.length === 1 ? "tarea" : "tareas"}
               </span>
-            </div>
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Tarea</th>
-                    <th>Estado</th>
-                    <th>Prioridad</th>
-                    <th>Tipo</th>
-                    <th>Impacto</th>
-                    <th>Fecha de entrega</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((t) => (
-                    <tr key={t.id} onClick={() => open(t)}>
-                      <td>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            open(t);
-                          }}
-                          className="table-task"
-                        >
-                          {statuses.find((s) => s.id === t.statusId)?.isDone ? (
-                            <CircleCheck size={16} className="completed-icon" />
-                          ) : (
-                            <span className="task-circle" />
-                          )}
-                          {t.title}
-                        </button>
-                        {t.labels.length > 0 && (
-                          <div className="table-labels">
-                            {t.labels.map((l, i) => (
-                              <LabelChip name={l} key={i} />
-                            ))}
+            </header>
+            <ul className={styles.rows} aria-label={`Tareas de ${f.name}`}>
+              {rows.map((task) => {
+                const status = statuses.find((s) => s.id === task.statusId);
+                const overdue = taskOverdue(task, new Date(), timeZone) && !status?.isDone && !archived;
+                return (
+                  <li key={task.id} className={styles.row} onClick={() => open(task)}>
+                    <div className={styles.heading}>
+                      <button
+                        type="button"
+                        className={styles.title}
+                        aria-label={`Abrir tarea: ${task.title}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          open(task);
+                        }}
+                      >
+                        {status?.isDone ? (
+                          <CircleCheck size={17} className={styles.completed} aria-hidden="true" />
+                        ) : (
+                          <span className="task-circle" aria-hidden="true" />
+                        )}
+                        <span>{task.title}</span>
+                      </button>
+                      <div className={styles.status}>
+                        <StatusPill status={status} />
+                      </div>
+                    </div>
+                    {(task.leader || task.labels.length > 0) && (
+                      <div className={styles.context}>
+                        <TaskPeopleSummary leader={task.leader} teamMembers={task.teamMembers} />
+                        {task.labels.length > 0 && (
+                          <div className={styles.labels} aria-label="Etiquetas">
+                            {task.labels.map((label) => <LabelChip name={label} key={label} />)}
                           </div>
                         )}
-                      </td>
-                      <td>
-                        <StatusPill
-                          status={statuses.find((s) => s.id === t.statusId)}
-                        />
-                      </td>
-                      <td>
-                        <Priority priority={t.priority} />
-                      </td>
-                      <td>
-                        <TaskCategoryChip kind="type" id={t.typeId} />
-                        {!t.typeId && "Sin tipo"}
-                      </td>
-                      <td>
-                        <TaskCategoryChip kind="impact" id={t.impactId} />
-                        {!t.impactId && "Sin impacto"}
-                      </td>
-                      <td className="table-date" title={taskScheduleLabel(t)}>
-                        {t.startDate && (
-                          <span className="table-start-date">
-                            Inicio: {shortDate(t.startDate)}
-                            {t.startTime && ` · ${t.startTime}`}
-                          </span>
+                      </div>
+                    )}
+                    <div className={styles.details}>
+                      <dl className={styles.properties}>
+                        <div>
+                          <dt>Prioridad</dt>
+                          <dd><Priority priority={task.priority} /></dd>
+                        </div>
+                        <div>
+                          <dt>Tipo</dt>
+                          <dd>
+                            <TaskCategoryChip kind="type" id={task.typeId} />
+                            {!task.typeId && <span className={styles.unset}>Sin tipo</span>}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Impacto</dt>
+                          <dd>
+                            <TaskCategoryChip kind="impact" id={task.impactId} />
+                            {!task.impactId && <span className={styles.unset}>Sin impacto</span>}
+                          </dd>
+                        </div>
+                      </dl>
+                      <dl className={styles.schedule} title={taskScheduleLabel(task)}>
+                        {task.startDate && (
+                          <div>
+                            <dt>Inicio</dt>
+                            <dd>
+                              <time dateTime={`${task.startDate}${task.startTime ? `T${task.startTime}` : ""}`}>
+                                {shortDate(task.startDate)}
+                                {task.startTime && ` · ${task.startTime}`}
+                              </time>
+                            </dd>
+                          </div>
                         )}
-                        {t.dueDate ? shortDate(t.dueDate) : "Sin fecha"}
-                        {t.dueTime && ` · ${t.dueTime}`}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        <div className={overdue ? styles.overdue : undefined}>
+                          <dt>Entrega{overdue && <span> · Vencida</span>}</dt>
+                          <dd>
+                            {task.dueDate ? (
+                              <time dateTime={`${task.dueDate}${task.dueTime ? `T${task.dueTime}` : ""}`}>
+                                {shortDate(task.dueDate)}
+                                {task.dueTime && ` · ${task.dueTime}`}
+                              </time>
+                            ) : <span className={styles.unset}>Sin fecha</span>}
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           </section>
         );
       })}

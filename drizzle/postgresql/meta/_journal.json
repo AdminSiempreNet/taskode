@@ -8,6 +8,104 @@
       "when": 1792203452951,
       "tag": "0000_postgresql_initial",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792219066442,
+      "tag": "0001_global_clients",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792221258296,
+      "tag": "0002_task_sharing",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792292692163,
+      "tag": "0003_task_leader_and_team",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792293756894,
+      "tag": "0004_comment_realtime",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792296180752,
+      "tag": "0005_entity_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792299115069,
+      "tag": "0006_entity_leaders_and_teams",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792309631200,
+      "tag": "0007_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792311935472,
+      "tag": "0008_notification_order",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792355522303,
+      "tag": "0009_diagrams",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792357910522,
+      "tag": "0010_documents",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792360815312,
+      "tag": "0011_mentions",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792369239167,
+      "tag": "0012_clients_tickets",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792377514135,
+      "tag": "0013_users_invitations",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792384100520,
+      "tag": "0014_oauth_mcp",
+      "breakpoints": true
     }
   ]
 }

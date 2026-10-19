@@ -3,10 +3,15 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MarkdownContent } from "../src/components/markdown-content";
+import { ImagePreviewProvider } from "../src/components/image-preview";
 
 test("la descripción renderiza formato, listas y saltos de línea sin ejecutar HTML o enlaces peligrosos", () => {
   const render = (value: string) =>
-    renderToStaticMarkup(createElement(MarkdownContent, { children: value }));
+    renderToStaticMarkup(
+      createElement(ImagePreviewProvider, {
+        children: createElement(MarkdownContent, { children: value }),
+      }),
+    );
   const formatted = render(
     "## Objetivo\n\n**Texto importante** y *énfasis*\nOtra línea\n\n- Paso uno\n- Paso dos\n\n[Referencia](https://example.com)",
   );
@@ -24,9 +29,11 @@ test("la descripción renderiza formato, listas y saltos de línea sin ejecutar 
 
 test("las tarjetas muestran la descripción sin enlaces interactivos ni símbolos de formato", () => {
   const html = renderToStaticMarkup(
-    createElement(MarkdownContent, {
-      children: "**Importante** y [referencia](https://example.com)",
-      compact: true,
+    createElement(ImagePreviewProvider, {
+      children: createElement(MarkdownContent, {
+        children: "**Importante** y [referencia](https://example.com)",
+        compact: true,
+      }),
     }),
   );
   assert.match(html, /Importante/);

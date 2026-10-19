@@ -9,6 +9,7 @@ import type {
 } from "@/lib/types";
 
 export const ProjectCatalog = createContext<{
+  timeZone?: string;
   priorities: ProjectPriority[];
   taskTypes: ProjectTaskType[];
   impacts: ProjectImpact[];

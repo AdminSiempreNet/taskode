@@ -1,0 +1,111 @@
+.mention {
+  display: inline;
+  border-radius: 3px;
+  padding: 1px 3px;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.mention-client {
+  color: var(--foreground);
+  background: var(--accent);
+}
+.mention-ticket { color: var(--primary); background: color-mix(in srgb, var(--primary) 9%, var(--accent)); }
+.mention-ticket-description { white-space: pre-wrap; max-height: 160px; overflow: auto; }
+.mention-card > a { color: var(--primary); text-decoration: underline; font-size: 12px; }
+.mention[tabindex] {
+  cursor: default;
+}
+.mention:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.mention-node {
+  display: inline;
+}
+.mention-card {
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: 0 8px 30px #0002;
+  overflow-wrap: anywhere;
+}
+.mention-card .user-option-avatar {
+  flex: 0 0 96px;
+  width: 96px;
+  height: 96px;
+  font-size: 28px;
+}
+.mention-card .user-option-avatar img {
+  object-fit: contain;
+}
+.mention-card > span:last-child {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.mention-suggestions {
+  position: fixed;
+  z-index: 90;
+  width: min(320px, calc(100vw - 24px));
+  max-height: min(280px, calc(100dvh - 24px));
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  box-shadow: 0 6px 24px #0002;
+  pointer-events: auto;
+}
+.mention-suggestions [role="option"] {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 9px 12px;
+  cursor: pointer;
+}
+.mention-suggestions [role="option"][aria-selected="true"],
+.mention-suggestions [role="option"]:hover {
+  background: var(--accent);
+}
+.mention-suggestions [role="option"] > span:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.mention-suggestions strong {
+  font-size: 13px;
+}
+.mention-suggestions small {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.mention-suggestions p {
+  margin: 0;
+  padding: 12px;
+  font-size: 12px;
+}
+.mention-description-field .description-writing {
+  min-height: 90px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+[id^="comment-"]:target {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+  border-radius: 8px;
+}

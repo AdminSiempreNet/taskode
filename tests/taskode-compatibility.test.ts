@@ -76,12 +76,12 @@ test("Taskode admite enlaces de invitación anteriores y mantiene revocación y 
       repo,
       authConfig.BETTER_AUTH_SECRET,
       authConfig.BETTER_AUTH_URL,
-      async () => {},
     );
     const created = await service.create(
       { email: "legacy@example.com" },
       actor,
     );
+    assert.equal(created.kind, "invitation");
     const currentToken = new URL(created.invitation.url).pathname
       .split("/")
       .pop()!;

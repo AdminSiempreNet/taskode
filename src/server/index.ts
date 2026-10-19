@@ -10,6 +10,8 @@ const globalDatabase = globalThis as typeof globalThis & {
 };
 export function repository(): PostgresRepository {
   const previous = globalDatabase.taskodeRepository;
+  // Turbopack compiles pages and route handlers separately. Constructor identity
+  // can differ between those bundles even when they share the same contract.
   if (previous && previous.cacheVersion !== PostgresRepository.cacheVersion) {
     globalDatabase.taskodeRepository = undefined;
     globalDatabase.taskodeBackups = undefined;

@@ -9,7 +9,7 @@ import { BackupManager } from "../src/server/backups";
 import { PostgresRepository } from "../src/server/postgres";
 import { RESTORE_CONFIRMATION } from "../src/lib/backups";
 import type { ApplicationBackup } from "../src/server/backup-data";
-import { session, invitations } from "../src/server/schema";
+import { session, invitations, jwks, mcpActivity, oauthAccessToken, oauthClient, oauthConsent, oauthRefreshToken } from "../src/server/schema";
 import { randomUUID } from "node:crypto";
 async function setup() {
   const dir = await mkdtemp(join(tmpdir(), "taskode-backup-test-"));
@@ -41,13 +41,13 @@ async function setup() {
         priority: "medium",
         typeId: workspace.taskTypes[0].id,
         impactId: workspace.impacts[0].id,
-        ticketNumber: "001234",
         labels: ["Original"],
         dueDate: null,
       },
       actor,
     )
   ).createdId!;
+  await repo.execute({ type: "ticket.create", number: "001234", description: "", url: null, clientId: null, scope: { kind: "task", id: taskId, projectId } }, actor);
   await repo.execute(
     {
       type: "task.move",
@@ -114,7 +114,7 @@ test("respaldo JSON: lista, descarga, restaura con copia previa y elimina; reaju
       (await s.manager.download(backup.id)).toString(),
     ) as ApplicationBackup;
     assert.equal(file.format, "taskode-backup");
-    assert.equal(file.version, 1);
+    assert.equal(file.version, 12);
     assert.equal(file.tables.session, undefined);
     assert.equal(file.tables.verification, undefined);
     assert.deepEqual(await s.manager.list(), [backup]);
@@ -445,6 +445,27 @@ test("restaurar invalida sesiones, revoca invitaciones pendientes y conserva las
       restoredInvites.find((row) => row.id === "accepted")!.revokedAt,
       null,
     );
+  } finally {
+    await s.cleanup();
+  }
+});
+
+test("restaurar retira las aplicaciones conectadas y conserva las claves de firma", async () => {
+  const s = await setup();
+  try {
+    const now = new Date();
+    const later = new Date(Date.now() + 86400000);
+    await s.repo.store.db.insert(jwks).values({ id: "key", publicKey: "{}", privateKey: "secret", createdAt: now });
+    await s.repo.store.db.insert(oauthClient).values({ id: "c1", clientId: "client-1", redirectUris: ["http://127.0.0.1/cb"], createdAt: now, updatedAt: now });
+    await s.repo.store.db.insert(oauthConsent).values({ id: "consent", clientId: "client-1", userId: actor.id, scopes: ["taskode:read"], createdAt: now, updatedAt: now });
+    await s.repo.store.db.insert(oauthRefreshToken).values({ id: "r1", token: "refresh", clientId: "client-1", userId: actor.id, scopes: ["taskode:read"], expiresAt: later, createdAt: now });
+    await s.repo.store.db.insert(oauthAccessToken).values({ id: "a1", token: "access", clientId: "client-1", userId: actor.id, refreshId: "r1", scopes: ["taskode:read"], expiresAt: later, createdAt: now });
+    await s.repo.store.db.insert(mcpActivity).values({ id: "m1", userId: actor.id, clientId: "client-1", tool: "get_me", outcome: "ok" });
+    const backup = await s.manager.create();
+    await s.manager.restore({ backupId: backup.id }, RESTORE_CONFIRMATION, false);
+    for (const table of [oauthClient, oauthConsent, oauthRefreshToken, oauthAccessToken, mcpActivity])
+      assert.equal((await s.repo.store.db.select().from(table)).length, 0);
+    assert.equal((await s.repo.store.db.select().from(jwks)).length, 1);
   } finally {
     await s.cleanup();
   }

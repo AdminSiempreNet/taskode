@@ -1,11 +1,22 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createMarkdownParser } from "@/lib/markdown-parser";
+import {
+  EditorContent,
+  ReactNodeViewRenderer,
+  useEditor,
+  useEditorState,
+} from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Markdown } from "@tiptap/markdown";
+import { DescriptionImage } from "./description-image";
+import { ImageAlignmentControls } from "./image-alignment-controls";
+import { imageAlignment } from "@/lib/image-formatting";
+import { imagePasteExtension, MarkdownYoutube } from "./media-extensions";
 import { toast } from "sonner";
 import {
+  GitBranch,
   Bold,
   Check,
   Code,
@@ -22,6 +33,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MarkdownContent } from "./markdown-content";
+import type { EntityRef } from "@/lib/types";
+import { DiagramReference } from "./diagram-reference";
+import { DiagramReferenceView } from "./diagram-reference-view";
+import { DocumentDiagramPicker } from "./document-diagram-picker";
+import { Mention, MentionSuggestions } from "./mentions";
+import type { MentionContext } from "@/lib/mentions";
 
 export function DescriptionEditor({
   value,
@@ -29,29 +46,76 @@ export function DescriptionEditor({
   editing,
   setEditing,
   disabled,
-  onContentHeightChange,
+  uploadImage,
+  onUploadingChange,
+  diagramScope,
+  mentionContext,
+  label = "Descripción de la tarea",
 }: {
   value: string;
   onChange: (value: string) => void;
   editing: boolean;
   setEditing: (value: boolean) => void;
   disabled: boolean;
-  onContentHeightChange?: (height: number) => void;
+  uploadImage?: (file: File) => Promise<string>;
+  onUploadingChange?: (count: number) => void;
+  label?: string;
+  diagramScope?: EntityRef;
+  mentionContext?: MentionContext;
 }) {
+  const mentionRef = useRef(mentionContext);
+  mentionRef.current = mentionContext;
   const lastValue = useRef(value);
+  const uploads = useRef({ uploadImage, onUploadingChange });
+  uploads.current = { uploadImage, onUploadingChange };
+  const [uploading, setUploading] = useState(0);
   const root = useRef<HTMLElement>(null);
+  const [diagramPicker, setDiagramPicker] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [linkError, setLinkError] = useState("");
+  const scrollTop = useRef(0);
+  const pendingAction = useRef<(() => void) | null>(null);
+  const diagramInsertion = useRef<number | null>(null);
+  const markdownParser = useMemo(createMarkdownParser, []);
+  const clickPosition = useRef<{ left: number; top: number } | null>(null);
   const editor = useEditor({
     extensions: [
+      Mention.configure({ getContext: () => mentionRef.current }),
       StarterKit.configure({
         heading: { levels: [2, 3] },
         underline: false,
         trailingNode: false,
         link: { openOnClick: false, autolink: true },
       }),
-      Markdown.configure({ markedOptions: { breaks: true } }),
+      Markdown.configure({
+        marked: markdownParser,
+        markedOptions: { breaks: true },
+      }),
+      ...(diagramScope
+        ? [
+            DiagramReference.extend({
+              addNodeView() {
+                return ReactNodeViewRenderer(DiagramReferenceView);
+              },
+            }).configure({ scope: diagramScope }),
+          ]
+        : []),
+      DescriptionImage,
+      MarkdownYoutube,
+      imagePasteExtension(
+        (file) =>
+          uploads.current.uploadImage
+            ? uploads.current.uploadImage(file)
+            : Promise.reject(
+                new Error("No hay almacenamiento disponible para este editor."),
+              ),
+        (count) => {
+          setUploading(count);
+          uploads.current.onUploadingChange?.(count);
+        },
+        (message) => toast.error(message),
+      ),
     ],
     content: value,
     contentType: "markdown",
@@ -59,7 +123,7 @@ export function DescriptionEditor({
     editorProps: {
       attributes: {
         role: "textbox",
-        "aria-label": "Descripción de la tarea",
+        "aria-label": label,
         "aria-multiline": "true",
         class: "rich-text description-writing",
       },
@@ -71,7 +135,7 @@ export function DescriptionEditor({
           contentType: "markdown",
           emitUpdate: false,
         });
-        toast.error("La descripción admite hasta 30.000 caracteres.");
+        toast.error("El contenido admite hasta 30.000 caracteres.");
         return;
       }
       lastValue.current = next;
@@ -88,6 +152,12 @@ export function DescriptionEditor({
       blockquote: editor?.isActive("blockquote") ?? false,
       code: editor?.isActive("code") ?? false,
       link: editor?.isActive("link") ?? false,
+      image: editor?.isActive("image") ?? false,
+      imagePosition: editor?.isActive("image")
+        ? editor.state.selection.from
+        : null,
+      imageAlignment: editor?.getAttributes("image").alignment as
+        string | undefined,
       style: editor?.isActive("heading", { level: 2 })
         ? "h2"
         : editor?.isActive("heading", { level: 3 })
@@ -109,71 +179,50 @@ export function DescriptionEditor({
   useEffect(() => {
     if (!editor) return;
     editor.setEditable(editing && !disabled, false);
-    if (editing && !disabled) editor.commands.focus("end");
-    if (!editing) setLinkOpen(false);
+    const viewport = root.current?.querySelector<HTMLElement>(
+      editing ? ".description-editor-content" : ".description-rendered",
+    );
+    if (viewport) viewport.scrollTop = scrollTop.current;
+    if (editing && !disabled) {
+      if (clickPosition.current) {
+        const position = editor.view.posAtCoords(clickPosition.current);
+        if (position) editor.commands.setTextSelection(position.pos);
+        clickPosition.current = null;
+      }
+      const action = pendingAction.current;
+      pendingAction.current = null;
+      if (action) action();
+      else editor.commands.focus(undefined, { scrollIntoView: false });
+    } else {
+      setLinkOpen(false);
+    }
   }, [editor, editing, disabled]);
   useEffect(() => {
     if (!editing) return;
-    const outside = (event: PointerEvent) => {
+    const outside = (event: MouseEvent) => {
       if (
         root.current &&
         event.target instanceof Node &&
-        !root.current.contains(event.target)
+        !(
+          event.target instanceof Element &&
+          event.target.closest("[data-image-preview], [data-document-picker], .mention-suggestions, .mention-card")
+        ) &&
+        !root.current.contains(event.target) && !event.composedPath().includes(root.current)
       )
         setEditing(false);
     };
-    document.addEventListener("pointerdown", outside);
-    return () => document.removeEventListener("pointerdown", outside);
+    // Finish the clicked action before collapsing the editor changes its layout.
+    document.addEventListener("click", outside);
+    return () => document.removeEventListener("click", outside);
   }, [editing, setEditing]);
-  useLayoutEffect(() => {
-    if (!root.current || !onContentHeightChange) return;
-    const element = root.current;
-    const viewport = element.querySelector<HTMLElement>(
-      editing ? ".description-editor-content" : ".description-rendered",
-    );
-    const writing = editing
-      ? element.querySelector<HTMLElement>(".description-writing")
-      : (viewport?.querySelector<HTMLElement>(".rich-text") ?? viewport);
-    if (!writing || !viewport) return;
-    const measure = () => {
-      const first = writing.firstElementChild;
-      const last = writing.lastElementChild;
-      const style = getComputedStyle(editing ? writing : viewport);
-      // Measure document blocks, excluding the editor's minimum fill height,
-      // so removing text can shrink the editor again.
-      const contentHeight =
-        first && last
-          ? last.getBoundingClientRect().bottom -
-            first.getBoundingClientRect().top +
-            parseFloat(getComputedStyle(first).marginTop) +
-            parseFloat(getComputedStyle(last).marginBottom)
-          : parseFloat(style.lineHeight);
-      const toolbarHeight = Array.from(element.children)
-        .filter(
-          (child) => !child.classList.contains("description-editor-content"),
-        )
-        .filter((child) => !child.classList.contains("description-rendered"))
-        .reduce(
-          (height, child) => height + child.getBoundingClientRect().height,
-          0,
-        );
-      onContentHeightChange(
-        Math.ceil(
-          contentHeight +
-            parseFloat(style.paddingTop) +
-            parseFloat(style.paddingBottom) +
-            toolbarHeight +
-            2,
-        ),
-      );
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(writing);
-    observer.observe(viewport);
-    for (const child of element.children) observer.observe(child);
-    return () => observer.disconnect();
-  }, [editor, editing, value, linkOpen, linkError, onContentHeightChange]);
+  function startEditing(action?: () => void) {
+    if (!editor || disabled) return;
+    if (editing) action?.();
+    else {
+      pendingAction.current = action ?? null;
+      setEditing(true);
+    }
+  }
   const controls = [
     {
       label: "Negrita",
@@ -228,172 +277,261 @@ export function DescriptionEditor({
       ref={root}
       className="description-editor"
       data-editing={editing}
-      aria-label="Descripción de la tarea"
+      aria-label={label}
       onBlurCapture={(event) => {
         if (
           event.relatedTarget instanceof Node &&
+          !(
+            event.relatedTarget instanceof Element &&
+            event.relatedTarget.closest(
+              "button, [data-image-preview], [data-document-picker], .mention-suggestions, .mention-card",
+            )
+          ) &&
           !event.currentTarget.contains(event.relatedTarget)
         )
           setEditing(false);
       }}
     >
-      {editing ? (
-        <>
-          <div
-            className="description-toolbar"
-            role="group"
-            aria-label="Formato de la descripción"
+      {uploading > 0 && (
+        <span className="field-hint" role="status">
+          Cargando {uploading} imagen(es)…
+        </span>
+      )}
+      {diagramScope && (
+        <DocumentDiagramPicker
+          scope={diagramScope}
+          open={diagramPicker}
+          onClose={() => setDiagramPicker(false)}
+          onSelect={(diagram) => {
+            setDiagramPicker(false);
+            startEditing(() =>
+              editor
+                ?.chain()
+                .focus()
+                .insertContentAt(
+                  diagramInsertion.current ?? editor.state.selection.to,
+                  [
+                    {
+                      type: "diagramReference",
+                      attrs: {
+                        projectId: diagram.scope.projectId,
+                        diagramId: diagram.id,
+                        title: diagram.title,
+                      },
+                    },
+                    { type: "paragraph" },
+                  ],
+                )
+                .run(),
+            );
+          }}
+        />
+      )}
+      <div
+        className="description-toolbar"
+        role="group"
+        aria-label="Formato de la descripción"
+      >
+        <select
+          aria-label="Estilo del texto"
+          value={state?.style ?? "p"}
+          disabled={!editor || disabled}
+          onChange={(event) => {
+            const style = event.target.value;
+            startEditing(() => {
+              if (style === "p") editor?.chain().focus().setParagraph().run();
+              else
+                editor
+                  ?.chain()
+                  .focus()
+                  .toggleHeading({ level: style === "h2" ? 2 : 3 })
+                  .run();
+            });
+          }}
+        >
+          <option value="p">Texto</option>
+          <option value="h2">Título</option>
+          <option value="h3">Subtítulo</option>
+        </select>
+        {controls.map((control) => (
+          <button
+            key={control.label}
+            type="button"
+            aria-label={control.label}
+            title={control.label}
+            aria-pressed={control.active}
+            disabled={!editor || disabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => startEditing(control.run)}
           >
-            <select
-              aria-label="Estilo del texto"
-              value={state?.style ?? "p"}
-              disabled={!editor || disabled}
-              onChange={(event) => {
-                if (event.target.value === "p")
-                  editor?.chain().focus().setParagraph().run();
-                else
-                  editor
-                    ?.chain()
-                    .focus()
-                    .toggleHeading({
-                      level: event.target.value === "h2" ? 2 : 3,
-                    })
-                    .run();
-              }}
-            >
-              <option value="p">Texto</option>
-              <option value="h2">Título</option>
-              <option value="h3">Subtítulo</option>
-            </select>
-            {controls.map((control) => (
-              <button
-                key={control.label}
-                type="button"
-                aria-label={control.label}
-                title={control.label}
-                aria-pressed={control.active}
-                disabled={!editor || disabled}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={control.run}
-              >
-                <control.icon size={16} />
-              </button>
-            ))}
-            <button
-              type="button"
-              aria-label="Añadir o editar enlace"
-              title="Añadir o editar enlace"
-              aria-pressed={state?.link}
-              disabled={!editor || disabled}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                setUrl(editor?.getAttributes("link").href ?? "");
-                setLinkError("");
-                setLinkOpen(!linkOpen);
-              }}
-            >
-              <Link2 size={16} />
-            </button>
-            {state?.link && (
-              <button
-                type="button"
-                aria-label="Quitar enlace"
-                title="Quitar enlace"
-                disabled={disabled}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => editor?.chain().focus().unsetLink().run()}
-              >
-                <Unlink size={16} />
-              </button>
-            )}
-            <button
-              type="button"
-              aria-label="Deshacer"
-              title="Deshacer"
-              disabled={disabled || !state?.canUndo}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => editor?.chain().focus().undo().run()}
-            >
-              <Undo2 size={16} />
-            </button>
-            <button
-              type="button"
-              aria-label="Rehacer"
-              title="Rehacer"
-              disabled={disabled || !state?.canRedo}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => editor?.chain().focus().redo().run()}
-            >
-              <Redo2 size={16} />
-            </button>
-            <button
-              type="button"
-              className="description-finish"
-              aria-label="Terminar edición de descripción"
-              title="Terminar edición"
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => setEditing(false)}
-            >
-              <Check size={16} />
-            </button>
-          </div>
-          {linkOpen && (
-            <div className="description-link-form">
-              <Input
-                aria-label="Dirección del enlace"
-                placeholder="https://ejemplo.com"
-                value={url}
-                onChange={(event) => setUrl(event.target.value)}
-                autoFocus
-                maxLength={2000}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    applyLink();
-                  }
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    setLinkOpen(false);
-                    editor?.commands.focus();
-                  }
-                }}
-              />
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={disabled || !url.trim()}
-                onClick={applyLink}
-              >
-                Aplicar
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="Cancelar enlace"
-                onClick={() => {
-                  setLinkOpen(false);
-                  editor?.commands.focus();
-                }}
-              >
-                <X size={14} />
-              </Button>
-              {linkError && <p role="alert">{linkError}</p>}
-            </div>
-          )}
-          <EditorContent
-            editor={editor}
-            className="description-editor-content"
+            <control.icon size={16} />
+          </button>
+        ))}
+        <button
+          type="button"
+          aria-label="Añadir o editar enlace"
+          title="Añadir o editar enlace"
+          aria-pressed={state?.link}
+          disabled={!editor || disabled}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            startEditing(() => {
+              setUrl(editor?.getAttributes("link").href ?? "");
+              setLinkError("");
+              setLinkOpen((open) => !open);
+            });
+          }}
+        >
+          <Link2 size={16} />
+        </button>
+        {state?.link && (
+          <button
+            type="button"
+            aria-label="Quitar enlace"
+            title="Quitar enlace"
+            disabled={disabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() =>
+              startEditing(() => {
+                editor?.chain().focus().unsetLink().run();
+              })
+            }
+          >
+            <Unlink size={16} />
+          </button>
+        )}
+        {diagramScope && (
+          <button
+            type="button"
+            aria-label="Insertar diagrama"
+            title="Insertar diagrama"
+            disabled={!editor || disabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() =>
+              startEditing(() => {
+                diagramInsertion.current = editor?.state.selection.to ?? null;
+                setDiagramPicker(true);
+              })
+            }
+          >
+            <GitBranch size={16} />
+          </button>
+        )}
+        <button
+          type="button"
+          aria-label="Deshacer"
+          title="Deshacer"
+          disabled={disabled || !state?.canUndo}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() =>
+            startEditing(() => {
+              editor?.chain().focus().undo().run();
+            })
+          }
+        >
+          <Undo2 size={16} />
+        </button>
+        <button
+          type="button"
+          aria-label="Rehacer"
+          title="Rehacer"
+          disabled={disabled || !state?.canRedo}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() =>
+            startEditing(() => {
+              editor?.chain().focus().redo().run();
+            })
+          }
+        >
+          <Redo2 size={16} />
+        </button>
+        <button
+          type="button"
+          className="description-finish"
+          aria-label="Terminar edición de descripción"
+          title="Terminar edición"
+          disabled={!editing || disabled}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => setEditing(false)}
+        >
+          <Check size={16} />
+        </button>
+      </div>
+      {editing && state?.image && editor && (
+        <ImageAlignmentControls
+          editor={editor}
+          selectedPosition={state.imagePosition}
+          alignment={imageAlignment(state.imageAlignment)}
+          disabled={disabled}
+        />
+      )}
+      {linkOpen && (
+        <div className="description-link-form">
+          <Input
+            aria-label="Dirección del enlace"
+            placeholder="https://ejemplo.com"
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+            autoFocus
+            maxLength={2000}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                applyLink();
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setLinkOpen(false);
+                editor?.commands.focus();
+              }
+            }}
           />
-        </>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={disabled || !url.trim()}
+            onClick={applyLink}
+          >
+            Aplicar
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Cancelar enlace"
+            onClick={() => {
+              setLinkOpen(false);
+              editor?.commands.focus();
+            }}
+          >
+            <X size={14} />
+          </Button>
+          {linkError && <p role="alert">{linkError}</p>}
+        </div>
+      )}
+      {editing ? (
+        <EditorContent
+          editor={editor}
+          className="description-editor-content"
+          onScroll={(event) => {
+            scrollTop.current = event.currentTarget.scrollTop;
+          }}
+        />
       ) : (
         <>
           <div
             className="description-rendered"
             role="region"
-            aria-label="Editar descripción"
+            aria-label={
+              diagramScope
+                ? "Editar contenido del documento"
+                : "Editar descripción"
+            }
             tabIndex={disabled ? -1 : 0}
+            onScroll={(event) => {
+              scrollTop.current = event.currentTarget.scrollTop;
+            }}
             onKeyDown={(event) => {
               if (
                 !disabled &&
@@ -401,16 +539,26 @@ export function DescriptionEditor({
                 (event.key === "Enter" || event.key === "F2")
               ) {
                 event.preventDefault();
-                setEditing(true);
+                startEditing();
               }
             }}
             onClick={(event) => {
-              if (!disabled && !(event.target as HTMLElement).closest("a"))
-                setEditing(true);
+              if (
+                !disabled &&
+                !(event.target as HTMLElement).closest("a, button, .mention")
+              ) {
+                clickPosition.current = {
+                  left: event.clientX,
+                  top: event.clientY,
+                };
+                startEditing();
+              }
             }}
           >
             {value ? (
-              <MarkdownContent>{value}</MarkdownContent>
+              <MarkdownContent diagramScope={diagramScope} mentionContext={mentionContext}>
+                {value}
+              </MarkdownContent>
             ) : (
               <span className="description-placeholder">
                 Añade contexto, notas o enlaces…
@@ -419,6 +567,7 @@ export function DescriptionEditor({
           </div>
         </>
       )}
+      <MentionSuggestions editor={editor} context={editing ? mentionContext : undefined} />
     </section>
   );
 }

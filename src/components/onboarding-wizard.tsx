@@ -53,7 +53,7 @@ export function OnboardingWizard({ workspace }: { workspace: Workspace }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "finish" }),
       });
-      window.location.assign(projectId ? `/projects/${projectId}` : "/projects");
+      window.location.assign("/dashboard");
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo terminar.");
       setBusy(false);

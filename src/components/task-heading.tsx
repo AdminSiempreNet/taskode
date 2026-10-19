@@ -1,23 +1,33 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Check, ChevronDown, Plus, Search, Tags, X } from "lucide-react";
-import { Popover } from "radix-ui";
+import { Check, Plus, Search, Tags } from "lucide-react";
+import { Popover, Tooltip } from "radix-ui";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { LabelChip, colorStyle, useProjectCatalog } from "./project-catalog";
+import { colorStyle, useProjectCatalog } from "./project-catalog";
 import type { Mutate } from "./forms";
+import { EntityTypeIcon } from "./entity-type-icon";
+import type { EntityKind } from "@/lib/types";
 
-export function InlineTaskTitle({
+export function InlineTitle({
   value,
   change,
   commit,
   busy,
+  label = "Título de la tarea",
+  maxLength = 300,
+  readOnly = false,
+  kind = "task",
 }: {
   value: string;
   change: (value: string) => void;
   commit: (value: string) => void;
   busy: boolean;
+  label?: string;
+  maxLength?: number;
+  readOnly?: boolean;
+  kind?: EntityKind;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   const initialValue = useRef(value);
@@ -29,29 +39,35 @@ export function InlineTaskTitle({
   }, [value]);
   return (
     <h1 className="inline-task-title">
+      <EntityTypeIcon kind={kind} />
       <span
         ref={ref}
         role="textbox"
-        aria-label="Título de la tarea"
+        aria-label={label}
         aria-multiline="false"
-        contentEditable={!busy ? "plaintext-only" : false}
+        aria-readonly={readOnly}
+        contentEditable={!busy && !readOnly ? "plaintext-only" : false}
         suppressContentEditableWarning
         tabIndex={0}
-        data-placeholder="Escribe el título de la tarea…"
-        title="Clic para editar · Enter para guardar · Escape para cancelar"
+        data-placeholder={`Escribe ${label.toLocaleLowerCase("es")}…`}
+        title={
+          readOnly
+            ? label
+            : "Clic para editar · Enter para guardar · Escape para cancelar"
+        }
         onFocus={() => {
           beforeEdit.current = value;
           cancelled.current = false;
         }}
         onInput={(event) => {
           const text = event.currentTarget.textContent ?? "";
-          if (text.length > 300) {
-            event.currentTarget.textContent = text.slice(0, 300);
+          if (text.length > maxLength) {
+            event.currentTarget.textContent = text.slice(0, maxLength);
             const selection = window.getSelection();
             selection?.selectAllChildren(event.currentTarget);
             selection?.collapseToEnd();
           }
-          change(text.slice(0, 300));
+          change(text.slice(0, maxLength));
         }}
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing) return;
@@ -68,7 +84,8 @@ export function InlineTaskTitle({
           }
         }}
         onBlur={(event) => {
-          if (!cancelled.current) commit(event.currentTarget.textContent ?? "");
+          if (!readOnly && !cancelled.current)
+            commit(event.currentTarget.textContent ?? "");
         }}
       >
         {initialValue.current}
@@ -114,19 +131,34 @@ export function TaskLabelPicker({
   }, [active, open, listId, filtered]);
   return (
     <div className="task-title-labels" aria-label="Etiquetas de la tarea">
-      <div className="selected-labels">
-        {selected.map((name) => (
-          <button
-            key={name}
-            type="button"
-            onClick={() => toggle(name)}
-            aria-label={`Quitar etiqueta ${name}`}
-          >
-            <LabelChip name={name} />
-            <X size={12} />
-          </button>
-        ))}
-      </div>
+      <Tooltip.Provider delayDuration={200}>
+        <div className="selected-labels">
+          {selected.map((name) => (
+            <Tooltip.Root key={name}>
+              <Tooltip.Trigger asChild>
+                <span
+                  className="task-label-dot"
+                  style={colorStyle(
+                    labels.find((label) => label.name === name)?.color,
+                  )}
+                  role="img"
+                  aria-label={name}
+                  tabIndex={0}
+                />
+              </Tooltip.Trigger>
+              <Tooltip.Portal>
+                <Tooltip.Content
+                  className="task-label-tooltip"
+                  sideOffset={6}
+                  collisionPadding={12}
+                >
+                  {name}
+                </Tooltip.Content>
+              </Tooltip.Portal>
+            </Tooltip.Root>
+          ))}
+        </div>
+      </Tooltip.Provider>
       <Popover.Root
         open={open}
         onOpenChange={(value) => {
@@ -140,14 +172,14 @@ export function TaskLabelPicker({
         <Popover.Trigger asChild>
           <Button
             type="button"
-            variant="outline"
-            size="sm"
+            variant="ghost"
+            size="icon-sm"
             className="label-combobox-trigger"
-            aria-label="Seleccionar etiquetas"
+            aria-label="Agregar o quitar etiquetas"
+            title="Agregar o quitar etiquetas"
+            disabled={busy}
           >
-            <Tags size={15} />
-            <span>Etiquetas</span>
-            <ChevronDown size={13} />
+            <Tags size={15} aria-hidden="true" />
           </Button>
         </Popover.Trigger>
         <Popover.Portal>
@@ -294,3 +326,5 @@ export function TaskLabelPicker({
     </div>
   );
 }
+
+export { InlineTitle as InlineTaskTitle };

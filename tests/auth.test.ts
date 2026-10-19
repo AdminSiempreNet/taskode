@@ -34,12 +34,12 @@ test("OAuth real de Better Auth: primer administrador, invitación obligatoria y
       repo,
       authConfig.BETTER_AUTH_SECRET,
       authConfig.BETTER_AUTH_URL,
-      async () => {},
     );
     const result = await invites.create(
       { email: "member@example.com", projectIds: [] },
       { id: admin.id },
     );
+    assert.equal(result.kind, "invitation");
     const token = new URL(result.invitation.url).pathname.split("/").pop()!;
     const accepted = await oauthLogin(
       bundle,
@@ -68,13 +68,8 @@ test("OAuth real de Better Auth: primer administrador, invitación obligatoria y
       { email: "member@example.com", projectIds: [project.createdId] },
       { id: admin.id },
     );
-    const laterToken = new URL(later.invitation.url).pathname.split("/").pop()!;
-    assert.equal(
-      (
-        await oauthLogin(bundle, "github", "member@example.com", laterToken)
-      ).headers.get("location"),
-      "/",
-    );
+    assert.equal(later.kind, "assigned");
+    assert.deepEqual(later.addedProjectIds, [project.createdId]);
     const member = (
       await repo.store.db
         .select()
@@ -134,13 +129,13 @@ test("OAuth: correo incorrecto y fallos al crear la cuenta no consumen la invita
         repo,
         authConfig.BETTER_AUTH_SECRET,
         authConfig.BETTER_AUTH_URL,
-        async () => {},
-      );
+        );
     const invitation = await service.create(
         { email: "invited@example.com" },
         { id: admin.id },
-      ),
-      token = new URL(invitation.invitation.url).pathname.split("/").pop()!;
+      );
+    assert.equal(invitation.kind, "invitation");
+    const token = new URL(invitation.invitation.url).pathname.split("/").pop()!;
     const mismatch = await oauthLogin(
       bundle,
       "github",

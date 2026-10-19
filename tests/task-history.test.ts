@@ -174,7 +174,7 @@ test("los cambios rechazados no añaden historial ni modifican la tarea", async 
           },
           actor,
         ),
-      /destino/,
+      /no existe|acceso/,
     );
     await assert.rejects(
       async () =>

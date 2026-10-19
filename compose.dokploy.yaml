@@ -1,5 +1,21 @@
-# Producción: solo PostgreSQL. La aplicación Next.js se aloja en Vercel.
+# Producción: PostgreSQL y programador de notificaciones. La web sigue en Vercel.
 services:
+  notifications:
+    image: node:24-alpine
+    command: ["node", "/scheduler.mjs"]
+    environment:
+      NOTIFICATION_PROCESS_URL: ${NOTIFICATION_PROCESS_URL:-https://taskode.siempre.net.co/api/internal/notifications/process}
+      NOTIFICATION_WORKER_SECRET: ${NOTIFICATION_WORKER_SECRET:?Configura NOTIFICATION_WORKER_SECRET}
+    configs:
+      - source: notification-scheduler
+        target: /scheduler.mjs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "const fs=require('node:fs');process.exit(Date.now()-Number(fs.readFileSync('/tmp/last-success','utf8'))<180000?0:1)"]
+      interval: 60s
+      timeout: 5s
+      start_period: 90s
+      retries: 3
   postgres:
     image: pgvector/pgvector:0.8.7-pg18-bookworm
     environment:
@@ -37,6 +53,27 @@ volumes:
   taskode-postgres:
     name: ${TASKODE_POSTGRES_VOLUME:-${COMPOSE_PROJECT_NAME:-tareas}_taskode-postgres}
 configs:
+  notification-scheduler:
+    content: |
+      import { writeFile } from 'node:fs/promises';
+      const endpoint = new URL(process.env.NOTIFICATION_PROCESS_URL);
+      if (endpoint.protocol !== 'https:' || endpoint.username || endpoint.password) throw Error('Se requiere un endpoint HTTPS.');
+      if ((process.env.NOTIFICATION_WORKER_SECRET || '').length < 32) throw Error('Se requiere un secreto de al menos 32 caracteres.');
+      let cursor = null;
+      for (;;) {
+        const started = Date.now();
+        try {
+          const url = new URL(endpoint);
+          if (cursor) url.searchParams.set('after', cursor);
+          const response = await fetch(url, { method: 'POST', redirect: 'error', headers: { Authorization: 'Bearer ' + process.env.NOTIFICATION_WORKER_SECRET }, signal: AbortSignal.timeout(55000) });
+          if (!response.ok) throw Error('HTTP ' + response.status);
+          const result = await response.json();
+          cursor = result.nextCursor;
+          console.log(JSON.stringify({ at: new Date().toISOString(), ...result }));
+          await writeFile('/tmp/last-success', String(Date.now()));
+        } catch { console.warn('No se pudo procesar notificaciones; se reintentará en el siguiente ciclo.'); }
+        await new Promise(resolve => setTimeout(resolve, Math.max(1000, 60000 - (Date.now() - started))));
+      }
   postgres-init:
     content: |
       #!/bin/sh

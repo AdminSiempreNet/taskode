@@ -8,8 +8,11 @@ import {
   Github,
   Loader2,
   LockKeyhole,
+  ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import type { OAuthClientView } from "@/server/oauth-ui";
 import { Button } from "./ui/button";
 import { TaskodeBrand } from "./taskode-brand";
 
@@ -19,12 +22,16 @@ export function AuthScreen({
   invitation,
   email,
   error,
+  returnTo = "/dashboard",
+  oauth,
 }: {
   providers: { google: boolean; github: boolean };
   bootstrap?: boolean;
   invitation?: string;
   email?: string;
   error?: string;
+  returnTo?: string;
+  oauth?: OAuthClientView;
 }) {
   const [pending, setPending] = useState(""),
     [message, setMessage] = useState(error || "");
@@ -32,14 +39,25 @@ export function AuthScreen({
     setPending(provider);
     setMessage("");
     try {
-      const result = await authClient.signIn.social({
-        provider,
-        callbackURL: "/projects",
-        newUserCallbackURL: "/projects",
-        errorCallbackURL: invitation ? `/invite/${invitation}` : "/login",
-        requestSignUp: bootstrap || Boolean(invitation),
-        additionalData: invitation ? { invitation } : undefined,
-      });
+      // With an OAuth request, the client plugin sends the signed query and Better Auth
+      // resumes the authorization after the provider callback (callbackURL is ignored).
+      const result = await authClient.signIn.social(
+        oauth
+          ? {
+              provider,
+              callbackURL: "/dashboard",
+              errorCallbackURL: "/login?error=oauth",
+              requestSignUp: false,
+            }
+          : {
+              provider,
+              callbackURL: returnTo,
+              newUserCallbackURL: returnTo,
+              errorCallbackURL: invitation ? `/invite/${invitation}` : "/login",
+              requestSignUp: bootstrap || Boolean(invitation),
+              additionalData: invitation ? { invitation } : undefined,
+            },
+      );
       if (result.error)
         throw new Error(result.error.message || "No se pudo iniciar sesión.");
     } catch (e) {
@@ -132,14 +150,22 @@ export function AuthScreen({
           <div className="auth-card-content">
             <span className="auth-card-eyebrow">TU ESPACIO DE DESARROLLO</span>
             <h1 id="auth-title">
-              {invitation
-                ? "Tu equipo te espera"
-                : bootstrap
-                  ? "Empieza con Taskode"
-                  : "Vuelve a tu proyecto"}
+              {oauth
+                ? `Conectar ${oauth.name}`
+                : invitation
+                  ? "Tu equipo te espera"
+                  : bootstrap
+                    ? "Empieza con Taskode"
+                    : "Vuelve a tu proyecto"}
             </h1>
+            {oauth && <OAuthClientBadge client={oauth} />}
             <p>
-              {email ? (
+              {oauth ? (
+                <>
+                  Inicia sesión con tu cuenta de Taskode. Después revisarás
+                  qué podrá hacer <strong>{oauth.name}</strong> en tu nombre.
+                </>
+              ) : email ? (
                 <>
                   Continúa con la cuenta cuyo correo es <strong>{email}</strong>
                   .
@@ -202,11 +228,13 @@ export function AuthScreen({
             <div className="auth-access-note">
               <LockKeyhole size={14} aria-hidden="true" />
               <p className="auth-note">
-                {invitation
-                  ? "Tu invitación te dará acceso a los proyectos de tu equipo."
-                  : bootstrap
-                    ? "Accede de forma segura con tu cuenta de Google o GitHub."
-                    : "El acceso a este espacio requiere una invitación."}
+                {oauth
+                  ? "Solo las cuentas que ya tienen acceso a Taskode pueden autorizar aplicaciones."
+                  : invitation
+                    ? "Tu invitación te dará acceso a los proyectos de tu equipo."
+                    : bootstrap
+                      ? "Accede de forma segura con tu cuenta de Google o GitHub."
+                      : "El acceso a este espacio requiere una invitación."}
               </p>
             </div>
           </div>
@@ -216,5 +244,27 @@ export function AuthScreen({
         </section>
       </div>
     </main>
+  );
+}
+export function OAuthClientBadge({ client }: { client: OAuthClientView }) {
+  return (
+    <div
+      className={`oauth-client-badge${client.verifiedHost ? "" : " oauth-client-unverified"}`}
+    >
+      {client.verifiedHost ? (
+        <ShieldCheck size={15} aria-hidden="true" />
+      ) : (
+        <ShieldAlert size={15} aria-hidden="true" />
+      )}
+      <span>
+        {client.verifiedHost
+          ? `Identidad publicada por ${client.verifiedHost}`
+          : "Registrada automáticamente: confirma que reconoces esta aplicación."}
+        <br />
+        {client.loopback
+          ? "Devolverá el acceso a una aplicación de este equipo."
+          : `Devolverá el acceso a ${client.redirectHost}.`}
+      </span>
+    </div>
   );
 }

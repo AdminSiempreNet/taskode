@@ -1,15 +1,19 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useWorkspaceRouter } from "./unsaved-changes";
+import Link from "next/link";
 import {
   Archive,
   ArrowLeft,
   DatabaseBackup,
   ArrowUpRight,
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleHelp,
+  FolderKanban,
   Layers3,
   LayoutGrid,
   List,
@@ -23,6 +27,7 @@ import {
   Code2,
   Upload,
   Users,
+  Ticket as TicketIcon,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -48,18 +53,56 @@ import {
   type Modal,
   type MutationResult,
 } from "./forms";
-import type { Workspace, Task } from "@/lib/types";
-import { getProjectView, projectPath, taskPath } from "@/lib/routes";
+import type {
+  Client,
+  Workspace,
+  Task,
+  EntityDetailSnapshot,
+  EntityKind,
+} from "@/lib/types";
+import {
+  entityPath,
+  getProjectView,
+  projectPath,
+  taskPath,
+} from "@/lib/routes";
 import { ProjectCatalog } from "./project-catalog";
 import { SettingsModal } from "./settings-modal";
 import { BackupModal } from "./backup-modal";
+import { EntityDetail } from "./entity-detail";
 import { TaskDetail, type TaskDefaults } from "./task-detail";
+import { ClientsManager } from "./clients-manager";
+import { TicketsManager } from "./tickets";
+import { invalidateMentionOptions } from "./mentions";
+import { Dashboard, ProjectsDirectory } from "./dashboard";
+import type { DashboardScope } from "@/lib/dashboard";
 import { AccountMenu, ProfileModal } from "./account-menu";
-import { UsersModal } from "./invitation-manager";
+import { NotificationBell, NotificationsPage } from "./notifications";
+import { UsersManager } from "./users-manager";
 import { ProjectPeopleModal } from "./project-people";
-import { CatalogFilter, useProjectFilter } from "./status-filter";
-import { matchesTaskFilters } from "@/lib/task-filters";
+import { useProjectFilter } from "./status-filter";
+import { TaskFilterControls } from "./task-filter-controls";
+import {
+  MINE_FILTER,
+  UNASSIGNED_FILTER,
+  matchesTaskFilters,
+} from "@/lib/task-filters";
+import { taskMatchesText } from "@/lib/task-search";
+import {
+  filterGroupValues,
+  groupedFilterIds,
+  taskFilterOptions,
+} from "@/lib/task-filter-options";
 import { readPreference } from "@/lib/preferences";
+import { normalizeWorkspaceSnapshot } from "@/lib/workspace";
+import type { CatalogTicket } from "@/lib/catalogs";
+import type { Paginated } from "@/lib/pagination";
+import {
+  readProjectPreferences,
+  rememberProject,
+  saveProjectPreferences,
+  type ProjectPreferences,
+} from "@/lib/project-navigation";
 
 export function WorkspaceApp({
   initialWorkspace,
@@ -67,20 +110,51 @@ export function WorkspaceApp({
   taskId = "",
   taskDefaults,
   initialTaskCreation,
+  menuSection,
+  entityRoute,
+  initialEntityDetail,
+  dashboardScope,
+  initialNow,
+  notificationOpenId,
+  initialClientsPage,
+  initialTicketsPage,
 }: {
   initialWorkspace: Workspace;
+  initialClientsPage?: Paginated<Client>;
+  initialTicketsPage?: Paginated<CatalogTicket>;
   projectId?: string;
   taskId?: string;
   taskDefaults?: TaskDefaults;
   initialTaskCreation?: TaskDefaults;
+  menuSection?: "dashboard" | "clients" | "tickets" | "projects" | "notifications" | "users";
+  notificationOpenId?: string;
+  entityRoute?: { kind: Exclude<EntityKind, "task">; id: string };
+  initialEntityDetail?: EntityDetailSnapshot;
+  dashboardScope?: DashboardScope;
+  initialNow?: string;
 }) {
-  const router = useRouter();
+  const menuMode = !!menuSection;
+  const workspaceUrl = menuSection === "clients" || menuSection === "tickets"
+    ? "/api/workspace?catalogs=none" : "/api/workspace";
+  const contextRoute = entityRoute ?? dashboardScope;
+  const router = useWorkspaceRouter();
   const searchParams = useSearchParams();
   const view = getProjectView(searchParams.get("view"));
-  const [workspace, setWorkspace] = useState<Workspace | null>(
+  const [workspaceSnapshot, setWorkspace] = useState<Workspace | null>(
     initialWorkspace,
   );
-  const [featureId, setFeatureId] = useState("all");
+  const workspace = useMemo(
+    () => workspaceSnapshot ? normalizeWorkspaceSnapshot(workspaceSnapshot) : null,
+    [workspaceSnapshot],
+  );
+  const [featureId, setFeatureId] = useState(
+    searchParams.get("featureId") ?? "all",
+  );
+  const [projectPreferences, setProjectPreferences] =
+    useState<ProjectPreferences>({
+      favorites: [],
+      recent: [],
+    });
   const [search, setSearch] = useState("");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -100,7 +174,6 @@ export function WorkspaceApp({
   const [loadError, setLoadError] = useState("");
   const [backupOpen, setBackupOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [usersOpen, setUsersOpen] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
   const selectProject = useCallback(
     (id: string) => {
@@ -112,7 +185,7 @@ export function WorkspaceApp({
   const load = useCallback(async () => {
     setLoadError("");
     try {
-      const r = await fetch("/api/workspace", { cache: "no-store" });
+      const r = await fetch(workspaceUrl, { cache: "no-store" });
       if (r.status === 401) {
         window.location.assign("/login");
         return;
@@ -120,15 +193,20 @@ export function WorkspaceApp({
       if (!r.ok) throw new Error("No se pudo cargar tu espacio.");
       const w: Workspace = await r.json();
       setWorkspace(w);
-      if (!w.projects.some((project) => project.id === projectId)) {
-        const destination = w.projects[0] ? projectPath(w.projects[0].id) : "/projects";
+      if (
+        !menuMode &&
+        !w.projects.some((project) => project.id === projectId)
+      ) {
+        const destination = w.projects[0]
+          ? projectPath(w.projects[0].id)
+          : "/projects";
         if (projectId || w.projects.length)
           router.replace(destination, { scroll: false });
       }
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Error de conexión.");
     }
-  }, [projectId, router]);
+  }, [projectId, router, menuMode, workspaceUrl]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -147,11 +225,10 @@ export function WorkspaceApp({
       settingsOpen ||
       backupOpen ||
       profileOpen ||
-      usersOpen ||
       peopleOpen
     )
       setMobileSidebarOpen(false);
-  }, [modal, settingsOpen, backupOpen, profileOpen, usersOpen, peopleOpen]);
+  }, [modal, settingsOpen, backupOpen, profileOpen, peopleOpen]);
   function toggleSidebar() {
     const collapsed = !sidebarCollapsed;
     setSidebarCollapsed(collapsed);
@@ -168,7 +245,7 @@ export function WorkspaceApp({
       mutating.current = true;
       setBusy(true);
       try {
-        const r = await fetch("/api/workspace", {
+        const r = await fetch(workspaceUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(command),
@@ -180,14 +257,18 @@ export function WorkspaceApp({
         const data = await r.json();
         if (!r.ok) throw new Error(data.error || "No se pudo guardar.");
         setWorkspace(data.workspace);
+        if (/^(client|ticket)\./.test(String((command as { type?: string })?.type))) invalidateMentionOptions();
         const w = data.workspace as Workspace;
         if (
           projectId &&
           !w.projects.some((project) => project.id === projectId)
         ) {
-          router.replace(w.projects[0] ? projectPath(w.projects[0].id) : "/projects", {
-            scroll: false,
-          });
+          router.replace(
+            w.projects[0] ? projectPath(w.projects[0].id) : "/projects",
+            {
+              scroll: false,
+            },
+          );
         }
         setFeatureId((current) =>
           current === "all" || w.features.some((f) => f.id === current)
@@ -207,13 +288,39 @@ export function WorkspaceApp({
         setBusy(false);
       }
     },
-    [projectId, router],
+    [projectId, router, workspaceUrl],
   );
   const project = workspace?.projects.find((p) => p.id === projectId);
+  const currentUserId = workspace?.currentUser.id;
+  const activeProjectId = project?.id;
+  useEffect(() => {
+    if (!currentUserId) return;
+    const preferences = readProjectPreferences(currentUserId);
+    if (activeProjectId) {
+      preferences.recent = [
+        activeProjectId,
+        ...preferences.recent.filter((id) => id !== activeProjectId),
+      ].slice(0, 100);
+      rememberProject(currentUserId, activeProjectId);
+      saveProjectPreferences(currentUserId, preferences);
+    }
+    setProjectPreferences(preferences);
+  }, [currentUserId, activeProjectId]);
+  function toggleProjectFavorite(id: string) {
+    if (!currentUserId) return;
+    const next = {
+      ...projectPreferences,
+      favorites: projectPreferences.favorites.includes(id)
+        ? projectPreferences.favorites.filter((favoriteId) => favoriteId !== id)
+        : [...projectPreferences.favorites, id],
+    };
+    setProjectPreferences(next);
+    saveProjectPreferences(currentUserId, next);
+  }
   const canManageProject =
     !!workspace &&
     (workspace.currentUser.role === "admin" ||
-      project?.ownerId === workspace.currentUser.id);
+      project?.leaderId === workspace.currentUser.id);
   const selectedTask = workspace?.tasks.find(
     (task) => task.id === taskId && task.projectId === projectId,
   );
@@ -226,7 +333,14 @@ export function WorkspaceApp({
     workspace?.taskTypes?.filter((option) => option.projectId === projectId) ??
     [];
   const impacts =
-    workspace?.impacts?.filter((option) => option.projectId === projectId) ?? [];
+    workspace?.impacts?.filter((option) => option.projectId === projectId) ??
+    [];
+  const priorities =
+    workspace?.priorities.filter((option) => option.projectId === projectId) ??
+    [];
+  const labels =
+    workspace?.labels.filter((option) => option.projectId === projectId) ?? [];
+  const filterOptions = taskFilterOptions(workspace, projectId);
   const [selectedStatusIds, setStatusIds] = useProjectFilter(
     projectId,
     "status",
@@ -244,33 +358,66 @@ export function WorkspaceApp({
     impacts,
     true,
   );
+  const [selectedPriorityIds, setPriorityIds] = useProjectFilter(
+    projectId,
+    "priority",
+    priorities,
+  );
+  const [selectedLabelIds, setLabelIds] = useProjectFilter(
+    projectId,
+    "label",
+    labels,
+    true,
+  );
+  const [selectedUserIds, setUserIds] = useProjectFilter(
+    `${currentUserId ?? ""}.${projectId}`,
+    "user",
+    filterOptions.userOptions,
+    false,
+    [MINE_FILTER],
+  );
+  // Keep the existing per-category preferences while combining their controls.
+  const stateFilterIds = [
+    ...groupedFilterIds(selectedStatusIds, "status"),
+    ...groupedFilterIds(selectedLabelIds, "label"),
+  ];
+  const classificationFilterIds = [
+    ...groupedFilterIds(selectedPriorityIds, "priority"),
+    ...groupedFilterIds(selectedTypeIds, "type"),
+    ...groupedFilterIds(selectedImpactIds, "impact"),
+  ];
   const hasCategoryFilters =
+    selectedUserIds.length !== 1 ||
+    selectedUserIds[0] !== MINE_FILTER ||
     selectedStatusIds.length > 0 ||
     selectedTypeIds.length > 0 ||
-    selectedImpactIds.length > 0;
+    selectedImpactIds.length > 0 ||
+    selectedPriorityIds.length > 0 ||
+    selectedLabelIds.length > 0;
   const allTasks =
     workspace?.tasks.filter((t) => t.projectId === projectId) ?? [];
   const active = allTasks.filter((t) => !t.archived);
+  const selectedLabelNames = labels
+    .filter((label) => selectedLabelIds.includes(label.id))
+    .map((label) => label.name);
   const tasks = allTasks.filter(
     (t) =>
       t.archived === archived &&
       (featureId === "all" || t.featureId === featureId) &&
       matchesTaskFilters(t, {
+        userIds: selectedUserIds,
+        currentUserId,
         statusIds: selectedStatusIds,
         typeIds: selectedTypeIds,
         impactIds: selectedImpactIds,
+        priorityIds: selectedPriorityIds,
+        labelNames: selectedLabelNames,
+        includeUnlabeled: selectedLabelIds.includes(UNASSIGNED_FILTER),
       }) &&
-      (!search ||
-        `${t.title} ${t.description} ${t.ticketNumber ?? ""} ${t.labels.join(" ")}`
-          .toLocaleLowerCase("es")
-          .includes(search.toLocaleLowerCase("es"))),
+      taskMatchesText(t, workspace?.tickets ?? [], search),
   );
   const selectedFeature = features.find((f) => f.id === featureId);
   const openTask = (t: Task) => router.push(taskPath(projectId, t.id, view));
-  const openMenuDialog = (nextModal: Modal) => {
-    openingMenuDialog.current = true;
-    setModal(nextModal);
-  };
   const addTask = (
     statusId?: string,
     startDate?: string,
@@ -335,6 +482,7 @@ export function WorkspaceApp({
   return (
     <ProjectCatalog.Provider
       value={{
+        timeZone: project?.timeZone,
         taskTypes,
         impacts,
         priorities:
@@ -343,63 +491,24 @@ export function WorkspaceApp({
           workspace?.labels.filter((l) => l.projectId === projectId) ?? [],
       }}
     >
-      <div className="app-shell" data-sidebar-collapsed={sidebarCollapsed}>
+      <div
+        className="app-shell"
+        data-sidebar-collapsed={sidebarCollapsed}
+        data-page-scroll={menuMode || !!dashboardScope}
+      >
         <ResizableSidebar
           collapsed={sidebarCollapsed}
           edgeControl={desktopSidebarControl}
           mobileOpen={mobileSidebarOpen}
           onMobileOpenChange={setMobileSidebarOpen}
           triggerRef={sidebarTrigger}
-        >
-          <ProjectSelector
-            projects={workspace?.projects ?? []}
-            project={project}
-            loading={!workspace}
-            disabled={busy}
-            onSelect={selectProject}
-            onCreate={() => setModal({ type: "project" })}
-          />
-          <div className="sidebar-panel">
-            <FeatureSidebar
-              key={projectId}
-              projectId={project?.id}
-              features={features}
-              taskTypes={taskTypes}
-              modules={
-                workspace?.modules.filter(
-                  (module) => module.projectId === projectId,
-                ) ?? []
-              }
-              selectedId={featureId}
-              counts={Object.fromEntries(
-                features.map((feature) => [
-                  feature.id,
-                  active.filter((task) => task.featureId === feature.id).length,
-                ]),
-              )}
-              busy={busy}
-              select={(id) => {
-                setFeatureId(id);
-                setMobileSidebarOpen(false);
-                if (taskId) router.push(projectPath(projectId, view));
-              }}
-              createFeature={() => setModal({ type: "feature" })}
-              createModule={() => setModal({ type: "module" })}
-              createTask={(typeId) =>
-                setModal({
-                  type: "task",
-                  defaults: {
-                    typeId,
-                    featureId: selectedFeature?.id ?? selectedTask?.featureId,
-                  },
-                })
-              }
-              edit={(feature) => setModal({ type: "feature", feature })}
-              editModule={(module) => setModal({ type: "module", module })}
-              mutate={mutate}
-            />
-            <div className="sidebar-bottom">
-              {workspace && (
+          collapsedActions={
+            workspace && <NotificationBell userId={workspace.currentUser.id} />
+          }
+          footer={
+            workspace && (
+              <div className="sidebar-bottom">
+                <NotificationBell userId={workspace.currentUser.id} />
                 <AccountMenu
                   user={workspace.currentUser}
                   busy={busy}
@@ -407,16 +516,181 @@ export function WorkspaceApp({
                   onImport={() => setModal({ type: "import" })}
                   onSettings={() => setSettingsOpen(true)}
                   onBackup={() => setBackupOpen(true)}
-                  onUsers={() => setUsersOpen(true)}
+                  onUsers={() => router.push(`/users${projectId ? `?tab=invitations&projectId=${encodeURIComponent(projectId)}` : ""}`)}
                 />
-              )}
+              </div>
+            )
+          }
+        >
+          <div className="sidebar-navigation">
+            <div
+              className="view-tabs sidebar-tabs"
+              role="group"
+              aria-label="Secciones del espacio"
+            >
+              <button
+                type="button"
+                className={`sidebar-menu-button ${menuMode ? "active-view" : ""}`}
+                aria-label="Menú"
+                title="Menú"
+                aria-pressed={menuMode}
+                disabled={busy}
+                onClick={() => {
+                  if (menuMode) return;
+                  setMobileSidebarOpen(false);
+                  router.push("/dashboard", { scroll: false });
+                }}
+              >
+                <Menu size={16} aria-hidden="true" />
+              </button>
+              <ProjectSelector
+                projects={workspace?.projects ?? []}
+                project={project}
+                preferences={projectPreferences}
+                loading={!workspace}
+                disabled={busy}
+                onSelect={selectProject}
+                onToggleFavorite={toggleProjectFavorite}
+                onCreate={() => setModal({ type: "project" })}
+              >
+                <button
+                  type="button"
+                  className={`sidebar-project-button ${!menuMode ? "active-view" : ""}`}
+                  aria-pressed={!menuMode}
+                  disabled={busy || !workspace}
+                  title={
+                    project
+                      ? `Cambiar proyecto. Actual: ${project.name}`
+                      : "Seleccionar proyecto"
+                  }
+                >
+                  <span className="sidebar-project-icon" aria-hidden="true">
+                    {!menuMode && project?.icon ? (
+                      project.icon
+                    ) : (
+                      <FolderKanban size={16} />
+                    )}
+                  </span>
+                  <span className="sidebar-project-label">
+                    {!menuMode && project ? project.name : "Proyectos"}
+                  </span>
+                  <ChevronDown size={13} aria-hidden="true" />
+                </button>
+              </ProjectSelector>
             </div>
+          </div>
+          <div className="sidebar-panel">
+            {project ? (
+              <FeatureSidebar
+                userId={workspace!.currentUser.id}
+                canReorder={canManageProject}
+                key={projectId}
+                projectId={project?.id}
+                features={features}
+                taskTypes={taskTypes}
+                modules={
+                  workspace?.modules.filter(
+                    (module) => module.projectId === projectId,
+                  ) ?? []
+                }
+                selectedId={featureId}
+                counts={Object.fromEntries(
+                  features.map((feature) => [
+                    feature.id,
+                    active.filter((task) => task.featureId === feature.id)
+                      .length,
+                  ]),
+                )}
+                busy={busy}
+                select={(id) => {
+                  setFeatureId(id);
+                  setMobileSidebarOpen(false);
+                  if (taskId || entityRoute || dashboardScope) {
+                    const path = projectPath(projectId, view);
+                    router.push(
+                      `${path}${path.includes("?") ? "&" : "?"}featureId=${encodeURIComponent(id)}`,
+                    );
+                  }
+                }}
+                createFeature={() =>
+                  setModal({
+                    type: "feature",
+                    ...(contextRoute?.kind === "module"
+                      ? {
+                          moduleId:
+                            contextRoute.id === "general"
+                              ? null
+                              : contextRoute.id,
+                        }
+                      : {}),
+                  })
+                }
+                createModule={() => setModal({ type: "module" })}
+                createTask={(typeId) =>
+                  setModal({
+                    type: "task",
+                    defaults: {
+                      typeId,
+                      featureId:
+                        contextRoute?.kind === "feature"
+                          ? contextRoute.id
+                          : (selectedFeature?.id ?? selectedTask?.featureId),
+                    },
+                  })
+                }
+                edit={(feature) =>
+                  router.push(
+                    entityPath(projectId, "feature", feature.id, view),
+                  )
+                }
+                editModule={(module) =>
+                  router.push(entityPath(projectId, "module", module.id, view))
+                }
+                mutate={mutate}
+              />
+            ) : menuMode ? (
+              <nav className="application-menu" aria-label="Menú principal">
+                <Link
+                  href="/dashboard"
+                  className="nav-item"
+                  aria-current={
+                    menuSection === "dashboard" ? "page" : undefined
+                  }
+                  onClick={() => setMobileSidebarOpen(false)}
+                >
+                  <LayoutGrid size={17} />
+                  Dashboard
+                </Link>
+                <Link
+                  href="/projects"
+                  className="nav-item"
+                  aria-current={menuSection === "projects" ? "page" : undefined}
+                  onClick={() => setMobileSidebarOpen(false)}
+                >
+                  <FolderKanban size={17} />
+                  Proyectos
+                </Link>
+                <Link
+                  href="/clients"
+                  className="nav-item"
+                  aria-current={menuSection === "clients" ? "page" : undefined}
+                  onClick={() => setMobileSidebarOpen(false)}
+                >
+                  <Users size={17} />
+                  Clientes
+                </Link>
+                <Link href="/tickets" className="nav-item" aria-current={menuSection === "tickets" ? "page" : undefined} onClick={() => setMobileSidebarOpen(false)}>
+                  <TicketIcon size={17} />Tickets
+                </Link>
+                {workspace?.currentUser.role === "admin" && <Link href="/users" className="nav-item" aria-current={menuSection === "users" ? "page" : undefined} onClick={() => setMobileSidebarOpen(false)}><Users size={17} />Usuarios e invitaciones</Link>}
+              </nav>
+            ) : null}
           </div>
         </ResizableSidebar>
         <div className="main-shell">
           {(loadError ||
             !workspace ||
-            !project ||
+            (!project && menuSection !== "dashboard" && menuSection !== "projects") ||
             (taskId && !showTaskDetail)) && (
             <div className="workspace-navigation">{sidebarControls}</div>
           )}
@@ -436,6 +710,32 @@ export function WorkspaceApp({
                 <Loader2 className="animate-spin" />
                 <span>Preparando tu espacio…</span>
               </div>
+            ) : menuMode ? (
+              menuSection === "users" ? <UsersManager projects={workspace.projects} refreshWorkspace={load} /> : menuSection === "notifications" ? <NotificationsPage userId={workspace.currentUser.id} openId={notificationOpenId} /> : menuSection === "clients" ? (
+                <ClientsManager
+                  clients={workspace.clients ?? []}
+                  initialPage={initialClientsPage}
+                  mutate={mutate}
+                  busy={busy}
+                  confirm={setConfirmation}
+                />
+              ) : menuSection === "tickets" ? (
+                <TicketsManager tickets={workspace.tickets} clients={workspace.clients} initialPage={initialTicketsPage} mutate={mutate} busy={busy} confirm={setConfirmation} />
+              ) : menuSection === "projects" ? (
+                <ProjectsDirectory
+                  workspace={workspace}
+                  createProject={() => setModal({ type: "project" })}
+                  sidebarControls={sidebarControls}
+                />
+              ) : (
+                <Dashboard
+                  workspace={workspace}
+                  initialNow={initialNow!}
+                  refresh={load}
+                  createProject={() => setModal({ type: "project" })}
+                  sidebarControls={sidebarControls}
+                />
+              )
             ) : !project ? (
               <Empty
                 icon={<Code2 />}
@@ -456,6 +756,27 @@ export function WorkspaceApp({
                     </Button>
                   </>
                 }
+              />
+            ) : dashboardScope ? (
+              <Dashboard
+                workspace={workspace}
+                scope={dashboardScope}
+                initialNow={initialNow!}
+                refresh={load}
+                createProject={() => setModal({ type: "project" })}
+                sidebarControls={sidebarControls}
+              />
+            ) : entityRoute ? (
+              <EntityDetail
+                scope={{ ...entityRoute, projectId }}
+                initialDetail={initialEntityDetail}
+                project={project}
+                workspace={workspace}
+                mutate={mutate}
+                busy={busy}
+                confirm={setConfirmation}
+                create={setModal}
+                sidebarControls={sidebarControls}
               />
             ) : taskId ? (
               showTaskDetail ? (
@@ -525,53 +846,43 @@ export function WorkspaceApp({
                       ))}
                     </div>
                   </div>
+                  <div className="search-field">
+                    <Search size={15} />
+                    <Input
+                      aria-label="Buscar tareas"
+                      placeholder="Buscar tareas…"
+                      title="Buscar por título, descripción, etiquetas o número de ticket"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                    {search && (
+                      <button
+                        aria-label="Limpiar búsqueda"
+                        onClick={() => setSearch("")}
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
                   <div className="view-tools">
-                    <div className="search-field">
-                      <Search size={15} />
-                      <Input
-                        aria-label="Buscar tareas"
-                        placeholder="Buscar tareas…"
-                        title="Buscar por título, descripción, etiquetas o número de ticket"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                      />
-                      {search && (
-                        <button
-                          aria-label="Limpiar búsqueda"
-                          onClick={() => setSearch("")}
-                        >
-                          <X size={13} />
-                        </button>
-                      )}
-                    </div>
-                    <div className="task-filters">
-                      <CatalogFilter
-                        category="estados"
-                        allLabel="Todos los estados"
-                        shortLabel="Estados"
-                        options={statuses}
-                        selectedIds={selectedStatusIds}
-                        onChange={setStatusIds}
-                      />
-                      <CatalogFilter
-                        category="tipos"
-                        allLabel="Todos los tipos"
-                        shortLabel="Tipos"
-                        unassignedLabel="Sin tipo"
-                        options={taskTypes}
-                        selectedIds={selectedTypeIds}
-                        onChange={setTypeIds}
-                      />
-                      <CatalogFilter
-                        category="impactos"
-                        allLabel="Todos los impactos"
-                        shortLabel="Impactos"
-                        unassignedLabel="Sin impacto"
-                        options={impacts}
-                        selectedIds={selectedImpactIds}
-                        onChange={setImpactIds}
-                      />
-                    </div>
+                    <TaskFilterControls
+                      idPrefix="workspace"
+                      className="task-filters"
+                      options={filterOptions}
+                      userIds={selectedUserIds}
+                      stateIds={stateFilterIds}
+                      classificationIds={classificationFilterIds}
+                      changeUsers={setUserIds}
+                      changeState={(ids) => {
+                        setStatusIds(filterGroupValues(ids, "status"));
+                        setLabelIds(filterGroupValues(ids, "label"));
+                      }}
+                      changeClassification={(ids) => {
+                        setPriorityIds(filterGroupValues(ids, "priority"));
+                        setTypeIds(filterGroupValues(ids, "type"));
+                        setImpactIds(filterGroupValues(ids, "impact"));
+                      }}
+                    />
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
@@ -604,13 +915,16 @@ export function WorkspaceApp({
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
-                          disabled={!canManageProject}
                           onSelect={() =>
-                            openMenuDialog({ type: "project", project })
+                            router.push(
+                              entityPath(projectId, "project", projectId, view),
+                            )
                           }
                         >
                           <Pencil />
-                          Editar proyecto
+                          {canManageProject
+                            ? "Editar proyecto"
+                            : "Ver proyecto"}
                         </DropdownMenuItem>
                         {canManageProject && (
                           <DropdownMenuItem
@@ -620,7 +934,7 @@ export function WorkspaceApp({
                             }}
                           >
                             <Users />
-                            Participantes y propietario
+                            Líder y equipo
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem
@@ -642,10 +956,14 @@ export function WorkspaceApp({
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               onSelect={() =>
-                                openMenuDialog({
-                                  type: "feature",
-                                  feature: selectedFeature,
-                                })
+                                router.push(
+                                  entityPath(
+                                    projectId,
+                                    "feature",
+                                    selectedFeature.id,
+                                    view,
+                                  ),
+                                )
                               }
                             >
                               <Pencil />
@@ -670,18 +988,18 @@ export function WorkspaceApp({
                       </h2>
                       <span>
                         {tasks.length} {tasks.length === 1 ? "tarea" : "tareas"}
-                        {selectedFeature?.description
-                          ? ` · ${selectedFeature.description}`
-                          : ""}
                       </span>
                       {(search || hasCategoryFilters) && (
                         <button
                           className="clear-filters"
                           onClick={() => {
                             setSearch("");
+                            setUserIds([MINE_FILTER]);
                             setStatusIds([]);
                             setTypeIds([]);
                             setImpactIds([]);
+                            setPriorityIds([]);
+                            setLabelIds([]);
                           }}
                         >
                           Limpiar filtros
@@ -694,10 +1012,14 @@ export function WorkspaceApp({
                         <button
                           className="context-button"
                           onClick={() =>
-                            setModal({
-                              type: "feature",
-                              feature: selectedFeature,
-                            })
+                            router.push(
+                              entityPath(
+                                projectId,
+                                "feature",
+                                selectedFeature.id,
+                                view,
+                              ),
+                            )
                           }
                         >
                           <MoreHorizontal size={14} />
@@ -759,6 +1081,7 @@ export function WorkspaceApp({
                     />
                   ) : (
                     <CalendarView
+                      timeZone={project.timeZone}
                       tasks={tasks}
                       statuses={statuses}
                       open={openTask}
@@ -812,13 +1135,6 @@ export function WorkspaceApp({
           <ProfileModal
             user={workspace.currentUser}
             close={() => setProfileOpen(false)}
-          />
-        )}
-        {usersOpen && workspace?.currentUser.role === "admin" && (
-          <UsersModal
-            projects={workspace.projects}
-            projectId={projectId}
-            close={() => setUsersOpen(false)}
           />
         )}
         {peopleOpen && project && workspace && canManageProject && (

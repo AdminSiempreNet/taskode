@@ -1,4 +1,5 @@
 export type Priority = string;
+export type { NotificationItem, NotificationsSnapshot, NotificationPreferences } from "./notifications";
 export interface ProjectPriority {
   id: string;
   projectId: string;
@@ -24,10 +25,64 @@ export interface Checklist {
 }
 export interface TaskComment {
   id: string;
-  taskId: string;
+  taskId: string | null;
+  scope?: EntityRef;
   content: string;
   createdAt: string;
   updatedAt: string;
+  authorId?: string | null;
+  author?: UserSummary | null;
+  canEdit?: boolean;
+  canDelete?: boolean;
+}
+export interface TaskCommentsSnapshot {
+  comments: TaskComment[];
+  permissions: TaskPermissions;
+  realtime: { enabled: boolean; channel: string | null };
+}
+export interface UserSummary {
+  id: string;
+  name: string;
+  image: string | null;
+}
+export interface ProjectPerson extends UserSummary {
+  projectId: string;
+  email: string;
+}
+export interface TaskFile {
+  id: string;
+  projectId: string;
+  taskId: string | null;
+  scopeType?: EntityKind | null;
+  moduleId?: string | null;
+  featureId?: string | null;
+  name: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+  purpose: string;
+}
+export interface TaskPermissions {
+  canEdit: boolean;
+  canManageAccess: boolean;
+  canDelete: boolean;
+  canModerateComments: boolean;
+}
+export type EntityKind = "project" | "module" | "feature" | "task";
+export interface EntityRef {
+  kind: EntityKind;
+  id: string;
+  projectId: string;
+}
+export interface EntityPermissions extends TaskPermissions {
+  canComment: boolean;
+  canManageFiles: boolean;
+}
+export interface EntityDetailSnapshot {
+  scope: EntityRef;
+  entity: Project | ProjectModule | Feature | Task;
+  files: TaskFile[];
+  permissions: EntityPermissions;
 }
 export interface TaskStatusChange {
   id: number;
@@ -40,23 +95,33 @@ export interface TaskStatusChange {
   toStatusColor: string;
   changedAt: string;
 }
-export interface Project {
+export interface EntityAssignment {
+  teamMemberIds?: string[];
+}
+export interface EntityRelations {
+  clientIds: string[];
+  ticketIds: string[];
+}
+export interface Project extends EntityAssignment, EntityRelations {
   id: string;
-  ownerId: string;
+  timeZone?: string;
+  leaderId: string;
   name: string;
   description: string;
   icon: string;
   color: string;
   createdAt: string;
 }
-export interface ProjectModule {
+export interface ProjectModule extends EntityAssignment, EntityRelations {
   id: string;
   projectId: string;
   name: string;
   description: string;
   position: number;
+  leaderId?: string;
+  canManage?: boolean;
 }
-export interface Feature {
+export interface Feature extends EntityAssignment, EntityRelations {
   id: string;
   projectId: string;
   moduleId: string | null;
@@ -65,6 +130,8 @@ export interface Feature {
   description: string;
   position: number;
   pinned: boolean;
+  leaderId?: string;
+  canManage?: boolean;
 }
 export interface Status {
   id: string;
@@ -74,7 +141,7 @@ export interface Status {
   position: number;
   isDone: boolean;
 }
-export interface Task {
+export interface Task extends EntityRelations {
   id: string;
   projectId: string;
   featureId: string;
@@ -84,7 +151,6 @@ export interface Task {
   priority: Priority;
   typeId: string | null;
   impactId: string | null;
-  ticketNumber: string | null;
   dueDate: string | null;
   dueTime: string | null;
   startDate: string | null;
@@ -97,6 +163,13 @@ export interface Task {
   checklists: Checklist[];
   comments: TaskComment[];
   statusHistory: TaskStatusChange[];
+  createdById?: string | null;
+  leaderId?: string;
+  teamMemberIds?: string[];
+  leader?: UserSummary;
+  teamMembers?: UserSummary[];
+  permissions?: TaskPermissions;
+  files?: TaskFile[];
 }
 export interface Workspace {
   currentUser: CurrentUser;
@@ -110,6 +183,43 @@ export interface Workspace {
   taskTypes: ProjectTaskType[];
   impacts: ProjectImpact[];
   labels: ProjectLabel[];
+  clients: Client[];
+  tickets: Ticket[];
+  people?: ProjectPerson[];
+  settings?: { maxAttachmentBytes: number };
+}
+export interface Department {
+  id: string;
+  name: string;
+}
+export interface City {
+  id: string;
+  departmentId: string;
+  name: string;
+  kind: string;
+}
+export interface Geography {
+  departments: Department[];
+  cities: City[];
+}
+export interface Client {
+  id: string;
+  name: string;
+  cityId: string;
+  cityName: string;
+  departmentId: string;
+  departmentName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface Ticket {
+  id: string;
+  number: string;
+  description: string;
+  url: string | null;
+  clientId: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 export interface Actor {
   id: string;
