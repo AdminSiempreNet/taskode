@@ -865,6 +865,7 @@ export async function restoreApplicationBackup(
       "session",
       "verification",
       "comment_outbox",
+      "workspace_outbox",
       "notification_deliveries",
       "push_subscriptions",
       "task_reminders",

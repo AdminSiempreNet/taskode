@@ -39,9 +39,9 @@ export async function mcpFixture() {
     if (url.startsWith(`${base}/api/auth/`)) return bundle.handle(new Request(input, init));
     return realFetch(input, init);
   }) as typeof fetch;
-  const effects = { notifications: 0, comments: 0 };
+  const effects = { notifications: 0, comments: 0, workspace: 0 };
   const endpoint = createMcpEndpoint({
-    effects: { notifications: () => void effects.notifications++, comments: () => void effects.comments++ },
+    effects: { notifications: () => void effects.notifications++, comments: () => void effects.comments++, workspace: () => void effects.workspace++ },
   });
   const clients: Client[] = [];
   async function token(email = "test-admin@example.com", scopes = FULL_SCOPES) {

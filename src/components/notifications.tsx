@@ -15,7 +15,10 @@ import {
   Clock3,
 } from "lucide-react";
 import { toast } from "sonner";
-import { NotificationsClient } from "@/lib/notifications-client";
+import {
+  NotificationsClient,
+  type WorkspaceListener,
+} from "@/lib/notifications-client";
 import {
   notificationText,
   type NotificationItem,
@@ -53,6 +56,27 @@ export function useNotifications(userId: string) {
     () => initial,
   );
   return { ...state, client };
+}
+// Calls `changed` when tasks change in a project this person can open.
+export function useWorkspaceChanges(
+  userId: string | undefined,
+  changed: WorkspaceListener,
+) {
+  useEffect(() => {
+    if (!userId) return;
+    const client = clientFor(userId);
+    const release = client.onWorkspaceChanged(changed);
+    // Without realtime, catch up when the person comes back to the tab.
+    const visible = () => {
+      if (document.visibilityState === "visible" && !client.state.live)
+        changed(null);
+    };
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      release();
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [userId, changed]);
 }
 export function useOpenNotification(userId: string) {
   const router = useWorkspaceRouter();

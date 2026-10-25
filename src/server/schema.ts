@@ -937,6 +937,21 @@ export const commentOutbox = pgTable(
   ],
 );
 
+// One row per project: a burst of task writes collapses into a single "workspace.changed".
+export const workspaceOutbox = pgTable(
+  "workspace_outbox",
+  {
+    projectId: text().primaryKey(),
+    eventId: text()
+      .notNull()
+      .default(sql`gen_random_uuid()::text`),
+    attempts: integer().notNull().default(0),
+    availableAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    leaseUntil: timestamp({ withTimezone: true }),
+  },
+  (t) => [index("workspace_outbox_available").on(t.availableAt)],
+);
+
 export const notifications = pgTable("notifications", {
   id: text().primaryKey(),
   sequence: bigint({ mode: "number" }).generatedByDefaultAsIdentity().notNull(),

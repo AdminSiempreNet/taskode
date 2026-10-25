@@ -2,8 +2,12 @@ import { SignJWT } from "jose";
 import { Rest } from "ably";
 import { and, eq, sql } from "drizzle-orm";
 import type { PostgresRepository } from "./postgres";
-import { commentOutbox } from "./schema";
-import { ablyConfig, commentsChannel } from "./realtime-config";
+import { commentOutbox, workspaceOutbox } from "./schema";
+import {
+  ablyConfig,
+  commentsChannel,
+  notificationsChannel,
+} from "./realtime-config";
 import { DomainError } from "./repository";
 import type { EntityKind } from "../lib/types";
 
@@ -151,6 +155,91 @@ export async function flushCommentEvents(
               eq(commentOutbox.eventId, event.eventId),
             ),
           );
+      });
+    }
+  }
+  return { sent, failed };
+}
+
+export type WorkspaceEvent = { projectId: string; eventId: string };
+export type WorkspacePublisher = (
+  event: WorkspaceEvent,
+  recipients: string[],
+) => Promise<void>;
+
+// Task changes ride on each person's notifications channel: the browser already
+// holds that subscription, so the board needs no extra connection or token.
+export function ablyWorkspacePublisher(): WorkspacePublisher | null {
+  const config = ablyConfig();
+  if (!config) return null;
+  const client = new Rest({
+    key: config.key,
+    httpRequestTimeout: 4000,
+    httpMaxRetryCount: 0,
+    logLevel: 0,
+  });
+  return async (event, recipients) => {
+    for (let offset = 0; offset < recipients.length; offset += 5) {
+      await Promise.all(
+        recipients.slice(offset, offset + 5).map((userId) =>
+          client.channels
+            .get(notificationsChannel(config.namespace, userId))
+            .publish({
+              id: `${event.eventId}:0`,
+              name: "workspace.changed",
+              data: event,
+            }),
+        ),
+      );
+    }
+  };
+}
+
+// Same claim/ACK protocol as flushCommentEvents, keyed by project.
+export async function flushWorkspaceEvents(
+  repo: PostgresRepository,
+  publisher?: WorkspacePublisher | null,
+) {
+  const publish = publisher === undefined ? ablyWorkspacePublisher() : publisher;
+  if (!publish) return { sent: 0, failed: 0 };
+  const claimed = await repo.store.transaction(async () => {
+    const result = await repo.store.db.execute<WorkspaceEvent & { attempts: number }>(sql`
+      update workspace_outbox set "leaseUntil" = now() + interval '60 seconds', attempts = attempts + 1
+      where "projectId" in (
+        select "projectId" from workspace_outbox where "availableAt" <= now()
+        and ("leaseUntil" is null or "leaseUntil" < now())
+        order by "availableAt" limit 10 for update skip locked
+      ) returning "projectId", "eventId", attempts
+    `);
+    return result.rows;
+  });
+  let sent = 0,
+    failed = 0;
+  for (const { projectId, eventId, attempts } of claimed) {
+    const current = and(
+      eq(workspaceOutbox.projectId, projectId),
+      eq(workspaceOutbox.eventId, eventId),
+    );
+    try {
+      // Everyone who can open the project; the refetched workspace applies task-level visibility.
+      const recipients = await repo.commentRecipients(projectId, "project");
+      await publish({ projectId, eventId }, recipients);
+      await repo.store.transaction(async () => {
+        await repo.store.db.delete(workspaceOutbox).where(current);
+      });
+      sent++;
+    } catch {
+      failed++;
+      await repo.store.transaction(async () => {
+        await repo.store.db
+          .update(workspaceOutbox)
+          .set({
+            leaseUntil: null,
+            availableAt: new Date(
+              Date.now() + Math.min(60_000, 1000 * 2 ** Math.min(attempts, 6)),
+            ),
+          })
+          .where(current);
       });
     }
   }

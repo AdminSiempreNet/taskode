@@ -14,6 +14,7 @@ import {
 } from "./notification-delivery";
 import { pushSubscriptions, tasks } from "./schema";
 import { pruneOAuthData } from "./oauth-maintenance";
+import { flushWorkspaceEvents } from "./realtime";
 
 export const notificationHeaders = { "Cache-Control": "private, no-store" };
 export function deliverNotificationEvents() {
@@ -222,6 +223,11 @@ export async function processNotifications(request: Request) {
       undefined,
       { budgetMs: Math.max(1000, 45000 - (Date.now() - started)) },
     );
+    // Retries the board refreshes that failed right after their command.
+    const workspace = await flushWorkspaceEvents(repository()).catch(() => {
+      console.warn("No se pudieron reintentar los avisos de cambios en tareas.");
+      return { sent: 0, failed: 0 };
+    });
     // The worker runs every minute; OAuth cleanup only needs a quarter-hourly pass.
     if (!afterTask && new Date().getUTCMinutes() % 15 === 0)
       await pruneOAuthData(repository()).catch(() =>
@@ -231,11 +237,13 @@ export async function processNotifications(request: Request) {
       at: new Date().toISOString(),
       reminders,
       ...delivery,
+      workspace,
     });
     return Response.json(
       {
         reminders,
         ...delivery,
+        workspace,
         nextCursor: batch.length > 50 ? batch[49].id : null,
       },
       { headers: notificationHeaders },

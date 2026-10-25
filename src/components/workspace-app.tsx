@@ -77,7 +77,7 @@ import { invalidateMentionOptions } from "./mentions";
 import { Dashboard, ProjectsDirectory } from "./dashboard";
 import type { DashboardScope } from "@/lib/dashboard";
 import { AccountMenu, ProfileModal } from "./account-menu";
-import { NotificationBell, NotificationsPage } from "./notifications";
+import { NotificationBell, NotificationsPage, useWorkspaceChanges } from "./notifications";
 import { UsersManager } from "./users-manager";
 import { ProjectPeopleModal } from "./project-people";
 import { useProjectFilter } from "./status-filter";
@@ -182,8 +182,12 @@ export function WorkspaceApp({
     },
     [router],
   );
-  const load = useCallback(async () => {
-    setLoadError("");
+  // Bumped by every load and save: a slower, older response must not replace a newer snapshot.
+  const loadSequence = useRef(0);
+  const load = useCallback(async (options?: { background?: boolean }) => {
+    const background = options?.background === true;
+    const sequence = ++loadSequence.current;
+    if (!background) setLoadError("");
     try {
       const r = await fetch(workspaceUrl, { cache: "no-store" });
       if (r.status === 401) {
@@ -192,6 +196,7 @@ export function WorkspaceApp({
       }
       if (!r.ok) throw new Error("No se pudo cargar tu espacio.");
       const w: Workspace = await r.json();
+      if (sequence !== loadSequence.current) return;
       setWorkspace(w);
       if (
         !menuMode &&
@@ -204,7 +209,9 @@ export function WorkspaceApp({
           router.replace(destination, { scroll: false });
       }
     } catch (e) {
-      setLoadError(e instanceof Error ? e.message : "Error de conexión.");
+      // A failed background refresh keeps the current snapshot; the next change retries.
+      if (!background)
+        setLoadError(e instanceof Error ? e.message : "Error de conexión.");
     }
   }, [projectId, router, menuMode, workspaceUrl]);
   useEffect(() => {
@@ -243,6 +250,7 @@ export function WorkspaceApp({
     async (command: unknown): Promise<MutationResult | null> => {
       if (mutating.current) return null;
       mutating.current = true;
+      loadSequence.current++;
       setBusy(true);
       try {
         const r = await fetch(workspaceUrl, {
@@ -290,6 +298,18 @@ export function WorkspaceApp({
     },
     [projectId, router, workspaceUrl],
   );
+  // Someone else changed tasks: coalesce the burst and refetch once no save of our own is pending.
+  const remoteRefresh = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const refreshFromRemote = useCallback(() => {
+    clearTimeout(remoteRefresh.current);
+    const run = () => {
+      if (mutating.current) remoteRefresh.current = setTimeout(run, 300);
+      else void load({ background: true });
+    };
+    remoteRefresh.current = setTimeout(run, 300);
+  }, [load]);
+  useEffect(() => () => clearTimeout(remoteRefresh.current), []);
+  useWorkspaceChanges(workspace?.currentUser.id, refreshFromRemote);
   const project = workspace?.projects.find((p) => p.id === projectId);
   const currentUserId = workspace?.currentUser.id;
   const activeProjectId = project?.id;
@@ -708,7 +728,7 @@ export function WorkspaceApp({
                 icon={<CircleHelp />}
                 title="No pudimos abrir tu espacio"
                 description={loadError}
-                action={<Button onClick={load}>Volver a intentar</Button>}
+                action={<Button onClick={() => void load()}>Volver a intentar</Button>}
               />
             ) : !workspace ? (
               <div className="loading-state">

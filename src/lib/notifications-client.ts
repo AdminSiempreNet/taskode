@@ -5,14 +5,18 @@ export type NotificationsState = {
   error: string;
   live: boolean;
 };
+// projectId null means "anything may have changed", e.g. after a reconnection.
+export type WorkspaceListener = (projectId: string | null) => void;
 type Connect = (
   channel: string,
   changed: () => void,
   status: (live: boolean) => void,
+  workspaceChanged: WorkspaceListener,
 ) => Promise<() => void>;
 export class NotificationsClient {
   state: NotificationsState = { snapshot: null, error: "", live: false };
   private listeners = new Set<() => void>();
+  private workspaceListeners = new Set<WorkspaceListener>();
   private timer?: ReturnType<typeof setInterval>;
   private release?: ReturnType<typeof setTimeout>;
   private disconnect?: () => void;
@@ -46,6 +50,18 @@ export class NotificationsClient {
     for (const listener of this.listeners) listener();
   }
   getSnapshot = () => this.state;
+  // Task changes share this channel; the listener keeps the client running.
+  onWorkspaceChanged(listener: WorkspaceListener) {
+    this.workspaceListeners.add(listener);
+    const release = this.subscribe(() => {});
+    return () => {
+      this.workspaceListeners.delete(listener);
+      release();
+    };
+  }
+  private workspaceChanged = (projectId: string | null) => {
+    for (const listener of this.workspaceListeners) listener(projectId);
+  };
   subscribe = (listener: () => void) => {
     clearTimeout(this.release);
     this.listeners.add(listener);
@@ -164,6 +180,7 @@ export class NotificationsClient {
                   if (!this.stopped && generation === this.generation)
                     this.emit({ live });
                 },
+                this.workspaceChanged,
               );
               if (this.stopped || generation !== this.generation) close();
               else this.disconnect = close;
@@ -206,6 +223,7 @@ async function connectNotifications(
   channel: string,
   changed: () => void,
   status: (live: boolean) => void,
+  workspaceChanged: WorkspaceListener,
 ) {
   const { Realtime } = await import("ably");
   const client = new Realtime({
@@ -225,9 +243,14 @@ async function connectNotifications(
     },
   });
   const sub = client.channels.get(channel);
+  let connectedBefore = false;
   client.connection.on((change) => {
     status(change.current === "connected" && sub.state === "attached");
-    if (change.current === "connected") changed();
+    if (change.current !== "connected") return;
+    changed();
+    // Task events can be lost while disconnected; resync the board on reconnection.
+    if (connectedBefore) workspaceChanged(null);
+    connectedBefore = true;
   });
   sub.on((change) =>
     status(
@@ -239,6 +262,13 @@ async function connectNotifications(
   // and return cleanup immediately while Ably manages reconnection.
   void sub
     .subscribe("notifications.changed", changed)
+    .catch(() => status(false));
+  void sub
+    .subscribe("workspace.changed", (message) => {
+      const projectId = (message.data as { projectId?: unknown } | undefined)
+        ?.projectId;
+      workspaceChanged(typeof projectId === "string" ? projectId : null);
+    })
     .catch(() => status(false));
   return () => {
     client.close();
