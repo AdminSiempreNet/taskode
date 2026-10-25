@@ -6,11 +6,11 @@ La aplicación se ejecuta en **Dokploy** (`https://server.eduinpro.net`), proyec
 (`taskode-db`) y el programador de notificaciones (`taskode-notifications`).
 GitHub Actions construye la imagen y la publica en
 `ghcr.io/adminsiemprenet/taskode`; Dokploy no compila nada, solo descarga la imagen.
-Solo `main` despliega; `dev` y los pull requests construyen la imagen sin publicarla.
+Solo `main` despliega; los pull requests construyen la imagen sin publicarla.
 
 ## Flujo
 
-`.github/workflows/ci.yml` se ejecuta en cada pull request y en cada push a `dev` y `main`:
+`.github/workflows/ci.yml` se ejecuta en cada pull request y en cada push a `main`:
 
 1. **Tipos y pruebas**: `npm ci`, `npm run typecheck` y `npm test`, con un PostgreSQL
    pgvector desechable en el runner (`TEST_DATABASE_URL`).
@@ -122,8 +122,10 @@ restauración de ensayo es la comprobación necesaria antes de un cambio incompa
 
 ## Publicación
 
-Hacer merge de la versión verificada de `dev` a `main` y `git push origin main`. El CI
-publica la imagen y la despliega. Revisar el job **Desplegar en Dokploy** y los logs de
+Abrir un pull request de `dev` a `main` (`gh pr create --base main --head dev`) y,
+cuando **Tipos y pruebas** e **Imagen Docker** estén en verde, hacer merge con un merge
+commit. `main` no acepta push directo: un ruleset exige el pull request y esos dos checks.
+El push del merge a `main` publica la imagen y la despliega. Revisar el job **Desplegar en Dokploy** y los logs de
 la aplicación en Dokploy, que deben mostrar «Migraciones PostgreSQL de Taskode
 aplicadas.» antes de que Next.js arranque.
 

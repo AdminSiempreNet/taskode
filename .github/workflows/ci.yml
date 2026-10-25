@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [dev, main]
+    branches: [main]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -50,7 +50,7 @@ jobs:
       - name: Pruebas
         run: npm test
 
-  # En PR y dev solo construye. En push a main la publica en GHCR (sha-<commit> y main); Dokploy no compila nada.
+  # En PR solo construye. En push a main la publica en GHCR (sha-<commit> y main); Dokploy no compila nada.
   image:
     name: Imagen Docker
     runs-on: ubuntu-latest
