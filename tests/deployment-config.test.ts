@@ -1,22 +1,24 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { databasePoolConfig } from "../src/server/database-config";
 import webpush from "web-push";
 
-test("Vercel: dev y otras ramas no despliegan; solo main está habilitada", () => {
-  const config = JSON.parse(readFileSync("vercel.json", "utf8"));
-  assert.deepEqual(config.git.deploymentEnabled, { "*": false, dev: false, main: true });
-  assert.equal(config.buildCommand, "npm run build:vercel");
-  const scripts = JSON.parse(readFileSync("package.json", "utf8")).scripts;
-  assert.equal(scripts["build:vercel"], "npm run check:production && npm run build && npm run db:migrate");
+test("Despliegue: sin Vercel; la imagen valida, migra y arranca en ese orden", () => {
+  assert.equal(existsSync("vercel.json"), false);
+  const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+  assert.equal(pkg.scripts["build:vercel"], undefined);
+  assert.equal(pkg.dependencies["@vercel/functions"], undefined);
+  const entrypoint = readFileSync("scripts/docker-entrypoint.sh", "utf8");
+  const order = ["dist/check-production.cjs", "dist/migrate.cjs", "exec node server.js"].map((step) => entrypoint.indexOf(step));
+  assert.ok(order.every((index, i) => index > (order[i - 1] ?? -1)), "El entrypoint debe validar, migrar y luego arrancar.");
 });
 
-test("Vercel: la configuración de producción se valida sin conectarse y rechaza dev/Preview", () => {
+test("Producción: la configuración se valida sin conectarse", () => {
   const vapid = webpush.generateVAPIDKeys();
   const env = {
-    ...process.env, VERCEL: "1", VERCEL_ENV: "production", VERCEL_GIT_COMMIT_REF: "main",
+    ...process.env,
     DATABASE_URL: "postgresql://taskode:example@db.example.com:5432/taskode", DATABASE_SSL: "verify-full",
     DATABASE_POOL_MAX: "5", BETTER_AUTH_URL: "https://taskode.siempre.net.co", BETTER_AUTH_SECRET: "x".repeat(32),
     GOOGLE_CLIENT_ID: "test", GOOGLE_CLIENT_SECRET: "test", BACKUP_STORAGE: "s3", ATTACHMENT_STORAGE: "s3",
@@ -30,10 +32,7 @@ test("Vercel: la configuración de producción se valida sin conectarse y rechaz
   const check = (overrides: Record<string, string> = {}) => spawnSync(process.execPath, ["--import", "tsx", "scripts/check-production.ts"], { env: { ...env, ...overrides }, encoding: "utf8", windowsHide: true });
   const valid = check();
   assert.equal(valid.status, 0, valid.stderr);
-  const dev = check({ VERCEL_GIT_COMMIT_REF: "dev" });
-  assert.equal(dev.status, 1);
-  assert.match(dev.stderr, /push a dev no despliegan/);
-  assert.equal(check({ VERCEL_ENV: "preview" }).status, 1);
+  assert.equal(check({ DATABASE_URL: "postgresql://taskode:example@postgres:5432/taskode" }).status, 1);
   assert.equal(check({ DATABASE_SSL: "disable" }).status, 1);
   assert.equal(check({ BACKUP_STORAGE: "filesystem" }).status, 1);
   assert.equal(check({ ATTACHMENT_STORAGE: "filesystem" }).status, 1);
@@ -53,15 +52,14 @@ test("Vercel: la configuración de producción se valida sin conectarse y rechaz
 test("PostgreSQL: valida TLS, CA y tamaño del pool sin permitir que la URL reemplace TLS", () => {
   const previous = { ...process.env };
   try {
-    process.env.VERCEL = "1";
-    process.env.DATABASE_SSL = "disable";
-    assert.throws(() => databasePoolConfig("postgresql://taskode:example@db.example.com/taskode"), /verify-full/);
+    process.env.DATABASE_SSL = "insegura";
+    assert.throws(() => databasePoolConfig("postgresql://taskode:example@db.example.com/taskode"), /disable o verify-full/);
     process.env.DATABASE_SSL = "verify-full";
     process.env.DATABASE_SSL_CA = "line1\\nline2";
     process.env.DATABASE_POOL_MAX = "5";
     const config = databasePoolConfig("postgresql://taskode:example@db.example.com/taskode");
     assert.deepEqual(config.ssl, { rejectUnauthorized: true, ca: "line1\nline2" });
-    assert.equal(config.idleTimeoutMillis, 5000);
+    assert.equal(config.idleTimeoutMillis, 30000);
     assert.throws(() => databasePoolConfig("postgresql://taskode:example@db.example.com/taskode?sslmode=require"), /retira los parámetros SSL/);
     process.env.DATABASE_POOL_MAX = "1";
     assert.throws(() => databasePoolConfig("postgresql://taskode:example@db.example.com/taskode"), /entre 3 y 50/);

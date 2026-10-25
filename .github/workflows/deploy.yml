@@ -1,0 +1,108 @@
+name: Deploy
+
+# Despliega en Dokploy una imagen ya publicada en GHCR. Dokploy no construye nada: solo descarga la imagen.
+# - Lo llama ci.yml tras cada push a main (con la imagen sha-<commit> recién publicada).
+# - Se lanza a mano desde Actions para hacer rollback a un tag anterior (p. ej. sha-<commit>).
+#   El contenedor aplica las migraciones al arrancar; un rollback no revierte el esquema. Ver docs/despliegue.md.
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: Referencia completa de la imagen (ghcr.io/...:sha-...)
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag de ghcr.io/adminsiemprenet/taskode a desplegar (p. ej. sha-<commit> o main)
+        required: true
+        type: string
+
+jobs:
+  deploy:
+    name: Dokploy (producción)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # El secret DOKPLOY_API_KEY y las variables DOKPLOY_URL / DOKPLOY_APPLICATION_ID / PUBLIC_URL viven en el
+    # environment "production", restringido a la rama main.
+    environment:
+      name: production
+      url: ${{ vars.PUBLIC_URL }}
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    env:
+      DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
+      DOKPLOY_API_KEY: ${{ secrets.DOKPLOY_API_KEY }}
+      APP_ID: ${{ vars.DOKPLOY_APPLICATION_ID }}
+      PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+      INPUT_IMAGE: ${{ inputs.image }}
+      INPUT_TAG: ${{ inputs.tag }}
+      COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'Despliegue manual' }}
+    steps:
+      - name: Resolver la imagen
+        run: |
+          if [ -n "$INPUT_IMAGE" ]; then
+            image="$INPUT_IMAGE"
+          else
+            if ! printf '%s' "$INPUT_TAG" | grep -Eq '^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$'; then
+              echo "::error::Tag inválido: $INPUT_TAG"; exit 1
+            fi
+            image="ghcr.io/adminsiemprenet/taskode:$INPUT_TAG"
+          fi
+          echo "IMAGE=$image" >> "$GITHUB_ENV"
+          echo "Imagen: $image"
+
+      - name: Fijar la imagen y desplegar
+        run: |
+          api() { curl -sS --fail-with-body --retry 3 -H "x-api-key: $DOKPLOY_API_KEY" -H "Content-Type: application/json" "$@"; }
+
+          # Despliegues que ya existían, para reconocer el nuevo sin depender de los relojes.
+          api "$DOKPLOY_URL/api/deployment.all?applicationId=$APP_ID" | jq -c '[.[].deploymentId]' > before.json
+
+          # Solo cambia la imagen; las credenciales de GHCR y el resto de la configuración se conservan.
+          api -X POST "$DOKPLOY_URL/api/application.update" \
+            -d "$(jq -n --arg id "$APP_ID" --arg img "$IMAGE" '{applicationId: $id, dockerImage: $img}')" > /dev/null
+
+          title="${IMAGE##*:} · $(printf '%s' "$COMMIT_MESSAGE" | head -n 1 | cut -c1-120)"
+          api -X POST "$DOKPLOY_URL/api/application.deploy" \
+            -d "$(jq -n --arg id "$APP_ID" --arg t "$title" '{applicationId: $id, title: $t}')" > /dev/null
+          echo "Despliegue solicitado: $title"
+
+          # Espera a que Dokploy termine (máx. 10 min).
+          for _ in $(seq 1 60); do
+            sleep 10
+            status=$(api "$DOKPLOY_URL/api/deployment.all?applicationId=$APP_ID" \
+              | jq -r --slurpfile before before.json \
+                  '[.[] | select(.deploymentId | IN($before[0][]) | not)] | first | .status // "pending"')
+            echo "Estado: $status"
+            case "$status" in
+              done) exit 0 ;;
+              error) echo "::error::Dokploy reportó error en el despliegue. Revisa los logs en el panel."; exit 1 ;;
+            esac
+          done
+          echo "::error::El despliegue no terminó en 10 minutos"; exit 1
+
+      # /api/health valida la conexión y la versión exacta del esquema.
+      # Cloudflare puede bloquear las IPs de los runners de GitHub con un 403: eso no es un fallo de la app (el
+      # health check de Swarm con start-first + rollback ya valida el contenedor), así que solo deja un aviso.
+      - name: Smoke test
+        run: |
+          for _ in $(seq 1 12); do
+            out=$(curl -s -o /dev/null -m 15 -w '%{http_code} %header{server}' "$PUBLIC_URL/api/health" || true)
+            code="${out%% *}"
+            server="${out#* }"
+            case "$code" in
+              2??) echo "/api/health: $code"; exit 0 ;;
+              403)
+                if [ "$server" = "cloudflare" ]; then
+                  echo "::warning::Cloudflare bloqueó al runner en /api/health (403). Verifica $PUBLIC_URL/api/health a mano o crea una regla de WAF para el smoke test."
+                  exit 0
+                fi ;;
+            esac
+            echo "/api/health: ${code:-sin respuesta}, reintentando"
+            sleep 10
+          done
+          echo "::error::/api/health no respondió 2xx"
+          exit 1

@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 
 process.chdir(resolve(import.meta.dirname, ".."));
 if ((process.argv[2] || "prepare") !== "prepare") {
-  console.error("El despliegue antiguo de la web en Dokploy fue retirado. Usa Vercel para la web y consulta docs/despliegue-vercel-dokploy.md para PostgreSQL.");
+  console.error("La web se despliega desde GitHub Actions (imagen en GHCR y aplicación en Dokploy). Consulta docs/despliegue.md.");
   process.exitCode = 1;
 } else {
   execFileSync("docker", ["compose", "-f", "compose.dokploy.yaml", "config", "--no-interpolate", "--quiet"], { stdio: "pipe" });

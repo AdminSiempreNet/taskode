@@ -14,7 +14,7 @@ import { inline, link, list, textResult, untrusted } from "../format";
 import { confirm, entity, id, textMode } from "../schemas";
 
 const WRITE = { readOnlyHint: false, destructiveHint: false } as const;
-// Vercel limits request bodies to 4.5 MB; base64 adds a third.
+// Keep request bodies under 4.5 MB (the former hosting limit, kept for clients); base64 adds a third.
 export const MAX_UPLOAD_BYTES = 2_500_000;
 const MAX_IMAGE_RESULT = 1_000_000;
 const MAX_FILE_RESULT = 2_000_000;

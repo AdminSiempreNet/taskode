@@ -1,4 +1,4 @@
-# Producción: PostgreSQL y programador de notificaciones. La web sigue en Vercel.
+# Producción: PostgreSQL y programador de notificaciones. La web es la aplicación taskode-web de Dokploy (docs/despliegue.md).
 services:
   notifications:
     image: node:24-alpine

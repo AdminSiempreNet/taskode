@@ -36,13 +36,12 @@ export function s3BackupConfig(env: Record<string, string | undefined> = process
 }
 
 export function createBackupStorage(): BackupStorage | undefined {
-  const driver = process.env.BACKUP_STORAGE || (process.env.VERCEL === "1" ? "s3" : "filesystem");
+  const driver = process.env.BACKUP_STORAGE || "filesystem";
   if (driver === "s3") {
     const config = s3BackupConfig();
     return new S3BackupStorage(new S3Client(config.client), config.bucket, config.prefix);
   }
   if (driver !== "filesystem") throw new Error("BACKUP_STORAGE debe ser filesystem o s3.");
-  if (process.env.VERCEL === "1") throw new Error("Vercel requiere BACKUP_STORAGE=s3 para conservar los respaldos.");
   return undefined;
 }
 

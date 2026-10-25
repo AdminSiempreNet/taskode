@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 const config: NextConfig = {
-  ...(process.env.VERCEL === "1" ? {} : { output: "standalone" as const }),
+  output: "standalone",
   poweredByHeader: false,
   async headers() {
     // Login and consent carry the signed OAuth query (state, PKCE challenge): never framed or leaked.

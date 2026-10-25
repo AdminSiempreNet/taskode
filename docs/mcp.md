@@ -54,7 +54,7 @@ Las claves de firma se guardan cifradas con `BETTER_AUTH_SECRET` en la tabla `jw
 
 ## Despliegue
 
-1. `npm run db:migrate` aplica las migraciones pendientes, incluida `0014_oauth_mcp`, que crea las tablas OAuth, `jwks` y `mcp_activity`, y `0015_applications`, con su backfill de aplicaciones. `build:vercel` las ejecuta después de compilar y antes de publicar.
+1. `npm run db:migrate` aplica las migraciones pendientes, incluida `0014_oauth_mcp`, que crea las tablas OAuth, `jwks` y `mcp_activity`, y `0015_applications`, con su backfill de aplicaciones. El contenedor de producción las ejecuta al arrancar, antes de atender tráfico.
 2. No hay variables obligatorias nuevas: issuer, recurso y metadatos derivan de `BETTER_AUTH_URL`.
 3. Variables opcionales:
 

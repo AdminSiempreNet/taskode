@@ -16,7 +16,7 @@ Cambiar zona conserva los valores escritos en las tareas y recalcula trabajos fu
 
 Generar un par VAPID distinto por entorno con `npx web-push generate-vapid-keys`. Mantener estable ese par: rotarlo exige volver a activar los dispositivos. Configurar en el servidor:
 
-`npm run setup:notifications` prepara `.env.local`; con `-- --production` prepara `.env.production.local`. Genera el par y el secreto si faltan, conserva los valores existentes y no imprime secretos. Estos archivos están excluidos de Git. Copia las variables del archivo de producción a Vercel y el mismo `NOTIFICATION_WORKER_SECRET` al programador de Dokploy.
+`npm run setup:notifications` prepara `.env.local`; con `-- --production` prepara `.env.production.local`. Genera el par y el secreto si faltan, conserva los valores existentes y no imprime secretos. Estos archivos están excluidos de Git. Copia las variables del archivo de producción a la aplicación `taskode-web` de Dokploy y el mismo `NOTIFICATION_WORKER_SECRET` al programador de Dokploy.
 
 ```dotenv
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=<clave pública>
@@ -33,7 +33,7 @@ En iPhone/iPad se requiere Safari con soporte Web Push y añadir Taskode a la pa
 
 ## Procesamiento y despliegue
 
-La aplicación continúa en Vercel. `compose.dokploy.yaml` contiene PostgreSQL y un servicio `notifications` basado en Node 24 que llama cada minuto a:
+La aplicación se despliega en Dokploy desde GitHub Actions ([guía](despliegue.md)). `compose.dokploy.yaml` contiene PostgreSQL y un servicio `notifications` basado en Node 24 que llama cada minuto a:
 
 ```text
 POST https://taskode.siempre.net.co/api/internal/notifications/process
@@ -44,8 +44,8 @@ El programador no recibe credenciales de base de datos, no solapa llamadas y rec
 
 Aplicar en este orden:
 
-1. Ejecutar `npm run db:migrate` para aplicar todas las migraciones hasta `0015_applications`, con las instancias anteriores detenidas durante el cambio de versión de esquema. El orden de llegada y el límite de lectura usan una secuencia de base de datos para conservar los avisos nuevos incluso entre instancias con relojes diferentes.
-2. Configurar las variables VAPID, RESEND_API_KEY, RESEND_FROM_EMAIL y el secreto en Vercel; desplegar la aplicación. `npm run check:production` las valida sin conectarse a servicios.
+1. Aplicar las migraciones pendientes; el contenedor de producción lo hace al arrancar, y las instancias anteriores dejan de atender tráfico durante el cambio de versión de esquema. El orden de llegada y el límite de lectura usan una secuencia de base de datos para conservar los avisos nuevos incluso entre instancias con relojes diferentes.
+2. Configurar las variables VAPID, RESEND_API_KEY, RESEND_FROM_EMAIL y el secreto en `taskode-web` de Dokploy; desplegar la aplicación. `npm run check:production` las valida sin conectarse a servicios.
 3. Configurar el mismo secreto y la URL en Dokploy; actualizar el Compose conservando el nombre y volumen de PostgreSQL existentes.
 4. Revisar el estado de `notifications` y los logs con fecha, recordatorios generados, entregas, fallos y pendientes. Un fallo se reintenta sin perder la notificación persistida. Los recordatorios push caducan al vencer la tarea; las otras entregas caducan en 24 horas.
 5. Con dos usuarios, asignar una tarea al segundo, abrirla desde la campana, activar push y comprobar un vencimiento próximo. Probar también pérdida de conexión, retirada de acceso y cierre de sesión.

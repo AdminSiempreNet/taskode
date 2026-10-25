@@ -2,7 +2,7 @@
 
 Fecha de decisión: 16 de octubre de 2026.
 
-Actualización de alojamiento: la [preparación Vercel + Dokploy](despliegue-vercel-dokploy.md) sustituye el alojamiento completo en Compose descrito abajo. La aplicación y su API irán en Vercel, PostgreSQL en Dokploy y los respaldos en S3 compatible (R2 o Backblaze B2). Desarrollo continúa con Next.js local y PostgreSQL en Docker Desktop.
+Actualización de alojamiento: la preparación Vercel + Dokploy (hoy [docs/despliegue.md](../../docs/despliegue.md), solo Dokploy) sustituye el alojamiento completo en Compose descrito abajo. La aplicación y su API irán en Vercel, PostgreSQL en Dokploy y los respaldos en S3 compatible (R2 o Backblaze B2). Desarrollo continúa con Next.js local y PostgreSQL en Docker Desktop.
 
 ## Contexto y alternativas
 

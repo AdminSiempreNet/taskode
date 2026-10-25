@@ -10,13 +10,13 @@ PostgreSQL sigue almacenando los mensajes. Ably transporta únicamente avisos co
 
 En [el panel de Ably](https://ably.com/dashboard), crea una aplicación de desarrollo y otra de producción, o como mínimo claves separadas con sus restricciones de canales. En **API Keys → Create new API key**, marca solo **Publish** y **Subscribe**; limita los canales al patrón que corresponde al entorno. History, Presence, administración y revocación de tokens no son necesarios para esta integración.
 
-| Configuración | Desarrollo (`.env.local`) | Vercel (Production) |
+| Configuración | Desarrollo (`.env.local`) | Producción (Dokploy) |
 | --- | --- | --- |
 | Restricción de canales de la clave | `taskode-development:*` | `taskode-production:*` |
 | `ABLY_CHANNEL_NAMESPACE` | `taskode-development` | `taskode-production` |
 | `ABLY_API_KEY` | Clave completa de desarrollo | Otra clave completa para producción |
 
-Las claves tienen formato `appId.keyId:secret`; guárdalas solo en archivos de entorno ignorados por Git o en el gestor de variables de Vercel. No uses `NEXT_PUBLIC_` ni envíes la clave al navegador. El servidor entrega JWT de diez minutos, limitados a Subscribe en el canal exacto de la tarea y el usuario. Revalida sesión y permisos antes de emitir o renovar cada token.
+Las claves tienen formato `appId.keyId:secret`; guárdalas solo en archivos de entorno ignorados por Git o en las variables de la aplicación en Dokploy. No uses `NEXT_PUBLIC_` ni envíes la clave al navegador. El servidor entrega JWT de diez minutos, limitados a Subscribe en el canal exacto de la tarea y el usuario. Revalida sesión y permisos antes de emitir o renovar cada token.
 
 El servidor calcula los destinatarios actuales antes de publicar. Los canales son diferentes para cada tarea y usuario: al retirar acceso, esa persona deja de recibir los avisos siguientes y las API rechazan nuevas lecturas, escrituras y renovaciones. Un token ya emitido puede seguir conectado hasta caducar, pero su canal deja de recibir avisos de la tarea; no se publica contenido sensible en él.
 
@@ -34,7 +34,7 @@ npm run dev
 
 La opción `--development` carga `.env.local` y exige que PostgreSQL sea local. `check:ably` prueba un JWT de lectura, una suscripción y una publicación reales con identificadores sintéticos, sin revelar la clave ni enviar comentarios existentes. Si Next.js ya estaba abierto, reinícialo si no recoge las nuevas variables.
 
-Para producción, agrega ambas variables a **Vercel → tareas → Settings → Environment Variables → Production** y despliega el código actualizado. `build:vercel` valida las variables y aplica las migraciones. La validación exige `taskode-production`; una clave de desarrollo no debe reutilizarse como clave de producción. Se puede verificar una configuración local de producción mediante `npm run check:ably -- --production`, usando el archivo privado `.env.production.local`.
+Para producción, agrega ambas variables a **Dokploy → SiempreNet → production → taskode-web → Environment** y despliega el código actualizado. El contenedor valida las variables y aplica las migraciones al arrancar. La validación exige `taskode-production`; una clave de desarrollo no debe reutilizarse como clave de producción. Se puede verificar una configuración local de producción mediante `npm run check:ably -- --production`, usando el archivo privado `.env.production.local`.
 
 Pruebas:
 
@@ -70,7 +70,7 @@ Al retirar un miembro hay que reasignar previamente las tareas que lidera y sus 
 ## Almacenamiento
 
 - Desarrollo: `ATTACHMENT_STORAGE=filesystem`, `ATTACHMENT_DIR=./data/attachments`. En Docker Compose, el volumen `taskode-attachments` conserva los archivos en `/app/attachments`.
-- Vercel: `ATTACHMENT_STORAGE=s3`. Reutiliza `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, credenciales y `S3_PREFIX` de los respaldos. Los objetos se guardan bajo `<S3_PREFIX>attachments/`, separados de `backups/` y de las cargas de respaldos.
+- Producción (Dokploy): `ATTACHMENT_STORAGE=s3`; el contenedor no tiene volúmenes. Reutiliza `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, credenciales y `S3_PREFIX` de los respaldos. Los objetos se guardan bajo `<S3_PREFIX>attachments/`, separados de `backups/` y de las cargas de respaldos.
 - El bucket debe ser privado. Autoriza lectura, escritura, consulta y eliminación de objetos en ese prefijo a la cuenta del servidor. No publiques el bucket ni expongas credenciales al navegador.
 - Agrega a CORS los orígenes exactos de la aplicación y desarrollo que utilicen S3, métodos `PUT`, `GET`, `HEAD` y cabeceras `Content-Type` y `x-amz-*`. Ejemplo AWS compatible: `AllowedHeaders: ["*"]`, con `AllowedOrigins` limitado a tus dominios. Conserva las reglas existentes de respaldos.
 - Las cargas S3 van directamente al almacenamiento con una URL válida durante cinco minutos. El servidor valida tamaño y contenido antes de publicar bytes validados en una clave diferente. Las lecturas se autorizan de nuevo y generan URLs firmadas de 60 segundos; una URL ya emitida conserva esa vigencia tras revocar acceso.

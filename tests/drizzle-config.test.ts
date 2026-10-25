@@ -13,7 +13,6 @@ function credentials(overrides: Record<string, string>) {
       env: {
         ...process.env,
         NODE_ENV: "test",
-        VERCEL: "",
         DATABASE_URL: "postgresql://taskode:example@127.0.0.1/taskode",
         DATABASE_SSL: "disable",
         DATABASE_SSL_CA: "",
