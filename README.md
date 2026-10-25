@@ -88,16 +88,16 @@ Cada proyecto pertenece a su creador. Solo el administrador puede cambiar el lí
 
 El menú de usuario del pie del sidebar reúne **Mi perfil**, **Importar Trello**, **Configuración** y **Cerrar sesión**. Añade las opciones administrativas según los permisos. El perfil muestra los datos del proveedor, el rol y la fecha de registro, con enlaces para gestionar Google o GitHub; no edita la identidad localmente.
 
-## Producción: Vercel + Dokploy + S3
+## Producción: Dokploy + GHCR + S3
 
-- La aplicación Next.js (interfaz, autenticación y API) se ejecuta en **Vercel**, workspace **siemprenet**, dominio **https://taskode.siempre.net.co**.
-- PostgreSQL con pgvector se ejecuta en **Dokploy**, con volumen persistente y conexión TLS verificada desde Vercel.
+- La aplicación Next.js (interfaz, autenticación y API) se ejecuta en **Dokploy**, proyecto **SiempreNet**, como imagen Docker publicada por GitHub Actions en `ghcr.io/adminsiemprenet/taskode`, dominio **https://taskode.siempre.net.co**.
+- PostgreSQL con pgvector se ejecuta en el mismo proyecto de Dokploy, con volumen persistente y conexión TLS verificada.
 - Los respaldos usan la interfaz `BackupStorage` y su adaptador S3, configurable para **Cloudflare R2** o **Backblaze B2**. Desarrollo conserva archivos locales por defecto.
-- Los push a **`dev` no despliegan**. `main` es la rama de producción prevista; `vercel.json` habilita despliegues automáticos únicamente para `main`.
+- Los push a **`dev` no despliegan**: el CI ejecuta tipos y pruebas y construye la imagen sin publicarla. Un push a `main` además la publica y la despliega en Dokploy. El contenedor valida la configuración y aplica las migraciones antes de arrancar.
 
-La [guía de despliegue](docs/despliegue-vercel-dokploy.md) reúne variables, certificados, bucket/CORS, migraciones, DNS y las tareas de cada rol. `.env.production.example` corresponde a Vercel y `.env.dokploy.example` a PostgreSQL. Ninguno contiene credenciales reales.
+La [guía de despliegue](docs/despliegue.md) reúne el flujo de CI, el rollback, variables, certificados, bucket/CORS, migraciones y DNS. `.env.production.example` corresponde a la aplicación en Dokploy y `.env.dokploy.example` a PostgreSQL y el programador. Ninguno contiene credenciales reales.
 
-`npm run prepare:dokploy` prepara únicamente el Compose de PostgreSQL. El antiguo comando `node scripts/deploy-dokploy.mjs deploy` se ha retirado. La preparación no llama a Vercel ni a Dokploy y no publica nada.
+`npm run prepare:dokploy` prepara únicamente los Compose de PostgreSQL y del programador. No llama a Dokploy y no publica nada.
 
 ## Docker Compose completo (alternativa local)
 

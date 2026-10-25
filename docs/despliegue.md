@@ -1,29 +1,80 @@
 # Despliegue de producción
 
-La aplicación está en el proyecto **siemprenet/tareas** de Vercel, con el dominio
-**https://taskode.siempre.net.co**. PostgreSQL y el programador de notificaciones
-se ejecutan en Dokploy. Solo `main` despliega automáticamente; `dev` no publica.
+La aplicación se ejecuta en **Dokploy** (`https://server.eduinpro.net`), proyecto
+**SiempreNet → production**, como la aplicación `taskode-web`, con el dominio
+**https://taskode.siempre.net.co**. En el mismo proyecto están PostgreSQL
+(`taskode-db`) y el programador de notificaciones (`taskode-notifications`).
+GitHub Actions construye la imagen y la publica en
+`ghcr.io/adminsiemprenet/taskode`; Dokploy no compila nada, solo descarga la imagen.
+Solo `main` despliega; `dev` y los pull requests construyen la imagen sin publicarla.
+
+## Flujo
+
+`.github/workflows/ci.yml` se ejecuta en cada pull request y en cada push a `dev` y `main`:
+
+1. **Tipos y pruebas**: `npm ci`, `npm run typecheck` y `npm test`, con un PostgreSQL
+   pgvector desechable en el runner (`TEST_DATABASE_URL`).
+2. **Imagen Docker**: construye el stage `runner` del `Dockerfile` para `linux/amd64`.
+   En push a `main` la publica con los tags `sha-<commit>` y `main`.
+3. **Desplegar en Dokploy** (solo push a `main`, tras los dos anteriores): llama a
+   `.github/workflows/deploy.yml`, que fija `dockerImage` en la aplicación, solicita el
+   despliegue, espera a que Dokploy lo marque `done` y comprueba `/api/health`.
+
+Al arrancar, el contenedor ejecuta `scripts/docker-entrypoint.sh`:
+
+1. Con `CHECK_PRODUCTION=true`, valida la configuración (`dist/check-production.cjs`,
+   el mismo `scripts/check-production.ts` empaquetado). Si falla, termina sin migrar.
+2. Aplica las migraciones pendientes y sus backfills SQL (`dist/migrate.cjs`). La
+   migración toma un bloqueo asesor para serializar ejecuciones.
+3. Inicia `node server.js` en el puerto 5010.
+
+Swarm actualiza con `start-first` y rollback automático: el contenedor anterior sigue
+atendiendo hasta que el nuevo supera el healthcheck de `/api/health`. Ese endpoint
+comprueba la versión exacta del esquema, así que una configuración inválida o una
+migración fallida nunca reciben tráfico. Una migración aplicada no se revierte: en
+cuanto el esquema cambia, el contenedor anterior deja de estar sano hasta que el
+nuevo lo reemplaza.
+
+### Rollback
+
+**Actions → Deploy → Run workflow**, con el tag `sha-<commit>` de una imagen anterior.
+Solo es seguro si esa versión usa el mismo esquema; para volver a un esquema anterior
+hay que seguir el procedimiento de recuperación.
+
+### Configuración de GitHub
+
+- Environment **production**, restringido a `main`:
+  - Secret `DOKPLOY_API_KEY`: clave de API de Dokploy para Actions.
+  - Variables `DOKPLOY_URL=https://server.eduinpro.net`, `DOKPLOY_APPLICATION_ID`
+    (id de `taskode-web`) y `PUBLIC_URL=https://taskode.siempre.net.co`.
+- Variable de repositorio `NEXT_PUBLIC_VAPID_PUBLIC_KEY`: se incrusta en el JavaScript
+  del cliente durante el build. Es pública; debe coincidir con la de Dokploy.
+- El paquete GHCR se publica con el `GITHUB_TOKEN` del workflow. Dokploy lo descarga
+  con un usuario y token de `AdminSiempreNet` con `read:packages`, guardados en la
+  aplicación.
 
 ## Configuración
 
-Usar Node.js 24 y `npm ci`. Las variables reales se guardan en **Vercel → tareas →
-Settings → Environment Variables → Production**. `.env.production.example` enumera
-las variables; `.env.production.local` es una copia privada opcional para operación
-local, ignorada por Git. Las variables de Development o Preview no sustituyen las
-de Production. No compartir la base de producción con Preview.
+Las variables reales se guardan en **Dokploy → SiempreNet → production → taskode-web →
+Environment**. `.env.production.example` enumera las variables; `.env.production.local`
+es una copia privada opcional para operación local, ignorada por Git. No compartir la
+base de producción con otros entornos.
 
+- `CHECK_PRODUCTION=true` para validar al arrancar.
 - `BETTER_AUTH_URL=https://taskode.siempre.net.co` y un `BETTER_AUTH_SECRET` estable
   de al menos 32 caracteres. Conservar el secreto existente para no invalidar acceso.
 - Al menos un proveedor OAuth completo. Sus callbacks son
   `https://taskode.siempre.net.co/api/auth/callback/google` y
   `https://taskode.siempre.net.co/api/auth/callback/github`.
-- `DATABASE_URL` apunta al PostgreSQL externo de Dokploy; `DATABASE_SSL=verify-full`,
-  `DATABASE_SSL_CA` para la CA privada y `DATABASE_POOL_MAX=5`. El hostname debe
-  coincidir con el certificado. No añadir parámetros SSL a la URL ni desactivar
-  la verificación TLS. El rol de aplicación necesita permisos para migrar sus tablas.
+- `DATABASE_URL` apunta al endpoint TLS de PostgreSQL; `DATABASE_SSL=verify-full`,
+  `DATABASE_SSL_CA` para la CA privada y `DATABASE_POOL_MAX` (10 por defecto; una sola
+  instancia de larga vida). El hostname debe coincidir con el certificado. No añadir
+  parámetros SSL a la URL ni desactivar la verificación TLS. El rol de aplicación
+  necesita permisos para migrar sus tablas.
 - `BACKUP_STORAGE=s3` y `ATTACHMENT_STORAGE=s3`, con las variables `S3_*` de la
-  plantilla. El bucket es privado y debe permitir CORS desde el dominio de producción
-  para cargas y descargas directas. No usar almacenamiento local en Vercel.
+  plantilla. El contenedor no tiene volúmenes: el almacenamiento local se perdería
+  en cada despliegue. El bucket es privado y debe permitir CORS desde el dominio de
+  producción para cargas y descargas directas.
 - `ABLY_API_KEY` exclusiva de producción, con Publish y Subscribe para
   `taskode-production:*`; `ABLY_CHANNEL_NAMESPACE=taskode-production`.
 - `RESEND_API_KEY` y `RESEND_FROM_EMAIL` con un remitente verificado.
@@ -31,7 +82,8 @@ de Production. No compartir la base de producción con Preview.
   `VAPID_SUBJECT=https://taskode.siempre.net.co` y `NOTIFICATION_WORKER_SECRET`
   de al menos 32 caracteres. Solo la clave pública puede llegar al navegador.
   Conservar el par VAPID existente entre despliegues.
-- MCP funciona con el mismo origen. `MCP_ENABLED=false` lo desactiva;
+- MCP funciona con el mismo origen. `MCP_JWKS_URL=http://127.0.0.1:5010/api/auth/jwks`
+  verifica tokens sin salir del contenedor. `MCP_ENABLED=false` lo desactiva;
   `MCP_ALLOWED_ORIGINS` solo admite orígenes HTTPS adicionales de clientes de navegador.
 
 `npm run setup:notifications -- --production` genera VAPID y el secreto si faltan,
@@ -44,19 +96,15 @@ destino en el proceso o ejecutar en un checkout sin `.env.local`.
 ## Preparación de una versión
 
 1. Incluir en Git el código, todos los SQL de `drizzle/postgresql` y sus metadatos.
-   No editar migraciones ya aplicadas. La versión actual llega a `0015_applications`.
-   Esta migración incluye el backfill: crea Web, Android, iOS, Windows y macOS
-   por proyecto y asigna Web a todas las tareas existentes, incluidas las archivadas.
-   Los módulos y features quedan sin aplicaciones. No necesita un script ni semillas
-   adicionales; el SQL y el backfill se aplican juntos en la transacción de Drizzle.
+   No editar migraciones ya aplicadas.
 2. Ejecutar `npm test`, `npm run typecheck`, `npm run build`, `npm run test:http`
    y `npm run test:mcp:http`. Las pruebas de datos usan `TEST_DATABASE_URL`,
-   con esquemas desechables, nunca la base de producción.
+   con esquemas desechables, nunca la base de producción. El CI repite tipos y pruebas.
 3. Probar las migraciones pendientes sobre una restauración aislada de producción.
-4. Coordinar una ventana de mantenimiento y pausar el programador si ya existe.
-   La aplicación comprueba la versión exacta del esquema: el código anterior no
-   debe continuar atendiendo tráfico con el esquema nuevo. Bloquear temporalmente
-   el acceso externo antes del respaldo final y permitir terminar solicitudes activas.
+4. Para un cambio de esquema incompatible, coordinar una ventana de mantenimiento y
+   pausar el programador. El código anterior no debe continuar atendiendo tráfico con
+   el esquema nuevo. Bloquear temporalmente el acceso externo antes del respaldo final
+   y permitir terminar solicitudes activas.
 5. Crear el respaldo final con `npm run db:backup:production`. Requiere Docker en
    el equipo operador y conexión TLS a PostgreSQL. Lee `.env.production.local`
    y variables del proceso, sin recurrir a `.env.local`. Genera un archivo binario
@@ -71,19 +119,10 @@ restauración de ensayo es la comprobación necesaria antes de un cambio incompa
 
 ## Publicación
 
-Hacer merge de la versión verificada a `main` y `git push origin main`.
-Vercel ejecuta `npm run build:vercel` en este orden:
-
-1. Validar variables de Production.
-2. Compilar Next.js.
-3. Ejecutar las migraciones pendientes y sus backfills SQL mediante `npm run db:migrate`.
-4. Publicar el resultado si todos los pasos terminaron correctamente.
-
-Así una compilación fallida no cambia el esquema. La migración toma un bloqueo
-asesor para serializar ejecuciones. Esto no detiene las escrituras de la web ni
-convierte el cambio de esquema y la publicación en una única transacción.
-Si falla la publicación después de migrar, mantener el mantenimiento y resolver
-el despliegue o ejecutar el procedimiento de recuperación.
+Hacer merge de la versión verificada de `dev` a `main` y `git push origin main`. El CI
+publica la imagen y la despliega. Revisar el job **Desplegar en Dokploy** y los logs de
+la aplicación en Dokploy, que deben mostrar «Migraciones PostgreSQL de Taskode
+aplicadas.» antes de que Next.js arranque.
 
 Las migraciones manuales usan `npm run db:migrate` con las variables de producción
 explícitas; `-- --development` queda reservado para una base local. Repetir la
@@ -93,25 +132,19 @@ de ejemplos en producción.
 ## Programador en Dokploy
 
 `npm run prepare:dokploy` prepara `.dokploy/notifications.compose.yaml`, un Compose
-independiente que contiene solo el programador. Crear un servicio Compose de tipo
-Raw en el entorno de producción existente y copiar ese archivo, con:
+independiente que contiene solo el programador (servicio `taskode-notifications`), con:
 
 - `NOTIFICATION_PROCESS_URL=https://taskode.siempre.net.co/api/internal/notifications/process`.
-- `NOTIFICATION_WORKER_SECRET` idéntico al de Vercel.
+- `NOTIFICATION_WORKER_SECRET` idéntico al de `taskode-web`.
 
 El servicio usa Node 24, llama cada minuto por POST, rechaza redirecciones y no
 necesita acceso a la base ni credenciales S3 o VAPID. Mantener intactos el Compose,
 los certificados y los volúmenes del PostgreSQL existente. El `compose.yaml`
-general es una alternativa de alojamiento local; no es el despliegue Vercel/Dokploy.
-
-La protección de Vercel debe permitir llamadas al dominio de producción. El Bearer
-del programador no sustituye los mecanismos de protección propios de Vercel. La
-configuración habitual deja accesible el dominio personalizado y protege las URLs
-de despliegues; si se cambia, revisar el acceso del programador.
+general es una alternativa de alojamiento local.
 
 ## Verificación y recuperación
 
-- Vercel debe mostrar el commit publicado en estado **Ready**.
+- El job **Desplegar en Dokploy** termina en verde y Dokploy muestra el despliegue `done`.
 - `GET /api/health` debe devolver 200 y `{"status":"ok"}`; valida conexión y esquema.
 - Login y los callbacks OAuth deben usar el dominio canónico. Probar acceso,
   lectura/escritura y carga/descarga de un archivo con una cuenta autorizada.
@@ -124,9 +157,9 @@ de despliegues; si se cambia, revisar el acceso del programador.
   pantalla de inicio; las pruebas de navegador simulan permisos y recepción.
 - Retirar la protección temporal de mantenimiento tras verificar la versión.
 
-Volver al despliegue anterior de Vercel no revierte PostgreSQL. Para una migración
+Volver a una imagen anterior no revierte PostgreSQL. Para una migración
 incompatible, mantener el mantenimiento, detener procesos, restaurar el snapshot
-previo mediante `pg_restore` y recuperar los archivos asociados y el código
+previo mediante `pg_restore` y recuperar los archivos asociados y la imagen
 anterior. Preparar y ensayar la restauración con los permisos adecuados; preservar
 la extensión `vector` y la configuración TLS del servidor. Un JSON de respaldo
 de la aplicación restaura datos sobre el esquema actual y no deshace migraciones.
@@ -136,7 +169,7 @@ de la aplicación restaura datos sobre el esquema actual y no deshace migracione
 PostgreSQL está en `dbtaskode.siempre.net.co:5440`, con base y rol `taskode`,
 imagen `pgvector/pgvector:0.8.7-pg18-bookworm` y extensión `vector` activada.
 La CA privada se carga como certificado en `DATABASE_SSL_CA`; su clave privada
-permanece fuera de Vercel. El certificado del servidor debe incluir ese hostname.
+permanece fuera de Dokploy. El certificado del servidor debe incluir ese hostname.
 PostgreSQL usa sus propios certificados TLS, independientes del HTTPS de la web.
 
 Conservar el servicio `taskode-db`, el nombre físico de su volumen y sus montajes
@@ -145,16 +178,15 @@ volumen vacío; no cambian la contraseña de un rol existente. No ejecutar `down
 Las referencias históricas `brote-dev` del entorno local identifican recursos
 existentes y no deben renombrarse mediante sustituciones de texto.
 
-El puerto de PostgreSQL es TCP, sin proxy HTTP/Traefik, y debe aceptar las conexiones
-del build y de las funciones de Vercel con TLS verificado. Las IP normales de salida
-de Vercel son dinámicas; una restricción de firewall por IP necesita el mecanismo
-de IP estática correspondiente al proyecto. El rol de aplicación no es superusuario.
-Renovar los certificados antes de que expiren y mantener la clave del servidor
-legible por PostgreSQL con permisos adecuados, montada en solo lectura.
+El puerto de PostgreSQL es TCP, sin proxy HTTP/Traefik, y solo acepta conexiones
+con TLS verificado. El rol de aplicación no es superusuario. Renovar los certificados
+antes de que expiren y mantener la clave del servidor legible por PostgreSQL con
+permisos adecuados, montada en solo lectura.
 
-El pool se reutiliza por instancia y su total crece con las instancias de Vercel.
-Reservar conexiones para administración y migraciones. Si se incorpora PgBouncer,
-usar modo **session** por los bloqueos de sesión y el `search_path` del proyecto.
+Reservar conexiones para administración y migraciones; durante un despliegue
+`start-first` conviven brevemente dos contenedores con su pool. Si se incorpora
+PgBouncer, usar modo **session** por los bloqueos de sesión y el `search_path` del
+proyecto.
 
 El bucket S3/R2 es privado, con credenciales limitadas para listar, leer, escribir
 y borrar objetos. El prefijo de esta instalación es `taskode/production/`; cambiar
@@ -168,7 +200,6 @@ siempre bajo el prefijo. Aplicar retención a los snapshots y limpieza de cargas
 abandonadas; no borrar objetos definitivos usados por la aplicación. Conservar
 versiones o copias de archivos si se requiere recuperar un momento anterior.
 
-La configuración de cuenta de Vercel debe conservar **main** como Production Branch,
-Node.js **24.x** y la integración Git de `AdminSiempreNet/taskode`. `vercel.json`
-controla el filtro por rama, pero no reemplaza ese ajuste de la cuenta. Los callbacks
-OAuth y los DNS deben conservar el dominio canónico ya verificado.
+El DNS de `taskode.siempre.net.co` está en Cloudflare y apunta al servidor de Dokploy;
+Traefik emite el certificado HTTPS con Let's Encrypt. Los callbacks OAuth deben
+conservar el dominio canónico ya verificado.

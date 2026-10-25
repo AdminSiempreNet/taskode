@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 async function handleGET(_request: Request) {
   try {
     return Response.json(
-      { backups: await backups().list(), ...((process.env.BACKUP_STORAGE === "s3" || process.env.VERCEL === "1") ? { directUpload: true } : {}) },
+      { backups: await backups().list(), ...(process.env.BACKUP_STORAGE === "s3" ? { directUpload: true } : {}) },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {

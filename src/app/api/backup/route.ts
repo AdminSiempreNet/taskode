@@ -6,7 +6,7 @@ import { repository, backups } from "@/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 async function handleGET(_request: Request) {
-  if (process.env.VERCEL === "1" || process.env.BACKUP_STORAGE === "s3") {
+  if (process.env.BACKUP_STORAGE === "s3") {
     try {
       const manager = backups();
       const backup = await manager.create();

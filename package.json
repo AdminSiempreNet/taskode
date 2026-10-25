@@ -11,7 +11,6 @@
     "dev": "next dev --hostname 0.0.0.0 --port 5010",
     "email:preview": "tsx scripts/preview-invitation.ts",
     "build": "next build",
-    "build:vercel": "npm run check:production && npm run build && npm run db:migrate",
     "check:production": "tsx scripts/check-production.ts",
     "check:ably": "tsx scripts/check-ably.ts",
     "setup:notifications": "tsx scripts/setup-notifications.ts",
@@ -38,7 +37,8 @@
     "db:seed:dashboard": "tsx scripts/seed-dashboard.ts",
     "db:up": "docker compose --env-file .env.local -f compose.dev.yaml up -d --wait",
     "db:down": "docker compose --env-file .env.local -f compose.dev.yaml down",
-    "build:migrator": "esbuild scripts/migrate.ts --bundle --platform=node --packages=external --format=cjs --outfile=dist/migrate.cjs"
+    "build:migrator": "esbuild scripts/migrate.ts --bundle --platform=node --external:pg-native --format=cjs --outfile=dist/migrate.cjs",
+    "build:check": "esbuild scripts/check-production.ts --bundle --platform=node --external:pg-native --format=cjs --outfile=dist/check-production.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1152.0",
@@ -60,7 +60,6 @@
     "@tiptap/pm": "^3.32.0",
     "@tiptap/react": "^3.32.0",
     "@tiptap/starter-kit": "^3.32.0",
-    "@vercel/functions": "^3.10.1",
     "ably": "^2.29.0",
     "better-auth": "1.7.10",
     "class-variance-authority": "^0.7.1",

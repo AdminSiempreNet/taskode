@@ -194,14 +194,12 @@ export class S3FileStorage implements FileStorage {
   }
 }
 export function createFileStorage(): FileStorage {
-  const driver =
-    process.env.ATTACHMENT_STORAGE ||
-    (process.env.VERCEL === "1" ? "s3" : "filesystem");
+  const driver = process.env.ATTACHMENT_STORAGE || "filesystem";
   if (driver === "s3") {
     const c = s3BackupConfig();
     return new S3FileStorage(new S3Client(c.client), c.bucket, c.prefix);
   }
-  if (driver !== "filesystem" || process.env.VERCEL === "1")
-    throw new Error("Configura ATTACHMENT_STORAGE=s3 en Vercel.");
+  if (driver !== "filesystem")
+    throw new Error("ATTACHMENT_STORAGE debe ser filesystem o s3.");
   return new LocalFileStorage();
 }

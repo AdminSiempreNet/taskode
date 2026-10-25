@@ -2,8 +2,6 @@ import type { PoolConfig } from "pg";
 
 export function databaseSsl(connectionString: string): PoolConfig["ssl"] {
   const mode = process.env.DATABASE_SSL || "disable";
-  if (process.env.VERCEL === "1" && mode !== "verify-full")
-    throw new Error("En Vercel configura DATABASE_SSL=verify-full y TLS en PostgreSQL.");
   if (!["disable", "verify-full"].includes(mode))
     throw new Error("DATABASE_SSL debe ser disable o verify-full.");
   const url = new URL(connectionString);
@@ -17,7 +15,7 @@ export function databaseSsl(connectionString: string): PoolConfig["ssl"] {
 }
 
 export function databasePoolConfig(connectionString: string): PoolConfig {
-  const max = Number(process.env.DATABASE_POOL_MAX || (process.env.VERCEL === "1" ? 5 : 10));
+  const max = Number(process.env.DATABASE_POOL_MAX || 10);
   // Backups and authentication hold one connection while opening transactions.
   if (!Number.isInteger(max) || max < 3 || max > 50)
     throw new Error("DATABASE_POOL_MAX debe ser un entero entre 3 y 50.");
@@ -26,6 +24,6 @@ export function databasePoolConfig(connectionString: string): PoolConfig {
     ssl: databaseSsl(connectionString),
     max,
     connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: process.env.VERCEL === "1" ? 5000 : 30000,
+    idleTimeoutMillis: 30000,
   };
 }

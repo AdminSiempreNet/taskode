@@ -7,7 +7,6 @@ import * as schema from "./schema";
 import { expectedMigration } from "./migration-info";
 import { DomainError } from "./repository";
 import { databasePoolConfig } from "./database-config";
-import { attachDatabasePool } from "@vercel/functions";
 
 export type Database = NodePgDatabase<typeof schema>;
 export type DatabaseOptions = { schema?: string; max?: number };
@@ -46,7 +45,6 @@ export class DatabaseStore {
       ...(options.max !== undefined ? { max: options.max } : {}),
       options: `-c search_path=${this.schemaName}`,
     });
-    if (process.env.VERCEL === "1") attachDatabasePool(this.pool);
     this.pool.on("error", () =>
       console.error("Se perdió una conexión inactiva a PostgreSQL."),
     );
