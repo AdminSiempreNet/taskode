@@ -18,7 +18,7 @@ try {
   if (!process.env.DATABASE_URL) throw new Error("Configura DATABASE_URL.");
   const url = new URL(process.env.DATABASE_URL);
   if (!["postgres:", "postgresql:"].includes(url.protocol) || ["localhost", "127.0.0.1", "postgres"].includes(url.hostname))
-    throw new Error("DATABASE_URL debe apuntar al endpoint externo de PostgreSQL en Dokploy.");
+    throw new Error("DATABASE_URL debe apuntar al PostgreSQL de producción (taskode-postgres en la red interna de Dokploy).");
   databasePoolConfig(process.env.DATABASE_URL);
   if (process.env.BACKUP_STORAGE !== "s3") throw new Error("Configura BACKUP_STORAGE=s3.");
   if (process.env.ATTACHMENT_STORAGE !== "s3") throw new Error("Configura ATTACHMENT_STORAGE=s3 para conservar los archivos fuera del contenedor.");
