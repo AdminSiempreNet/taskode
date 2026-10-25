@@ -49,6 +49,16 @@ La última prueba es optativa y usa la clave real de desarrollo con dos sesiones
 
 Referencias: [tokens JWT](https://ably.com/docs/auth/token/jwt), [capacidades por canal](https://ably.com/docs/auth/capabilities) y [recuperación de conexiones](https://ably.com/docs/connect/states).
 
+## Tablero en tiempo real
+
+Cuando alguien crea, edita, mueve, reordena, archiva o elimina una tarea, el tablero, la lista y el calendario de las demás personas se actualizan sin recargar. La migración `0016_workspace_realtime` añade la cola `workspace_outbox` y dos triggers diferidos sobre `tasks`: cualquier escritura real (las actualizaciones sin cambios no cuentan) registra un aviso por proyecto al confirmar la transacción. Una ráfaga, como un movimiento que reordena toda la columna, se agrupa en un solo aviso. Como el trigger se ejecuta al confirmar, la fila de la cola se bloquea después de las tareas y dos movimientos simultáneos en la misma columna no se bloquean entre sí.
+
+Después de cada comando, `after()` drena la cola. El worker de notificaciones reintenta cada minuto los envíos que fallaron. El aviso `workspace.changed` contiene solo el proyecto y el evento, y se publica en el canal personal de notificaciones de cada persona con acceso al proyecto (administradores, líder y equipo). El navegador reutiliza la conexión de Ably de la campana, sin otro token ni otra conexión, y vuelve a leer `/api/workspace`, que aplica la visibilidad de cada tarea. Agrupa los avisos de 300 ms, espera a que termine un guardado propio y descarta las respuestas más antiguas que otra lectura o guardado posterior. Al reconectar se vuelve a sincronizar. Sin Ably, se actualiza al volver a la pestaña.
+
+El detalle abierto adopta los campos que la persona no ha modificado. Así un cambio ajeno no aparece como «cambios sin guardar» ni se deshace al guardar después. Los campos que sí se editaron conservan el valor local.
+
+`npm run test:workspace:live` es una prueba optativa con la clave de desarrollo. Abre dos navegadores con usuarios distintos y comprueba que un movimiento ajeno actualiza el tablero y el detalle abiertos.
+
 ## Migración y despliegue
 
 La migración `0005_entity_details` amplía comentarios y archivos a proyectos, módulos y features, conserva las asociaciones de tareas existentes y actualiza el trigger y el outbox de comentarios. Debe aplicarse antes de arrancar la nueva versión. En desarrollo utiliza `npm run db:migrate -- --development`; en otros entornos utiliza la conexión y el procedimiento de despliegue correspondiente.

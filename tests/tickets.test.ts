@@ -139,6 +139,7 @@ test("migración 0012 y respaldos v10 convierten cada número sin fusionar ni in
     await f.repo.store.pool.query(await readFile("drizzle/postgresql/0012_clients_tickets.sql", "utf8"));
     await f.repo.store.pool.query(await readFile("drizzle/postgresql/0014_oauth_mcp.sql", "utf8"));
     await f.repo.store.pool.query(await readFile("drizzle/postgresql/0015_applications.sql", "utf8"));
+    await f.repo.store.pool.query(await readFile("drizzle/postgresql/0016_workspace_realtime.sql", "utf8"));
     const workspace = await f.repo.getWorkspace(actor);
     assert.equal(workspace.tickets.length, 3);
     for (const [index, id] of taskIds.entries()) {

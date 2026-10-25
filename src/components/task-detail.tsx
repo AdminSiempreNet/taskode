@@ -282,6 +282,34 @@ export function TaskDetail({
       previousLabels.current = task.labels;
     }
   }, [task]);
+  // Someone else saved this task (seen through realtime): adopt every field still
+  // unedited here, so their change neither looks unsaved nor gets undone by our save.
+  const lastServerTask = useRef(task);
+  useEffect(() => {
+    const before = lastServerTask.current;
+    lastServerTask.current = task;
+    if (!task || !before || before.id !== task.id) return;
+    const sync = <T,>(local: T, previous: T, next: T, set: (value: T) => void) => {
+      const was = JSON.stringify(previous);
+      if (JSON.stringify(local) === was && was !== JSON.stringify(next)) set(next);
+    };
+    const me = workspace.currentUser.id;
+    sync(title, before.title, task.title, setTitle);
+    if (!descriptionEditing)
+      sync(description, before.description, task.description, setDescription);
+    sync(featureId, before.featureId, task.featureId, setFeatureId);
+    sync(statusId, before.statusId, task.statusId, setStatusId);
+    sync(priority, before.priority, task.priority, setPriority);
+    sync(typeId, before.typeId ?? "", task.typeId ?? "", setTypeId);
+    sync(impactId, before.impactId ?? "", task.impactId ?? "", setImpactId);
+    sync(startDate, before.startDate ?? "", task.startDate ?? "", setStartDate);
+    sync(startTime, before.startTime ?? "", task.startTime ?? "", setStartTime);
+    sync(dueDate, before.dueDate ?? "", task.dueDate ?? "", setDueDate);
+    sync(dueTime, before.dueTime ?? "", task.dueTime ?? "", setDueTime);
+    sync(leaderId, before.leaderId ?? me, task.leaderId ?? me, setLeaderId);
+    sync(teamMemberIds, before.teamMemberIds ?? [], task.teamMemberIds ?? [], setTeamMemberIds);
+    // Only a new server snapshot drives this; local values are read, not tracked.
+  }, [task]);
   async function saveAssignment(
     nextLeaderId: string,
     nextTeamMemberIds: string[],

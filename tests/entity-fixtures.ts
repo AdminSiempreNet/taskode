@@ -124,6 +124,10 @@ export function stripTicketTables(tables: Record<string, Record<string, unknown>
 // 0014: OAuth/MCP tables are additive and independent of earlier migrations.
 export async function removeOAuthSchema(repo: PostgresRepository) {
   if (!/^taskode_test_[a-f0-9]{32}$/.test(repo.store.schemaName)) throw new Error("Esquema de prueba inválido.");
+  // 0016: the board's realtime queue and its triggers on tasks.
+  await repo.store.pool.query(
+    "drop trigger if exists taskode_task_written on tasks; drop trigger if exists taskode_task_updated on tasks; drop function if exists taskode_queue_workspace_change(); drop table if exists workspace_outbox",
+  );
   await repo.store.pool.query("drop table if exists task_applications, feature_applications, module_applications, applications");
   await repo.store.pool.query(
     "drop table if exists oauth_access_token, oauth_refresh_token, oauth_consent, oauth_client_resource, oauth_client, oauth_resource, oauth_client_assertion, jwks, mcp_activity",
