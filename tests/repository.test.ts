@@ -490,12 +490,10 @@ test("los estados con tareas archivadas no se eliminan ni puede eliminarse el ú
         await repo.execute({ type: "status.delete", id: task.statusId }, actor),
       /archivadas/,
     );
-    (await repo.getWorkspace(actor)).statuses
-      .filter((s) => s.id !== task.statusId)
-      .forEach(
-        async (s) =>
-          await repo.execute({ type: "status.delete", id: s.id }, actor),
-      );
+    for (const s of (await repo.getWorkspace(actor)).statuses.filter(
+      (s) => s.id !== task.statusId,
+    ))
+      await repo.execute({ type: "status.delete", id: s.id }, actor);
     await assert.rejects(
       async () =>
         await repo.execute({ type: "status.delete", id: task.statusId }, actor),
