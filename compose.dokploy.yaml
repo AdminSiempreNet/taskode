@@ -23,8 +23,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD}
       TASKODE_DB_PASSWORD: ${TASKODE_DB_PASSWORD:?Configura TASKODE_DB_PASSWORD}
       TASKODE_DB_USER: ${TASKODE_DB_USER:-taskode}
-    ports:
-      - "${POSTGRES_BIND_ADDRESS:-0.0.0.0}:${POSTGRES_PORT:-5432}:5432"
+    # Sin puertos publicados: taskode-web conecta por la red interna de Dokploy con este alias.
+    networks:
+      default: {}
+      dokploy-network:
+        aliases: [taskode-postgres]
     command:
       - postgres
       - -c
@@ -52,6 +55,9 @@ services:
 volumes:
   taskode-postgres:
     name: ${TASKODE_POSTGRES_VOLUME:-${COMPOSE_PROJECT_NAME:-tareas}_taskode-postgres}
+networks:
+  dokploy-network:
+    external: true
 configs:
   notification-scheduler:
     content: |

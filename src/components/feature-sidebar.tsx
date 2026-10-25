@@ -6,6 +6,12 @@ import {
   saveSidebarExpansion,
 } from "@/lib/sidebar-expansion";
 import {
+  readSidebarTasksOnly,
+  saveSidebarTasksOnly,
+  setSidebarGroups,
+  sidebarVisibility,
+} from "@/lib/sidebar-visibility";
+import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
@@ -27,7 +33,10 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   Box,
   ChevronDown,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Layers3,
+  ListFilter,
   ListTodo,
   MoreHorizontal,
   Pin,
@@ -50,11 +59,12 @@ import type { Feature, ProjectModule, ProjectTaskType } from "@/lib/types";
 import { formatFeatureNumber } from "@/lib/features";
 import type { Mutate } from "./forms";
 
-function normalize(value: string) {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("es");
+function browserStorage(name: "localStorage" | "sessionStorage") {
+  try {
+    return window[name];
+  } catch {
+    /* Optional browser storage. */
+  }
 }
 
 export function FeatureSidebar({
@@ -100,15 +110,21 @@ export function FeatureSidebar({
   const [collapsedSearchModules, setCollapsedSearchModules] = useState<
     Set<string>
   >(() => new Set());
+  const [onlyWithTasks, setOnlyWithTasks] = useState(false);
   useEffect(() => {
-    let storage: Storage | undefined;
-    try {
-      storage = window.sessionStorage;
-    } catch {
-      /* Optional browser storage. */
-    }
-    setExpandedModules(readSidebarExpansion(userId, projectId ?? "", storage));
+    setExpandedModules(
+      readSidebarExpansion(
+        userId,
+        projectId ?? "",
+        browserStorage("sessionStorage"),
+      ),
+    );
   }, [userId, projectId]);
+  useEffect(() => {
+    setOnlyWithTasks(
+      readSidebarTasksOnly(userId, browserStorage("localStorage")),
+    );
+  }, [userId]);
   const openingCreateDialog = useRef(false);
   function openCreateDialog(create: () => void) {
     openingCreateDialog.current = true;
@@ -131,31 +147,56 @@ export function FeatureSidebar({
       code: String(index + 1).padStart(2, "0"),
     })),
   ];
-  const normalizedQuery = normalize(query.trim());
-  const matchingGroupIds = new Set(
-    groups
-      .filter((group) =>
-        normalize(`${group.name} ${group.description}`).includes(
-          normalizedQuery,
-        ),
-      )
-      .map((group) => group.id),
+  const {
+    searching,
+    matches,
+    groups: shownGroups,
+  } = sidebarVisibility({
+    groups,
+    features,
+    query,
+    counts,
+    onlyWithTasks,
+    selectedId,
+  });
+  const pinned = features.filter(
+    (feature) => feature.pinned && matches(feature),
   );
-  const matches = (feature: Feature) =>
-    matchingGroupIds.has(feature.moduleId ?? "general") ||
-    normalize(
-      `${formatFeatureNumber(feature.number)} ${feature.name} ${feature.description}`,
-    ).includes(normalizedQuery);
-  const visible = features.filter(matches);
-  const pinned = visible.filter((feature) => feature.pinned);
   const pinnedCount = features.filter((feature) => feature.pinned).length;
   const totalTasks = Object.values(counts).reduce(
     (sum, count) => sum + count,
     0,
   );
+  const isExpanded = (id: string) =>
+    searching ? !collapsedSearchModules.has(id) : expandedModules.has(id);
+  const allExpanded =
+    shownGroups.length > 0 &&
+    shownGroups.every((group) => isExpanded(group.id));
   function changeQuery(value: string) {
     setQuery(value);
     setCollapsedSearchModules(new Set());
+  }
+  // A search keeps its own collapsed set so clearing it restores the saved expansion.
+  function expandGroups(ids: string[], expand: boolean) {
+    if (searching) {
+      setCollapsedSearchModules(
+        setSidebarGroups(collapsedSearchModules, ids, !expand),
+      );
+      return;
+    }
+    const next = setSidebarGroups(expandedModules, ids, expand);
+    setExpandedModules(next);
+    saveSidebarExpansion(
+      userId,
+      projectId ?? "",
+      next,
+      browserStorage("sessionStorage"),
+    );
+  }
+  function toggleTasksOnly() {
+    const next = !onlyWithTasks;
+    setOnlyWithTasks(next);
+    saveSidebarTasksOnly(userId, next, browserStorage("localStorage"));
   }
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
@@ -230,6 +271,46 @@ export function FeatureSidebar({
           change={changeQuery}
           disabled={!projectId || busy}
         />
+        <Button
+          className="sidebar-tool-button"
+          size="icon-sm"
+          variant="outline"
+          aria-label={
+            allExpanded
+              ? "Contraer todos los módulos"
+              : "Expandir todos los módulos"
+          }
+          title={allExpanded ? "Contraer todo" : "Expandir todo"}
+          disabled={!projectId || !shownGroups.length}
+          onClick={() =>
+            expandGroups(
+              shownGroups.map((group) => group.id),
+              !allExpanded,
+            )
+          }
+        >
+          {allExpanded ? (
+            <ChevronsDownUp size={15} />
+          ) : (
+            <ChevronsUpDown size={15} />
+          )}
+        </Button>
+        <Button
+          className="sidebar-tool-button"
+          size="icon-sm"
+          variant="outline"
+          aria-label="Mostrar solo módulos y features con tareas"
+          aria-pressed={onlyWithTasks}
+          title={
+            onlyWithTasks
+              ? "Mostrando solo módulos y features con tareas"
+              : "Mostrar solo módulos y features con tareas"
+          }
+          disabled={!projectId}
+          onClick={toggleTasksOnly}
+        >
+          <ListFilter size={15} />
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -360,22 +441,9 @@ export function FeatureSidebar({
               </SortableContext>
             </div>
           )}
-          {groups.map((group) => {
-            const items = visible.filter(
-              (feature) => (feature.moduleId ?? "general") === group.id,
-            );
-            const allItems = features.filter(
-              (feature) => (feature.moduleId ?? "general") === group.id,
-            );
-            if (
-              normalizedQuery &&
-              !items.length &&
-              !matchingGroupIds.has(group.id)
-            )
-              return null;
-            const expanded = normalizedQuery
-              ? !collapsedSearchModules.has(group.id)
-              : expandedModules.has(group.id);
+          {shownGroups.map((group) => {
+            const { items } = group;
+            const expanded = isExpanded(group.id);
             const contentId = `${helpId}-${group.id}`;
             return (
               <section
@@ -394,31 +462,7 @@ export function FeatureSidebar({
                         ? `${group.name} · ${group.description}`
                         : group.name
                     }
-                    onClick={() => {
-                      const updateModules = normalizedQuery
-                        ? setCollapsedSearchModules
-                        : setExpandedModules;
-                      updateModules((current) => {
-                        const next = new Set(current);
-                        if (next.has(group.id)) next.delete(group.id);
-                        else next.add(group.id);
-                        if (!normalizedQuery) {
-                          let storage: Storage | undefined;
-                          try {
-                            storage = window.sessionStorage;
-                          } catch {
-                            /* Optional browser storage. */
-                          }
-                          saveSidebarExpansion(
-                            userId,
-                            projectId ?? "",
-                            next,
-                            storage,
-                          );
-                        }
-                        return next;
-                      });
-                    }}
+                    onClick={() => expandGroups([group.id], !expanded)}
                   >
                     <ChevronDown
                       size={12}
@@ -431,7 +475,7 @@ export function FeatureSidebar({
                     <span className="module-mobile-general" aria-hidden="true">
                       {group.code ? "" : "G"}
                     </span>
-                    <small>{allItems.length}</small>
+                    <small>{group.total}</small>
                   </button>
                   {group.module && (
                     <button
@@ -460,9 +504,13 @@ export function FeatureSidebar({
               </section>
             );
           })}
-          {!visible.length && normalizedQuery && !matchingGroupIds.size && (
+          {!shownGroups.length && (searching || onlyWithTasks) && (
             <p className="feature-search-empty">
-              No se encontraron módulos ni features.
+              {!onlyWithTasks
+                ? "No se encontraron módulos ni features."
+                : searching
+                  ? "No se encontraron módulos ni features con tareas."
+                  : "Ningún módulo ni feature tiene tareas."}
             </p>
           )}
         </div>
@@ -493,7 +541,7 @@ function FeatureSearch({
       <Search size={14} />
       <Input
         aria-label="Buscar módulos y features por nombre o descripción"
-        placeholder="Buscar módulos y features…"
+        placeholder="Buscar…"
         value={value}
         onChange={(event) => change(event.target.value)}
         disabled={disabled}

@@ -29,6 +29,7 @@
     "test:catalogs:browser": "node --import tsx --test tests/catalogs-browser.mjs",
     "test:applications:browser": "node --import tsx --test tests/applications-browser.mjs",
     "test:diagrams:browser": "node --import tsx --test tests/diagrams-browser.mjs",
+    "test:sidebar:browser": "node --import tsx --test tests/sidebar-browser.mjs",
     "test:notifications:live": "node --import tsx --test tests/notifications-realtime-live.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",

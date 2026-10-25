@@ -564,7 +564,7 @@ a:focus-visible {
   display: flex;
   align-items: center;
   flex-shrink: 0;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 10px;
 }
 .feature-search {
@@ -778,11 +778,21 @@ a:focus-visible {
 .feature-row .feature-item:active {
   cursor: grabbing;
 }
-.sidebar-new-button[data-slot="button"] {
+.sidebar-new-button[data-slot="button"],
+.sidebar-tool-button[data-slot="button"] {
   width: 32px;
   height: 32px;
+  flex-shrink: 0;
   padding: 0;
   border-color: color-mix(in srgb, var(--foreground) 28%, var(--border));
+}
+.sidebar-tool-button[data-slot="button"] {
+  color: var(--muted-foreground);
+}
+.sidebar-tool-button[data-slot="button"][aria-pressed="true"] {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
 }
 .sidebar-new-menu {
   min-width: 180px;

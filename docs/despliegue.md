@@ -66,7 +66,8 @@ base de producción con otros entornos.
 - Al menos un proveedor OAuth completo. Sus callbacks son
   `https://taskode.siempre.net.co/api/auth/callback/google` y
   `https://taskode.siempre.net.co/api/auth/callback/github`.
-- `DATABASE_URL` apunta al endpoint TLS de PostgreSQL; `DATABASE_SSL=verify-full`,
+- `DATABASE_URL` apunta a `taskode-postgres:5432`, el alias interno de PostgreSQL en la
+  red `dokploy-network`; `DATABASE_SSL=verify-full`,
   `DATABASE_SSL_CA` para la CA privada y `DATABASE_POOL_MAX` (10 por defecto; una sola
   instancia de larga vida). El hostname debe coincidir con el certificado. No añadir
   parámetros SSL a la URL ni desactivar la verificación TLS. El rol de aplicación
@@ -106,7 +107,9 @@ destino en el proceso o ejecutar en un checkout sin `.env.local`.
    el esquema nuevo. Bloquear temporalmente el acceso externo antes del respaldo final
    y permitir terminar solicitudes activas.
 5. Crear el respaldo final con `npm run db:backup:production`. Requiere Docker en
-   el equipo operador y conexión TLS a PostgreSQL. Lee `.env.production.local`
+   el equipo operador y conexión TLS a PostgreSQL. PostgreSQL no publica puertos, así
+   que este paso necesita habilitar temporalmente un acceso (ver «Infraestructura
+   existente») o usar el respaldo de la aplicación en S3. Lee `.env.production.local`
    y variables del proceso, sin recurrir a `.env.local`. Genera un archivo binario
    `.dump` y un manifiesto SHA-256 en `data/backups/`, ignorados por Git. Copiarlos
    a almacenamiento privado fuera del equipo; conservar también el código anterior
@@ -166,11 +169,22 @@ de la aplicación restaura datos sobre el esquema actual y no deshace migracione
 
 ## Infraestructura existente
 
-PostgreSQL está en `dbtaskode.siempre.net.co:5440`, con base y rol `taskode`,
-imagen `pgvector/pgvector:0.8.7-pg18-bookworm` y extensión `vector` activada.
-La CA privada se carga como certificado en `DATABASE_SSL_CA`; su clave privada
-permanece fuera de Dokploy. El certificado del servidor debe incluir ese hostname.
-PostgreSQL usa sus propios certificados TLS, independientes del HTTPS de la web.
+PostgreSQL es el servicio Compose `taskode-db`, con base y rol `taskode`, imagen
+`pgvector/pgvector:0.8.7-pg18-bookworm` y extensión `vector` activada. **No publica
+puertos**: está unido a la red `dokploy-network` con el alias `taskode-postgres`, y
+`taskode-web` conecta a `taskode-postgres:5432` sin salir del servidor. La CA privada se
+carga como certificado en `DATABASE_SSL_CA`; su clave privada permanece fuera de Dokploy.
+El certificado del servidor incluye los SAN `taskode-postgres` y
+`dbtaskode.siempre.net.co` (válido hasta enero de 2029). PostgreSQL usa sus propios
+certificados TLS, independientes del HTTPS de la web.
+
+Para habilitar un acceso externo temporal (DBeaver, `db:backup:production`), añadir de
+nuevo un mapeo de puerto al servicio `postgres` del Compose `taskode-db`
+(por ejemplo `0.0.0.0:5440:5432`) y desplegar. Conectar con
+`dbtaskode.siempre.net.co:5440`, usuario `taskode`, SSL `verify-full` y la CA privada.
+Al terminar, retirar el mapeo y desplegar otra vez. Cada despliegue reinicia
+PostgreSQL unos segundos. El registro DNS `dbtaskode` (solo DNS, sin proxy) se
+conserva para ese uso.
 
 Conservar el servicio `taskode-db`, el nombre físico de su volumen y sus montajes
 de certificados. Las variables de inicialización solo crean usuarios sobre un
@@ -178,8 +192,8 @@ volumen vacío; no cambian la contraseña de un rol existente. No ejecutar `down
 Las referencias históricas `brote-dev` del entorno local identifican recursos
 existentes y no deben renombrarse mediante sustituciones de texto.
 
-El puerto de PostgreSQL es TCP, sin proxy HTTP/Traefik, y solo acepta conexiones
-con TLS verificado. El rol de aplicación no es superusuario. Renovar los certificados
+PostgreSQL solo acepta conexiones con TLS del rol `taskode` (`pg_hba`); el superusuario
+solo entra por socket local dentro del contenedor. El rol de aplicación no es superusuario. Renovar los certificados
 antes de que expiren y mantener la clave del servidor legible por PostgreSQL con
 permisos adecuados, montada en solo lectura.
 
