@@ -93,7 +93,7 @@ El menú de usuario del pie del sidebar reúne **Mi perfil**, **Importar Trello*
 - La aplicación Next.js (interfaz, autenticación y API) se ejecuta en **Dokploy**, proyecto **SiempreNet**, como imagen Docker publicada por GitHub Actions en `ghcr.io/adminsiemprenet/taskode`, dominio **https://taskode.siempre.net.co**.
 - PostgreSQL con pgvector se ejecuta en el mismo proyecto de Dokploy, con volumen persistente y conexión TLS verificada.
 - Los respaldos usan la interfaz `BackupStorage` y su adaptador S3, configurable para **Cloudflare R2** o **Backblaze B2**. Desarrollo conserva archivos locales por defecto.
-- Los push a **`dev` no despliegan**: el CI ejecuta tipos y pruebas y construye la imagen sin publicarla. Un push a `main` además la publica y la despliega en Dokploy. El contenedor valida la configuración y aplica las migraciones antes de arrancar.
+- `dev` llega a `main` solo por pull request: el CI del PR ejecuta tipos y pruebas y construye la imagen sin publicarla. El merge a `main` además la publica y la despliega en Dokploy. El contenedor valida la configuración y aplica las migraciones antes de arrancar.
 
 La [guía de despliegue](docs/despliegue.md) reúne el flujo de CI, el rollback, variables, certificados, bucket/CORS, migraciones y DNS. `.env.production.example` corresponde a la aplicación en Dokploy y `.env.dokploy.example` a PostgreSQL y el programador. Ninguno contiene credenciales reales.
 
